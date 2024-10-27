@@ -363,7 +363,7 @@ class TrackNetValidator(BaseValidator):
 
             ############## MAX ##############
             conf_threshold = 0.7
-            p_conf_masked = p_conf * (p_conf > conf_threshold).float()
+            p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
             max_position = torch.argmax(p_conf_masked)
             # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
             max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
@@ -375,7 +375,9 @@ class TrackNetValidator(BaseValidator):
             metric["x"] = p_cell_x[max_y][max_x]/16
             metric["y"] = p_cell_y[max_y][max_x]/16
             metric["conf"] = max_conf
-            metrics = [metric]
+            metrics = []
+            if max_conf >= conf_threshold:
+                metrics.append(metric)
 
             # confusion metrics
             pred_x = max_x*32 + p_cell_x[max_y][max_x]/16
@@ -385,7 +387,7 @@ class TrackNetValidator(BaseValidator):
 
             ball_count = mask_has_ball.sum()
             self.ball_count += ball_count   
-            tolerance = 2
+            tolerance = 5
             distance = torch.sqrt((pred_x - target_x) ** 2 + (pred_y - target_y) ** 2)
             tensor_correct = (distance <= tolerance).int()
 
