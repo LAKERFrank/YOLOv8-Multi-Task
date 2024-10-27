@@ -377,15 +377,14 @@ class TrackNetValidator(BaseValidator):
                 metric["conf"] = value
                 metrics.append(metric)
             
-            if len(metrics) > 0:
-                now = datetime.now()
-                # Format the datetime object as a string
-                formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
-                display_predict_image(
-                        batch_img[frame_idx],  
-                        metrics, 
-                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                        )  
+            now = datetime.now()
+            # Format the datetime object as a string
+            formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
+            display_predict_image(
+                    batch_img[frame_idx],  
+                    metrics, 
+                    'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                    )  
             
 
         # 計算 conf 的 confusion matrix
