@@ -387,7 +387,7 @@ class TrackNetValidator(BaseValidator):
 
             ball_count = mask_has_ball.sum()
             self.ball_count += ball_count   
-            tolerance = 10.0
+            tolerance = 4.0
             distance = torch.sqrt((pred_x - target_x) ** 2 + (pred_y - target_y) ** 2)
             
             box_color = 'blue'
