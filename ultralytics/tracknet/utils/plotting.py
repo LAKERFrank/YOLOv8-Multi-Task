@@ -174,6 +174,8 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
             y_coordinates = y_coordinates.cpu().numpy()
         if isinstance(conf, torch.Tensor):
             conf = conf.cpu().item()
+        if isinstance(target, torch.Tensor):
+            target = target.cpu().numpy()
         
         # next_x = current_x+dx*640
         # next_y = current_y+dy*640
