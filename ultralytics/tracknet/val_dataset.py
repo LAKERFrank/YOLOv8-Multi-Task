@@ -149,7 +149,6 @@ class TrackNetValDataset(Dataset):
         target = torch.from_numpy(d['target'])
         count_ones = (target[:, 1] == 1).sum().item()
         self.total_ball+=count_ones
-        print(f'\n total_count: {self.total_ball}')
 
         img_files = [f"{self.root_dir}/../{im}" for im in d['img_files']]
 
