@@ -349,33 +349,90 @@ class TrackNetValidator(BaseValidator):
         cls_targets = cls_targets.view(self.num_groups*20*20, 1)
         mask_has_ball = mask_has_ball.view(self.num_groups*20*20).bool()
 
+
+        each_probs = pred_probs.view(10, 20, 20)
+        each_pos_x, each_pos_y = pred_pos.view(10, 20, 20, 2).split([1, 1], dim=3)
         ## save image
-        for frame_idx in [0, 4, 8]:
-        
-            each_probs = pred_probs.view(10, 20, 20)
-            each_pos_x, each_pos_y = pred_pos.view(10, 20, 20, 2).split([1, 1], dim=3)
+        for frame_idx in range(10):
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
             metrics = []
             # 獲取當前圖片的 conf
             p_conf = each_probs[frame_idx]
 
-            # 獲取大於 threshold 的位置及其值
-            indices = torch.nonzero(p_conf > 0.6, as_tuple=True)
-            values = p_conf[indices]
 
-            # 將 indices (y, x) 轉換為 (cell_y, cell_x)
-            cells = list(zip(indices[0].tolist(), indices[1].tolist()))
-            frame_results = [(cell, value.item()) for cell, value in zip(cells, values)]
-            for ((y, x), value) in frame_results:
+            ############## MAX ##############
+            conf_threshold = 0.7
+            p_conf_masked = p_conf * (p_conf > conf_threshold).float()
+            max_position = torch.argmax(p_conf_masked)
+            # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
+            max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
+            max_conf = p_conf[max_y, max_x]
+            
+            metric = {}
+            metric["grid_x"] = max_x
+            metric["grid_y"] = max_y
+            metric["x"] = p_cell_x[max_y][max_x]/16
+            metric["y"] = p_cell_y[max_y][max_x]/16
+            metric["conf"] = max_conf
+            metrics = [metric]
 
-                metric = {}
-                metric["grid_x"] = x
-                metric["grid_y"] = y
-                metric["x"] = p_cell_x[y][x]/16
-                metric["y"] = p_cell_y[y][x]/16
-                metric["conf"] = value
-                metrics.append(metric)
+            # confusion metrics
+            pred_x = max_x*32 + p_cell_x[max_y][max_x]/16
+            pred_y = max_y*32 + p_cell_y[max_y][max_x]/16
+            target_x = batch_target[frame_idx][2]
+            target_y = batch_target[frame_idx][3]
+
+            ball_count = mask_has_ball.sum()
+            self.ball_count += ball_count   
+            tolerance = 2
+            distance = torch.sqrt((pred_x - target_x) ** 2 + (pred_y - target_y) ** 2)
+            tensor_correct = (distance <= tolerance).int()
+
+            ground_truth_binary_tensor = torch.ones(ball_count).int()
+
+            unique_classes = torch.unique(ground_truth_binary_tensor)
+            if ball_count == 0:
+                pass
+            elif len(unique_classes) == 1:
+                if unique_classes.item() == 1:
+                    # All targets are 1 (positive class)
+                    self.pos_TP += (tensor_correct == 1).sum().item()  # Count of true positives
+                    self.pos_FN += (tensor_correct == 0).sum().item()  # Count of false negatives
+                    self.pos_TN += 0  # No true negatives
+                    self.pos_FP += 0  # No false positives
+                else:
+                    # All targets are 0 (negative class)
+                    self.pos_TN += (tensor_correct == 0).sum().item()  # Count of true negatives
+                    self.pos_FP += (tensor_correct == 1).sum().item()  # Count of false positives
+                    self.pos_TP += 0  # No true positives
+                    self.pos_FN += 0  # No false negatives
+            else:
+                # Compute confusion matrix normally
+                pos_matrix = confusion_matrix(ground_truth_binary_tensor.cpu().numpy(), tensor_correct.cpu().numpy())
+                self.pos_TN += pos_matrix[0][0]
+                self.pos_FP += pos_matrix[0][1]
+                self.pos_FN += pos_matrix[1][0]
+                self.pos_TP += pos_matrix[1][1]
+            
+            ############## 獲取大於 threshold 的位置及其值 ##############
+            # indices = torch.nonzero(p_conf > 0.6, as_tuple=True)
+            # values = p_conf[indices]
+
+            # # 將 indices (y, x) 轉換為 (cell_y, cell_x)
+            # cells = list(zip(indices[0].tolist(), indices[1].tolist()))
+            # frame_results = [(cell, value.item()) for cell, value in zip(cells, values)]
+
+            # for ((y, x), value) in frame_results:
+
+            #     metric = {}
+            #     metric["grid_x"] = x
+            #     metric["grid_y"] = y
+            #     metric["x"] = p_cell_x[y][x]/16
+            #     metric["y"] = p_cell_y[y][x]/16
+            #     metric["conf"] = value
+            #     metrics.append(metric)
+                
             
             now = datetime.now()
             # Format the datetime object as a string
@@ -413,46 +470,6 @@ class TrackNetValidator(BaseValidator):
             self.conf_FP += conf_matrix[0][1]
             self.conf_FN += conf_matrix[1][0]
             self.conf_TP += conf_matrix[1][1]
-
-        # 計算 x, y 的 confusion matrix
-        pred_tensor = pred_pos[mask_has_ball]
-        ground_truth_tensor = target_pos_distri[mask_has_ball]
-        ball_count = mask_has_ball.sum()
-        self.ball_count += ball_count
-        
-
-        tolerance = 1
-        x_tensor_correct = (torch.abs(pred_tensor[:, 0] - ground_truth_tensor[:, 0]) <= tolerance).int()
-        y_tensor_correct = (torch.abs(pred_tensor[:, 1] - ground_truth_tensor[:, 1]) <= tolerance).int()
-
-        tensor_combined_correct = (x_tensor_correct & y_tensor_correct).int()
-
-        ground_truth_binary_tensor = torch.ones(ball_count).int()
-
-        unique_classes = torch.unique(ground_truth_binary_tensor)
-        if ball_count == 0:
-            pass
-        elif len(unique_classes) == 1:
-            if unique_classes.item() == 1:
-                # All targets are 1 (positive class)
-                self.pos_TP += (tensor_combined_correct == 1).sum().item()  # Count of true positives
-                self.pos_FN += (tensor_combined_correct == 0).sum().item()  # Count of false negatives
-                self.pos_TN += 0  # No true negatives
-                self.pos_FP += 0  # No false positives
-            else:
-                # All targets are 0 (negative class)
-                self.pos_TN += (tensor_combined_correct == 0).sum().item()  # Count of true negatives
-                self.pos_FP += (tensor_combined_correct == 1).sum().item()  # Count of false positives
-                self.pos_TP += 0  # No true positives
-                self.pos_FN += 0  # No false negatives
-        else:
-            # Compute confusion matrix normally
-            pos_matrix = confusion_matrix(ground_truth_binary_tensor.cpu().numpy(), tensor_combined_correct.cpu().numpy())
-            self.pos_TN += pos_matrix[0][0]
-            self.pos_FP += pos_matrix[0][1]
-            self.pos_FN += pos_matrix[1][0]
-            self.pos_TP += pos_matrix[1][1]
-
         
     def finalize_metrics(self):
         """Calculate final metrics for this validation run."""
