@@ -139,7 +139,7 @@ def display_image_with_coordinates(img_tensor, target, pred, fileName, input_num
     plt.savefig(check_training_img_path+fileName, bbox_inches='tight')
     plt.close()
 
-def display_predict_image(img_tensor, preds, fileName, input_number = None):
+def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue'):
     
     # Convert the image tensor to numpy array
     img_array = img_tensor.cpu().numpy()
@@ -177,7 +177,7 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None):
         
         # next_x = current_x+dx*640
         # next_y = current_y+dy*640
-        rect = patches.Rectangle(xy=(x_coordinates, y_coordinates), height=32, width=32, edgecolor='blue', facecolor='none', linewidth=0.5)
+        rect = patches.Rectangle(xy=(x_coordinates, y_coordinates), height=32, width=32, edgecolor=box_color, facecolor='none', linewidth=0.5)
         ax.add_patch(rect)
         text = ax.text(x_coordinates+32+1, y_coordinates+32, str(conf), verticalalignment='bottom', horizontalalignment='left', fontsize=5)
         text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),

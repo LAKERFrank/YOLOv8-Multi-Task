@@ -387,35 +387,21 @@ class TrackNetValidator(BaseValidator):
 
             ball_count = mask_has_ball.sum()
             self.ball_count += ball_count   
-            tolerance = 5
+            tolerance = 10.0
             distance = torch.sqrt((pred_x - target_x) ** 2 + (pred_y - target_y) ** 2)
-            tensor_correct = (distance <= tolerance).int()
-
-            ground_truth_binary_tensor = torch.ones(ball_count).int()
-
-            unique_classes = torch.unique(ground_truth_binary_tensor)
-            if ball_count == 0:
-                pass
-            elif len(unique_classes) == 1:
-                if unique_classes.item() == 1:
-                    # All targets are 1 (positive class)
-                    self.pos_TP += (tensor_correct == 1).sum().item()  # Count of true positives
-                    self.pos_FN += (tensor_correct == 0).sum().item()  # Count of false negatives
-                    self.pos_TN += 0  # No true negatives
-                    self.pos_FP += 0  # No false positives
+            
+            box_color = 'blue'
+            if batch_target[frame_idx][1] == 0:
+                if max_conf >= 0.7:
+                    self.pos_FP += 1
+                    box_color = 'red'
                 else:
-                    # All targets are 0 (negative class)
-                    self.pos_TN += (tensor_correct == 0).sum().item()  # Count of true negatives
-                    self.pos_FP += (tensor_correct == 1).sum().item()  # Count of false positives
-                    self.pos_TP += 0  # No true positives
-                    self.pos_FN += 0  # No false negatives
+                    self.pos_TN += 1
+            elif distance <= tolerance:
+                self.pos_TP += 1
             else:
-                # Compute confusion matrix normally
-                pos_matrix = confusion_matrix(ground_truth_binary_tensor.cpu().numpy(), tensor_correct.cpu().numpy())
-                self.pos_TN += pos_matrix[0][0]
-                self.pos_FP += pos_matrix[0][1]
-                self.pos_FN += pos_matrix[1][0]
-                self.pos_TP += pos_matrix[1][1]
+                self.pos_FP += 1
+                box_color = 'red'
             
             ############## 獲取大於 threshold 的位置及其值 ##############
             # indices = torch.nonzero(p_conf > 0.6, as_tuple=True)
@@ -443,6 +429,7 @@ class TrackNetValidator(BaseValidator):
                     batch_img[frame_idx],  
                     metrics, 
                     'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                    box_color=box_color
                     )  
             
 
