@@ -11,7 +11,7 @@ from ultralytics.yolo.v8.detect.train import DetectionTrainer
 from .utils.loss import TrackNetLoss
 from ultralytics.nn.tasks import DetectionModel
 
-class TrackNetV4(DetectionModel):
+class TrackNetV4Model(DetectionModel):
     def init_criterion(self):
         if not hasattr(self, 'track_net_loss'):
             self.track_net_loss = TrackNetLoss(self)

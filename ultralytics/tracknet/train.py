@@ -1,5 +1,5 @@
 from ultralytics.tracknet.dataset import TrackNetDataset
-from ultralytics.tracknet.tracknet_v4 import TrackNetV4
+from ultralytics.tracknet.tracknet_v4 import TrackNetV4Model
 from ultralytics.tracknet.val import TrackNetValidator
 from ultralytics.tracknet.val_dataset import TrackNetValDataset
 from ultralytics.yolo.utils import RANK
@@ -22,7 +22,7 @@ class TrackNetTrainer(DetectionTrainer):
             return dataset
 
     def get_model(self, cfg=None, weights=None, verbose=True):
-        self.tracknet_model = TrackNetV4(cfg, ch=10, nc=self.data['nc'], verbose=verbose and RANK == -1)
+        self.tracknet_model = TrackNetV4Model(cfg, ch=10, nc=self.data['nc'], verbose=verbose and RANK == -1)
         if weights:
             self.tracknet_model.load(weights)
         return self.tracknet_model

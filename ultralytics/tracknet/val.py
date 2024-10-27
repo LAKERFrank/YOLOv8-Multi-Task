@@ -476,6 +476,7 @@ class TrackNetValidator(BaseValidator):
     
     def print_results(self):
         """Print the results."""
+        print(self.get_stats())
         # precision = 0
         # recall = 0
         # f1 = 0
