@@ -68,6 +68,7 @@ class BaseValidator:
         self.dataloader = dataloader
         self.pbar = pbar
         self.args = args or get_cfg(DEFAULT_CFG)
+        self.args.batch = 1
         self.model = None
         self.data = None
         self.device = None
