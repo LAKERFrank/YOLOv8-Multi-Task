@@ -397,11 +397,15 @@ class TrackNetValidator(BaseValidator):
                     box_color = 'red'
                 else:
                     self.pos_TN += 1
-            elif distance <= tolerance:
-                self.pos_TP += 1
             else:
-                self.pos_FP += 1
-                box_color = 'red'
+                if max_conf >= 0.7:
+                    if distance <= tolerance:
+                        self.pos_TP += 1
+                    else:
+                        self.pos_FP += 1
+                        box_color = 'red'
+                else:
+                    self.pos_FN += 1
             
             ############## 獲取大於 threshold 的位置及其值 ##############
             # indices = torch.nonzero(p_conf > 0.6, as_tuple=True)
