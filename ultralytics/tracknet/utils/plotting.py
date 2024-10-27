@@ -140,7 +140,9 @@ def display_image_with_coordinates(img_tensor, target, pred, fileName, input_num
     plt.close()
 
 def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue', target = None):
-    
+    if isinstance(target, torch.Tensor):
+        target = target.cpu().numpy()
+        
     # Convert the image tensor to numpy array
     img_array = img_tensor.cpu().numpy()
 
@@ -174,8 +176,7 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
             y_coordinates = y_coordinates.cpu().numpy()
         if isinstance(conf, torch.Tensor):
             conf = conf.cpu().item()
-        if isinstance(target, torch.Tensor):
-            target = target.cpu().numpy()
+        
         
         # next_x = current_x+dx*640
         # next_y = current_y+dy*640
