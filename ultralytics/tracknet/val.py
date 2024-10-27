@@ -380,8 +380,8 @@ class TrackNetValidator(BaseValidator):
                 metrics.append(metric)
 
             # confusion metrics
-            pred_x = max_x*32 + p_cell_x[max_y][max_x]/16
-            pred_y = max_y*32 + p_cell_y[max_y][max_x]/16
+            pred_x = max_x*32 + (p_cell_x[max_y][max_x]/16)*32
+            pred_y = max_y*32 + (p_cell_y[max_y][max_x]/16)*32
             target_x = batch_target[frame_idx][2]
             target_y = batch_target[frame_idx][3]
 
@@ -429,7 +429,8 @@ class TrackNetValidator(BaseValidator):
                     batch_img[frame_idx],  
                     metrics, 
                     'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                    box_color=box_color
+                    box_color=box_color,
+                    target=(target_x, target_y)
                     )  
             
 
