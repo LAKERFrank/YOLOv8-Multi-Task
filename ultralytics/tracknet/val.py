@@ -350,7 +350,7 @@ class TrackNetValidator(BaseValidator):
         mask_has_ball = mask_has_ball.view(self.num_groups*20*20).bool()
 
         ## save image
-        for frame_idx in range(10):
+        for frame_idx in [0, 4, 8]:
         
             each_probs = pred_probs.view(10, 20, 20)
             each_pos_x, each_pos_y = pred_pos.view(10, 20, 20, 2).split([1, 1], dim=3)
@@ -361,7 +361,7 @@ class TrackNetValidator(BaseValidator):
             p_conf = each_probs[frame_idx]
 
             # 獲取大於 threshold 的位置及其值
-            indices = torch.nonzero(p_conf > 0.5, as_tuple=True)
+            indices = torch.nonzero(p_conf > 0.6, as_tuple=True)
             values = p_conf[indices]
 
             # 將 indices (y, x) 轉換為 (cell_y, cell_x)
