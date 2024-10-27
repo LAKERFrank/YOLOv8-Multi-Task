@@ -435,7 +435,7 @@ class TrackNetValidator(BaseValidator):
             
 
         # 計算 conf 的 confusion matrix
-        threshold = 0.8
+        threshold = 0.7
         pred_binary = (pred_probs >= threshold)
         self.pred_ball_count += pred_binary.int().sum()
 
