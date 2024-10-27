@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from ultralytics.tracknet.dataset import TrackNetDataset
+from ultralytics.tracknet.engine.model import TrackNet
 from ultralytics.tracknet.predict import TrackNetPredictor
 from ultralytics.tracknet.test_dataset import TrackNetTestDataset
 from ultralytics.tracknet.train import TrackNetTrainer
@@ -742,6 +743,12 @@ def main(arg):
                     )
 
         print(f"avg predict time: { elapsed_times / len(dataloader):.2f} 毫秒")    
+    elif arg.mode == 'train_v2':
+        model = TrackNet(overrides)
+        model.train()
+    elif arg.mode == 'val_v2':
+        model = TrackNet(overrides)
+        model.val()
 
 def confusion_matrix_gpu(y_true, y_pred):
     conf_matrix = torch.zeros(2, 2, dtype=torch.int64, device=y_true.device)
