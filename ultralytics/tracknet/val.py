@@ -433,8 +433,7 @@ class TrackNetValidator(BaseValidator):
                     batch_img[frame_idx],  
                     metrics, 
                     'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                    box_color=box_color,
-                    target=(target_x, target_y)
+                    box_color=box_color
                     )  
             
 
