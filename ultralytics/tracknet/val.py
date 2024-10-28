@@ -402,7 +402,7 @@ class TrackNetValidator(BaseValidator):
                     if distance <= tolerance:
                         self.pos_TP += 1
                     else:
-                        self.pos_FP += 1
+                        self.pos_FN += 1
                         box_color = 'blue'
                 else:
                     self.pos_FN += 1
