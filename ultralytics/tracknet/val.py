@@ -284,6 +284,7 @@ class TrackNetValidator(BaseValidator):
         self.pos_TN = 0
         self.pos_FP = 0
         self.pos_FN = 0
+        self.pos_FN_dis = 0
         self.pos_acc = 0
         self.pos_precision = 0
         self.ball_count = 0
@@ -387,7 +388,7 @@ class TrackNetValidator(BaseValidator):
 
             ball_count = mask_has_ball.sum()
             self.ball_count += ball_count   
-            tolerance = 10.0
+            tolerance = 5.0
             distance = torch.sqrt((pred_x - target_x) ** 2 + (pred_y - target_y) ** 2)
             
             box_color = 'red'
@@ -402,7 +403,7 @@ class TrackNetValidator(BaseValidator):
                     if distance <= tolerance:
                         self.pos_TP += 1
                     else:
-                        self.pos_FN += 1
+                        self.pos_FN_dis += 1
                         box_color = 'blue'
                 else:
                     self.pos_FN += 1
@@ -477,7 +478,7 @@ class TrackNetValidator(BaseValidator):
 
     def get_stats(self):
         """Return the stats."""
-        return {'pos_FN': self.pos_FN, 'pos_FP': self.pos_FP, 'pos_TN': self.pos_TN, 
+        return {'pos_FN': self.pos_FN, 'pos_FN_dis': self.pos_FN_dis, 'pos_FP': self.pos_FP, 'pos_TN': self.pos_TN, 
                 'pos_TP': self.pos_TP, 'pos_acc': self.pos_acc, 'pos_precision': self.pos_precision,
                 'conf_FN': self.conf_FN, 'conf_FP': self.conf_FP, 'conf_TN': self.conf_TN, 
                 'conf_TP': self.conf_TP, 'conf_acc': self.conf_acc, 'conf_precision': self.conf_precision,
