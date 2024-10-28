@@ -390,11 +390,11 @@ class TrackNetValidator(BaseValidator):
             tolerance = 5.0
             distance = torch.sqrt((pred_x - target_x) ** 2 + (pred_y - target_y) ** 2)
             
-            box_color = 'blue'
+            box_color = 'red'
             if batch_target[frame_idx][1] == 0:
                 if max_conf >= 0.7:
                     self.pos_FP += 1
-                    box_color = 'red'
+                    box_color = 'blue'
                 else:
                     self.pos_TN += 1
             else:
@@ -403,7 +403,7 @@ class TrackNetValidator(BaseValidator):
                         self.pos_TP += 1
                     else:
                         self.pos_FP += 1
-                        box_color = 'red'
+                        box_color = 'blue'
                 else:
                     self.pos_FN += 1
             
