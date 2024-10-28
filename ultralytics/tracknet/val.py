@@ -387,7 +387,7 @@ class TrackNetValidator(BaseValidator):
 
             ball_count = mask_has_ball.sum()
             self.ball_count += ball_count   
-            tolerance = 5.0
+            tolerance = 10.0
             distance = torch.sqrt((pred_x - target_x) ** 2 + (pred_y - target_y) ** 2)
             
             box_color = 'red'
@@ -429,12 +429,12 @@ class TrackNetValidator(BaseValidator):
             now = datetime.now()
             # Format the datetime object as a string
             formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
-            display_predict_image(
-                    batch_img[frame_idx],  
-                    metrics, 
-                    'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                    box_color=box_color
-                    )  
+            # display_predict_image(
+            #         batch_img[frame_idx],  
+            #         metrics, 
+            #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+            #         box_color=box_color
+            #         )  
             
 
         # 計算 conf 的 confusion matrix
