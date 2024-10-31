@@ -240,7 +240,6 @@ class TrackNetLoss:
         mask_has_ball = torch.zeros(b, self.num_groups, 20, 20, device=self.device)
         cls_targets = torch.zeros(b, self.num_groups, 20, 20, 1, device=self.device)
         mask_has_next_ball = torch.zeros(b, self.num_groups, 20, 20, device=self.device)
-        fast_ball_weight = torch.ones(b, self.num_groups, 1, device=self.device)
         fast_ball_cell_weight = torch.ones(b, self.num_groups, 20, 20, device=self.device)
 
         fast_ball_count = 0
@@ -252,7 +251,6 @@ class TrackNetLoss:
                 # target xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
                 if batch_target[idx][target_idx][4]**2 + batch_target[idx][target_idx][5]**2 >= 20**2:
-                    fast_ball_weight[idx][target_idx] = 5
                     fast_ball_cell_weight[idx, target_idx, grid_y, grid_x] = 5
                     fast_ball_count+=1
 
@@ -277,10 +275,9 @@ class TrackNetLoss:
         mask_has_ball = mask_has_ball.view(b, self.num_groups*20*20).bool()
         mask_may_has_ball = mask_may_has_ball.view(b, self.num_groups*20*20, 1).bool()
         fast_ball_cell_weight = fast_ball_cell_weight.view(b, self.num_groups*20*20, 1)
-        fast_ball_weight = fast_ball_weight.view(b*self.num_groups, 1)
         
         loss = torch.zeros(2, device=self.device)
-        a, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball, fast_ball_weight)
+        a, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball, fast_ball_cell_weight)
         
         cls_targets = cls_targets.to(pred_scores.dtype)
 
@@ -496,8 +493,7 @@ class XYLoss(nn.Module):
         # DFL loss
         if self.use_dfl:
             loss_dfl = self._df_loss(pred_dist[fg_mask].view(-1, self.reg_max + 1), target_pos_distri[fg_mask]) * weight
-            print(fast_weight.shape)
-            loss_dfl = loss_dfl * fast_weight
+            loss_dfl = loss_dfl * fast_weight[fg_mask]
             loss_dfl = loss_dfl.sum() / target_scores_sum
         else:
             loss_dfl = torch.tensor(0.0).to(pred_dist.device)
