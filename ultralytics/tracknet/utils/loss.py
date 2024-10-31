@@ -251,7 +251,7 @@ class TrackNetLoss:
                 # target xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
                 if batch_target[idx][target_idx][4]**2 + batch_target[idx][target_idx][5]**2 >= 20**2:
-                    fast_ball_cell_weight[idx, target_idx, grid_y, grid_x] = 5
+                    fast_ball_cell_weight[idx, target_idx, grid_y, grid_x] = 10
                     fast_ball_count+=1
 
                 if target[1] == 1:
@@ -291,7 +291,7 @@ class TrackNetLoss:
         loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, fast_ball_cell_weight, 2, 0.75)
 
         # print(f'conf loss: {fp_loss_weighted, fn_loss_weighted, tp_loss_weighted}\n')
-        print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
+        # print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
 
         loss[0] *= 3  # dfl gain
         loss[1] *= 100  # cls gain
