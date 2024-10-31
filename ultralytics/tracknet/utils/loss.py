@@ -291,7 +291,7 @@ class TrackNetLoss:
         loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, fast_ball_cell_weight, 2, 0.75)
 
         # print(f'conf loss: {fp_loss_weighted, fn_loss_weighted, tp_loss_weighted}\n')
-        print(f'fast ball count: {fast_ball_count}\n')
+        print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
 
         loss[0] *= 3  # dfl gain
         loss[1] *= 100  # cls gain
