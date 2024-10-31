@@ -496,6 +496,7 @@ class XYLoss(nn.Module):
         # DFL loss
         if self.use_dfl:
             loss_dfl = self._df_loss(pred_dist[fg_mask].view(-1, self.reg_max + 1), target_pos_distri[fg_mask]) * weight
+            print(fast_weight.shape)
             loss_dfl = loss_dfl * fast_weight
             loss_dfl = loss_dfl.sum() / target_scores_sum
         else:
