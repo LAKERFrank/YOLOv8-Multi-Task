@@ -1,4 +1,5 @@
 import csv
+import math
 import os
 import numpy as np
 import torch
@@ -240,9 +241,10 @@ class TrackNetLoss:
         mask_has_ball = torch.zeros(b, self.num_groups, 20, 20, device=self.device)
         cls_targets = torch.zeros(b, self.num_groups, 20, 20, 1, device=self.device)
         mask_has_next_ball = torch.zeros(b, self.num_groups, 20, 20, device=self.device)
-        fast_ball_cell_weight = torch.ones(b, self.num_groups, 20, 20, device=self.device)
+        cell_weight = torch.ones(b, self.num_groups, 20, 20, device=self.device)
 
         fast_ball_count = 0
+        hit_ball_count = 0
         for idx, _ in enumerate(batch_target):
             # pred = [330 * 20 * 20]
             stride = self.stride[0]
@@ -250,9 +252,27 @@ class TrackNetLoss:
             for target_idx, target in enumerate(batch_target[idx]):
                 # target xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
-                if batch_target[idx][target_idx][4]**2 + batch_target[idx][target_idx][5]**2 >= 20**2:
-                    fast_ball_cell_weight[idx, target_idx, grid_y, grid_x] = 10
+                if target[4]**2 + target[5]**2 >= 20**2:
+                    cell_weight[idx, target_idx, grid_y, grid_x] += 100
                     fast_ball_count+=1
+
+                if target_idx < len(batch_target[idx])-2 \
+                    and batch_target[idx][target_idx][1] == 1 and batch_target[idx][target_idx+1][1] == 1 \
+                    and batch_target[idx][target_idx+2][1] == 1:
+                    
+                    first = [batch_target[idx][target_idx][2], batch_target[idx][target_idx][3]]
+                    second = [batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3]]
+                    third = [batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3]]
+                    angle = calculate_angle(first, second, third)
+                    dist1 = calculate_dist(first, second)
+                    dist2 = calculate_dist(second, third)
+                    if angle > 30 and (dist1 > 10 or dist2 > 10):
+                        second_grid_x, second_grid_y, _, _ = target_grid(batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3], stride)
+                        third_grid_x, third_grid_y, _, _ = target_grid(batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3], stride)
+                        cell_weight[idx, target_idx, grid_y, grid_x] += 200
+                        cell_weight[idx, target_idx+1, second_grid_y, second_grid_x] += 200
+                        cell_weight[idx, target_idx+2, third_grid_y, third_grid_x] += 200
+                        hit_ball_count+=1
 
                 if target[1] == 1:
                     mask_has_ball[idx, target_idx, grid_y, grid_x] = 1
@@ -274,10 +294,10 @@ class TrackNetLoss:
         cls_targets = cls_targets.view(b, self.num_groups*20*20, 1)
         mask_has_ball = mask_has_ball.view(b, self.num_groups*20*20).bool()
         mask_may_has_ball = mask_may_has_ball.view(b, self.num_groups*20*20, 1).bool()
-        fast_ball_cell_weight = fast_ball_cell_weight.view(b, self.num_groups*20*20, 1)
+        cell_weight = cell_weight.view(b, self.num_groups*20*20, 1)
         
         loss = torch.zeros(2, device=self.device)
-        a, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball, fast_ball_cell_weight)
+        a, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball, cell_weight)
         
         cls_targets = cls_targets.to(pred_scores.dtype)
 
@@ -288,10 +308,11 @@ class TrackNetLoss:
         # bce = nn.BCEWithLogitsLoss(reduction='none', weight=cls_weight)
 
         self.confusion_class.confusion_matrix(pred_scores.sigmoid(), cls_targets)
-        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, fast_ball_cell_weight, 2, 0.75)
+        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, cell_weight, 2, 0.75)
 
         # print(f'conf loss: {fp_loss_weighted, fn_loss_weighted, tp_loss_weighted}\n')
         # print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
+        print(f'hit_ball_count: {hit_ball_count}, total ball: {target_scores_sum}\n')
 
         loss[0] *= 3  # dfl gain
         loss[1] *= 100  # cls gain
@@ -409,6 +430,26 @@ class TrackNetLossV3:
 
         return tlose, tlose_item
 
+
+def calculate_dist(p1, p2):
+    # 計算兩點之間的距離
+    return math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
+
+def calculate_angle(p1, p2, p3):
+    # 計算從p1到p2和從p2到p3之間的夾角
+    v1 = (p2[0] - p1[0], p2[1] - p1[1])
+    v2 = (p3[0] - p2[0], p3[1] - p2[1])
+    
+    # 計算內積和模長
+    dot_product = v1[0] * v2[0] + v1[1] * v2[1]
+    mag_v1 = math.sqrt(v1[0]**2 + v1[1]**2)
+    mag_v2 = math.sqrt(v2[0]**2 + v2[1]**2)
+    
+    # 計算角度（弧度），並轉換為角度
+    angle_rad = math.acos(dot_product / (mag_v1 * mag_v2))
+    angle_deg = math.degrees(angle_rad)
+    
+    return angle_deg
 class FocalLossWithMask(nn.Module):
     """Wraps focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5)."""
 
