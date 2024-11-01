@@ -266,7 +266,7 @@ class TrackNetLoss:
                     angle = calculate_angle(first, second, third)
                     dist1 = calculate_dist(first, second)
                     dist2 = calculate_dist(second, third)
-                    if angle > 30 and (dist1 > 10 or dist2 > 10):
+                    if angle and angle > 30 and (dist1 > 10 or dist2 > 10):
                         second_grid_x, second_grid_y, _, _ = target_grid(batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3], stride)
                         third_grid_x, third_grid_y, _, _ = target_grid(batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3], stride)
                         cell_weight[idx, target_idx, grid_y, grid_x] += 200
@@ -445,8 +445,15 @@ def calculate_angle(p1, p2, p3):
     mag_v1 = math.sqrt(v1[0]**2 + v1[1]**2)
     mag_v2 = math.sqrt(v2[0]**2 + v2[1]**2)
     
+    # 如果其中一個向量為零，則無法計算角度
+    if mag_v1 == 0 or mag_v2 == 0:
+        return None  # 或者返回特定值，根據需要設置
+    
+    # 限制範圍避免數值問題
+    cosine_value = max(-1, min(1, dot_product / (mag_v1 * mag_v2)))
+
     # 計算角度（弧度），並轉換為角度
-    angle_rad = math.acos(dot_product / (mag_v1 * mag_v2))
+    angle_rad = math.acos(cosine_value)
     angle_deg = math.degrees(angle_rad)
     
     return angle_deg
