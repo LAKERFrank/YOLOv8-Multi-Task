@@ -312,7 +312,7 @@ class TrackNetLoss:
 
         # print(f'conf loss: {fp_loss_weighted, fn_loss_weighted, tp_loss_weighted}\n')
         # print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
-        print(f'hit_ball_count: {hit_ball_count}, total ball: {target_scores_sum}\n')
+        # print(f'hit_ball_count: {hit_ball_count}, total ball: {target_scores_sum}\n')
 
         loss[0] *= 3  # dfl gain
         loss[1] *= 100  # cls gain
