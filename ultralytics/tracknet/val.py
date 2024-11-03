@@ -338,8 +338,9 @@ class TrackNetValidator(BaseValidator):
 
         for target_idx, target in enumerate(batch_target):
             grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], self.stride)
-            if target[4]**2 + target[5]**2 >= 20**2:
+            if target_idx < len(batch_target)-1 and batch_target[target_idx+1][1] == 1 and target[4]**2 + target[5]**2 >= 20**2:
                 mask_fast_ball[target_idx] = 1
+                mask_fast_ball[target_idx+1] = 1
 
             if target_idx < len(batch_target)-2 \
                 and batch_target[target_idx][1] == 1 and batch_target[target_idx+1][1] == 1 \
@@ -353,6 +354,8 @@ class TrackNetValidator(BaseValidator):
                 dist2 = calculate_dist(second, third)
                 if angle and angle > 30 and (dist1 > 10 or dist2 > 10):
                     mask_hit_ball[target_idx] = 1
+                    mask_hit_ball[target_idx+1] = 1
+                    mask_hit_ball[target_idx+2] = 1
             if target[1] == 1:
                 # xy
                 mask_has_ball[target_idx, grid_y, grid_x] = 1
