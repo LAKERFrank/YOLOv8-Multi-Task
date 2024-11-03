@@ -254,7 +254,9 @@ class TrackNetLoss:
             for target_idx, target in enumerate(batch_target[idx]):
                 # target xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
-                if target_idx < len(batch_target[idx])-1 and batch_target[idx][target_idx+1][1] == 1 and target[4]**2 + target[5]**2 >= 20**2:
+                if target_idx < len(batch_target[idx])-1 and batch_target[idx][target_idx+1][1] == 1 and\
+                    batch_target[idx][target_idx][1] == 1 and target[4]**2 + target[5]**2 >= 20**2:
+
                     mask_fast_ball[idx, target_idx, grid_y, grid_x] = 1
 
                     next_grid_x, next_grid_y, _, _ = target_grid(batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3], stride)
