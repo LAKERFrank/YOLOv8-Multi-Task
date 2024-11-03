@@ -383,7 +383,7 @@ class TrackNetValidator(BaseValidator):
 
         self.fast_count += mask_fast_ball.sum()
         self.hit_count += mask_hit_ball.sum()
-        mask_fast_hit_ball = mask_fast_ball|mask_hit_ball
+        mask_fast_hit_ball = (mask_fast_ball|mask_hit_ball).int()
         self.fast_hit_count += mask_fast_hit_ball.sum()
 
         each_probs = pred_probs.view(10, 20, 20)
