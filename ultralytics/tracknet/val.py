@@ -289,6 +289,8 @@ class TrackNetValidator(BaseValidator):
         self.hit_TP = 0
         self.fast_FN = 0
         self.hit_FN = 0
+        self.fast_hit_TP = 0
+        self.fast_hit_FN = 0
         self.pos_acc = 0
         self.pos_precision = 0
         self.ball_count = 0
@@ -302,6 +304,7 @@ class TrackNetValidator(BaseValidator):
 
         self.fast_count = 0
         self.hit_count = 0
+        self.fast_hit_count = 0
     
     def update_metrics(self, preds, batch):
         """Calculate and update metrics based on predictions and batch."""
@@ -380,6 +383,8 @@ class TrackNetValidator(BaseValidator):
 
         self.fast_count += mask_fast_ball.sum()
         self.hit_count += mask_hit_ball.sum()
+        mask_fast_hit_ball = mask_fast_ball|mask_hit_ball
+        self.fast_hit_count += mask_fast_hit_ball.sum()
 
         each_probs = pred_probs.view(10, 20, 20)
         each_pos_x, each_pos_y = pred_pos.view(10, 20, 20, 2).split([1, 1], dim=3)
@@ -444,12 +449,16 @@ class TrackNetValidator(BaseValidator):
                         self.fast_TP += 1
                     if mask_hit_ball[frame_idx] == 1:
                         self.hit_TP += 1
+                    if mask_fast_hit_ball[frame_idx] == 1:
+                        self.fast_hit_TP += 1
                 else:
                     self.pos_FN += 1
                     if mask_fast_ball[frame_idx] == 1:
                         self.fast_FN += 1
                     if mask_hit_ball[frame_idx] == 1:
                         self.hit_FN += 1
+                    if mask_fast_hit_ball[frame_idx] == 1:
+                        self.fast_hit_FN += 1
             
             ############## 獲取大於 threshold 的位置及其值 ##############
             # indices = torch.nonzero(p_conf > 0.6, as_tuple=True)
@@ -526,6 +535,7 @@ class TrackNetValidator(BaseValidator):
                 'pos_TP': self.pos_TP, 'pos_acc': self.pos_acc, 'pos_precision': self.pos_precision,
                 "fast_TP": self.fast_TP, "fast_FN": self.fast_FN, 
                 "hit_TP": self.hit_TP, "hit_FN": self.hit_FN, 
+                "fast_hit_TP": self.fast_hit_TP, "fast_hit_FN": self.fast_hit_FN, 
                 'conf_FN': self.conf_FN, 'conf_FP': self.conf_FP, 'conf_TN': self.conf_TN, 
                 'conf_TP': self.conf_TP, 'conf_acc': self.conf_acc, 'conf_precision': self.conf_precision,
                 'threshold>0.8 rate':self.pred_ball_count/self.ball_count}
@@ -534,6 +544,7 @@ class TrackNetValidator(BaseValidator):
         """Print the results."""
         print(f'fast count: {self.fast_count}, hit count: {self.hit_count}')
         print(f'fast acc: {self.fast_TP/self.fast_count}, hit acc: {self.hit_TP/self.hit_count}')
+        print(f'fast or hit count: {self.fast_hit_count}, fast or hit acc: {self.fast_hit_TP/self.fast_hit_count}')
         print(self.get_stats())
         # precision = 0
         # recall = 0
