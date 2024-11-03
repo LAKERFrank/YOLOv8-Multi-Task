@@ -285,6 +285,10 @@ class TrackNetValidator(BaseValidator):
         self.pos_FP = 0
         self.pos_FN = 0
         self.pos_FN_dis = 0
+        self.fast_TP = 0
+        self.hit_TP = 0
+        self.fast_FN = 0
+        self.hit_FN = 0
         self.pos_acc = 0
         self.pos_precision = 0
         self.ball_count = 0
@@ -370,6 +374,7 @@ class TrackNetValidator(BaseValidator):
         cls_targets = cls_targets.view(self.num_groups*20*20, 1)
         mask_has_ball = mask_has_ball.view(self.num_groups*20*20).bool()
 
+        print(f'fast count:{mask_fast_ball.sum()}, hit count: {mask_hit_ball.sum()}')
 
         each_probs = pred_probs.view(10, 20, 20)
         each_pos_x, each_pos_y = pred_pos.view(10, 20, 20, 2).split([1, 1], dim=3)
@@ -430,8 +435,14 @@ class TrackNetValidator(BaseValidator):
                     else:
                         self.pos_FN_dis += 1
                         box_color = 'blue'
+                    if mask_fast_ball[frame_idx] == 1:
+                        self.fast_TP += 1
+                    if mask_hit_ball[frame_idx] == 1:
+                        self.hit_TP += 1
                 else:
                     self.pos_FN += 1
+                    self.hit_FN += 1
+                    self.hit_FN += 1
             
             ############## 獲取大於 threshold 的位置及其值 ##############
             # indices = torch.nonzero(p_conf > 0.6, as_tuple=True)
@@ -493,8 +504,8 @@ class TrackNetValidator(BaseValidator):
         
     def finalize_metrics(self):
         """Calculate final metrics for this validation run."""
-        if (self.pos_FN+self.pos_FP+self.pos_TN + self.pos_TP) != 0:
-            self.pos_acc = (self.pos_TN + self.pos_TP) / (self.pos_FN+self.pos_FP+self.pos_TN + self.pos_TP)
+        if (self.pos_FN+self.pos_FN_dis+self.pos_FP+self.pos_TN + self.pos_TP) != 0:
+            self.pos_acc = (self.pos_TN + self.pos_TP) / (self.pos_FN+self.pos_FN_dis+self.pos_FP+self.pos_TN + self.pos_TP)
         if (self.conf_FN+self.conf_FP+self.conf_TN + self.conf_TP) != 0:
             self.conf_acc = (self.conf_TN + self.conf_TP) / (self.conf_FN+self.conf_FP+self.conf_TN + self.conf_TP)
         if (self.conf_TP+self.conf_FP) != 0:
@@ -506,6 +517,8 @@ class TrackNetValidator(BaseValidator):
         """Return the stats."""
         return {'pos_FN': self.pos_FN, 'pos_FN_dis': self.pos_FN_dis, 'pos_FP': self.pos_FP, 'pos_TN': self.pos_TN, 
                 'pos_TP': self.pos_TP, 'pos_acc': self.pos_acc, 'pos_precision': self.pos_precision,
+                "fast_TP": self.fast_TP, "fast_FN": self.fast_FN, 
+                "hit_TP": self.hit_TP, "hit_FN": self.hit_FN, 
                 'conf_FN': self.conf_FN, 'conf_FP': self.conf_FP, 'conf_TN': self.conf_TN, 
                 'conf_TP': self.conf_TP, 'conf_acc': self.conf_acc, 'conf_precision': self.conf_precision,
                 'threshold>0.8 rate':self.pred_ball_count/self.ball_count}
