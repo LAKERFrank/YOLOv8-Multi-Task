@@ -299,6 +299,9 @@ class TrackNetValidator(BaseValidator):
         self.no = 33
         self.feat_no = 2
         self.nc = 1
+
+        self.fast_count = 0
+        self.hit_count = 0
     
     def update_metrics(self, preds, batch):
         """Calculate and update metrics based on predictions and batch."""
@@ -374,7 +377,8 @@ class TrackNetValidator(BaseValidator):
         cls_targets = cls_targets.view(self.num_groups*20*20, 1)
         mask_has_ball = mask_has_ball.view(self.num_groups*20*20).bool()
 
-        print(f'fast count:{mask_fast_ball.sum()}, hit count: {mask_hit_ball.sum()}')
+        self.fast_count += mask_fast_ball.sum()
+        self.hit_count += mask_hit_ball.sum()
 
         each_probs = pred_probs.view(10, 20, 20)
         each_pos_x, each_pos_y = pred_pos.view(10, 20, 20, 2).split([1, 1], dim=3)
@@ -441,7 +445,7 @@ class TrackNetValidator(BaseValidator):
                         self.hit_TP += 1
                 else:
                     self.pos_FN += 1
-                    self.hit_FN += 1
+                    self.fast_FN += 1
                     self.hit_FN += 1
             
             ############## 獲取大於 threshold 的位置及其值 ##############
@@ -525,6 +529,7 @@ class TrackNetValidator(BaseValidator):
     
     def print_results(self):
         """Print the results."""
+        print(f'fast count: {self.fast_count}, hit count: {self.hit_count}')
         print(self.get_stats())
         # precision = 0
         # recall = 0
