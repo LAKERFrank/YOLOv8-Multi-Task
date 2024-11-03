@@ -533,6 +533,7 @@ class TrackNetValidator(BaseValidator):
     def print_results(self):
         """Print the results."""
         print(f'fast count: {self.fast_count}, hit count: {self.hit_count}')
+        print(f'fast acc: {self.fast_TP/self.fast_count}, hit acc: {self.hit_TP/self.hit_count}')
         print(self.get_stats())
         # precision = 0
         # recall = 0
