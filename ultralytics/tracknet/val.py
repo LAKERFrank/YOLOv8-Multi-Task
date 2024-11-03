@@ -3,7 +3,7 @@ import numpy as np
 import torch
 from ultralytics.tracknet.dataset import TrackNetDataset
 from ultralytics.tracknet.utils.plotting import display_predict_image
-from ultralytics.tracknet.utils.transform import target_grid
+from ultralytics.tracknet.utils.transform import calculate_angle, calculate_dist, target_grid
 from ultralytics.tracknet.val_dataset import TrackNetValDataset
 from ultralytics.yolo.data.build import build_dataloader
 from ultralytics.yolo.engine.validator import BaseValidator
@@ -333,11 +333,28 @@ class TrackNetValidator(BaseValidator):
         target_pos_distri = torch.zeros(self.num_groups, 20, 20, self.feat_no, device=self.device)
         mask_has_ball = torch.zeros(self.num_groups, 20, 20, device=self.device)
         cls_targets = torch.zeros(self.num_groups, 20, 20, 1, device=self.device)
+        mask_fast_ball = torch.zeros(self.num_groups, 1, device=self.device)
+        mask_hit_ball = torch.zeros(self.num_groups, 1, device=self.device)
 
         for target_idx, target in enumerate(batch_target):
+            grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], self.stride)
+            if target[4]**2 + target[5]**2 >= 20**2:
+                mask_fast_ball[target_idx] = 1
+
+            if target_idx < len(batch_target)-2 \
+                and batch_target[target_idx][1] == 1 and batch_target[target_idx+1][1] == 1 \
+                and batch_target[target_idx+2][1] == 1:
+                
+                first = [batch_target[target_idx][2], batch_target[target_idx][3]]
+                second = [batch_target[target_idx+1][2], batch_target[target_idx+1][3]]
+                third = [batch_target[target_idx+2][2], batch_target[target_idx+2][3]]
+                angle = calculate_angle(first, second, third)
+                dist1 = calculate_dist(first, second)
+                dist2 = calculate_dist(second, third)
+                if angle and angle > 30 and (dist1 > 10 or dist2 > 10):
+                    mask_hit_ball[target_idx] = 1
             if target[1] == 1:
                 # xy
-                grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], self.stride)
                 mask_has_ball[target_idx, grid_y, grid_x] = 1
                 
                 target_pos_distri[target_idx, grid_y, grid_x, 0] = offset_x*(self.reg_max-1)/self.stride
@@ -355,6 +372,11 @@ class TrackNetValidator(BaseValidator):
         each_pos_x, each_pos_y = pred_pos.view(10, 20, 20, 2).split([1, 1], dim=3)
         ## save image
         for frame_idx in range(10):
+            label = ''
+            if mask_fast_ball[frame_idx] == 1:
+                label += '_fast_'
+            if mask_hit_ball[frame_idx] == 1:
+                label += '_hit_'
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
             metrics = []
@@ -430,12 +452,12 @@ class TrackNetValidator(BaseValidator):
             now = datetime.now()
             # Format the datetime object as a string
             formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
-            # display_predict_image(
-            #         batch_img[frame_idx],  
-            #         metrics, 
-            #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-            #         box_color=box_color
-            #         )  
+            display_predict_image(
+                    batch_img[frame_idx],  
+                    metrics, 
+                    'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                    box_color=box_color
+                    )  
             
 
         # 計算 conf 的 confusion matrix
