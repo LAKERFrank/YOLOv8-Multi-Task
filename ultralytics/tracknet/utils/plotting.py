@@ -179,10 +179,13 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         # next_y = current_y+dy*640
         rect = patches.Rectangle(xy=(x_coordinates, y_coordinates), height=32, width=32, edgecolor=box_color, facecolor='none', linewidth=0.5)
         ax.add_patch(rect)
-        text = ax.text(x_coordinates+32+1, y_coordinates+32, f'{str(conf)} {label}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
+        text = ax.text(x_coordinates+32+1, y_coordinates+32, f'{str(conf)}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
         text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
                        patheffects.Normal()])
         ax.scatter(current_x, current_y, s=1.4, c='red', marker='o')
+    label_text = ax.text(0, 0, f'{label}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
+    label_text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
+                       patheffects.Normal()])
     if target:
         (x, y) = target
         if isinstance(x, torch.Tensor):
