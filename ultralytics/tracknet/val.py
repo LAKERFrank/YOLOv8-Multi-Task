@@ -445,8 +445,10 @@ class TrackNetValidator(BaseValidator):
                         self.hit_TP += 1
                 else:
                     self.pos_FN += 1
-                    self.fast_FN += 1
-                    self.hit_FN += 1
+                    if mask_fast_ball[frame_idx] == 1:
+                        self.fast_FN += 1
+                    if mask_hit_ball[frame_idx] == 1:
+                        self.hit_FN += 1
             
             ############## 獲取大於 threshold 的位置及其值 ##############
             # indices = torch.nonzero(p_conf > 0.6, as_tuple=True)
