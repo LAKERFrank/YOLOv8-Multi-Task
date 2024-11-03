@@ -495,11 +495,11 @@ class FocalLossWithMask(nn.Module):
         loss[FN_mask] *= negative_ratio*10*w
         loss[FP_mask & ~may_has_ball] *= negative_ratio*10*w
         loss[TP_mask] *= negative_ratio*10
-        loss[mask_fast_ball|mask_hit_ball] *= 10
+        loss[mask_fast_ball|mask_hit_ball] *= 20
 
-        print(f'fast and hit count: {(mask_fast_ball|mask_hit_ball).sum()}')
-        print(f'fast and hit with relevant count: {(loss[mask_fast_ball|mask_hit_ball] > 0).sum()}')
-        print(f'relevant loss count: {(loss > 0).sum()}')
+        # print(f'fast and hit count: {(mask_fast_ball|mask_hit_ball).sum()}')
+        # print(f'fast and hit with relevant count: {(loss[mask_fast_ball|mask_hit_ball] > 0).sum()}')
+        # print(f'relevant loss count: {(loss > 0).sum()}')
 
         # Apply the mask to the loss
         loss = (loss).sum() / relevant_mask.float().sum()
