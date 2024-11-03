@@ -241,7 +241,9 @@ class TrackNetLoss:
         mask_has_ball = torch.zeros(b, self.num_groups, 20, 20, device=self.device)
         cls_targets = torch.zeros(b, self.num_groups, 20, 20, 1, device=self.device)
         mask_has_next_ball = torch.zeros(b, self.num_groups, 20, 20, device=self.device)
-        cell_weight = torch.ones(b, self.num_groups, 20, 20, device=self.device)
+
+        mask_fast_ball = torch.zeros(b, self.num_groups, 20, 20, device=self.device)
+        mask_hit_ball = torch.zeros(b, self.num_groups, 20, 20, device=self.device)
 
         fast_ball_count = 0
         hit_ball_count = 0
@@ -252,8 +254,12 @@ class TrackNetLoss:
             for target_idx, target in enumerate(batch_target[idx]):
                 # target xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
-                if target[4]**2 + target[5]**2 >= 20**2:
-                    cell_weight[idx, target_idx, grid_y, grid_x] += 100
+                if target_idx < len(batch_target[idx])-1 and batch_target[idx][target_idx+1][1] == 1 and target[4]**2 + target[5]**2 >= 20**2:
+                    mask_fast_ball[idx, target_idx, grid_y, grid_x] = 1
+
+                    next_grid_x, next_grid_y, _, _ = target_grid(batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3], stride)
+                    mask_fast_ball[idx, target_idx+1, next_grid_y, next_grid_x] = 1
+                    
                     fast_ball_count+=1
 
                 if target_idx < len(batch_target[idx])-2 \
@@ -269,9 +275,9 @@ class TrackNetLoss:
                     if angle and angle > 30 and (dist1 > 10 or dist2 > 10):
                         second_grid_x, second_grid_y, _, _ = target_grid(batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3], stride)
                         third_grid_x, third_grid_y, _, _ = target_grid(batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3], stride)
-                        cell_weight[idx, target_idx, grid_y, grid_x] += 200
-                        cell_weight[idx, target_idx+1, second_grid_y, second_grid_x] += 200
-                        cell_weight[idx, target_idx+2, third_grid_y, third_grid_x] += 200
+                        mask_hit_ball[idx, target_idx, grid_y, grid_x] = 1
+                        mask_hit_ball[idx, target_idx+1, second_grid_y, second_grid_x] = 1
+                        mask_hit_ball[idx, target_idx+2, third_grid_y, third_grid_x] = 1
                         hit_ball_count+=1
 
                 if target[1] == 1:
@@ -294,10 +300,11 @@ class TrackNetLoss:
         cls_targets = cls_targets.view(b, self.num_groups*20*20, 1)
         mask_has_ball = mask_has_ball.view(b, self.num_groups*20*20).bool()
         mask_may_has_ball = mask_may_has_ball.view(b, self.num_groups*20*20, 1).bool()
-        cell_weight = cell_weight.view(b, self.num_groups*20*20, 1)
+        mask_fast_ball = mask_fast_ball.view(b, self.num_groups*20*20, 1).bool()
+        mask_hit_ball = mask_hit_ball.view(b, self.num_groups*20*20, 1).bool()
         
         loss = torch.zeros(2, device=self.device)
-        a, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball, cell_weight)
+        a, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball)
         
         cls_targets = cls_targets.to(pred_scores.dtype)
 
@@ -308,7 +315,7 @@ class TrackNetLoss:
         # bce = nn.BCEWithLogitsLoss(reduction='none', weight=cls_weight)
 
         self.confusion_class.confusion_matrix(pred_scores.sigmoid(), cls_targets)
-        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, cell_weight, 2, 0.75)
+        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, mask_fast_ball, mask_hit_ball, 2, 0.75)
 
         # print(f'conf loss: {fp_loss_weighted, fn_loss_weighted, tp_loss_weighted}\n')
         # print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
@@ -458,7 +465,7 @@ class FocalLossWithMask(nn.Module):
 
         return pos_mask | neg_mask
 
-    def forward(self, pred, label, may_has_ball, fast_ball_cell_weight, gamma=2, alpha=0.75, negative_ratio=3.0):
+    def forward(self, pred, label, may_has_ball, mask_fast_ball, mask_hit_ball, gamma=2, alpha=0.75, negative_ratio=3.0):
         """Calculates and updates confusion matrix for object detection/classification tasks."""
         loss = F.binary_cross_entropy_with_logits(pred, label, reduction='none')
         # p_t = torch.exp(-loss)
@@ -489,7 +496,8 @@ class FocalLossWithMask(nn.Module):
         loss[TP_mask] *= negative_ratio*10
 
         # Apply the mask to the loss
-        loss = (loss * relevant_mask.float() * fast_ball_cell_weight).sum() / relevant_mask.float().sum()
+        fast_hit_weight = (mask_fast_ball+mask_hit_ball)*10
+        loss = (loss * relevant_mask.float() * fast_hit_weight).sum() / relevant_mask.float().sum()
 
         return loss
 
@@ -501,7 +509,7 @@ class XYLoss(nn.Module):
         self.reg_max = reg_max
         self.use_dfl = use_dfl
 
-    def forward(self, pred_dist, pred_pos, target_pos_distri, target_scores, target_scores_sum, fg_mask, fast_weight):
+    def forward(self, pred_dist, pred_pos, target_pos_distri, target_scores, target_scores_sum, fg_mask):
         """IoU loss."""
         weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
         # iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
@@ -513,7 +521,6 @@ class XYLoss(nn.Module):
         # DFL loss
         if self.use_dfl:
             loss_dfl = self._df_loss(pred_dist[fg_mask].view(-1, self.reg_max + 1), target_pos_distri[fg_mask]) * weight
-            loss_dfl = loss_dfl * fast_weight[fg_mask]
             loss_dfl = loss_dfl.sum() / target_scores_sum
         else:
             loss_dfl = torch.tensor(0.0).to(pred_dist.device)
