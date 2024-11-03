@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from ultralytics.tracknet.utils.confusion_matrix import ConfConfusionMatrix
 from ultralytics.tracknet.utils.plotting import display_image_with_coordinates, display_predict_in_checkerboard
-from ultralytics.tracknet.utils.transform import target_grid
+from ultralytics.tracknet.utils.transform import calculate_angle, calculate_dist, target_grid
 
 from ultralytics.yolo.utils import LOGGER
 
@@ -429,34 +429,6 @@ class TrackNetLossV3:
         tlose_item = loss.detach()
 
         return tlose, tlose_item
-
-
-def calculate_dist(p1, p2):
-    # 計算兩點之間的距離
-    return math.sqrt((p2[0] - p1[0]) ** 2 + (p2[1] - p1[1]) ** 2)
-
-def calculate_angle(p1, p2, p3):
-    # 計算從p1到p2和從p2到p3之間的夾角
-    v1 = (p2[0] - p1[0], p2[1] - p1[1])
-    v2 = (p3[0] - p2[0], p3[1] - p2[1])
-    
-    # 計算內積和模長
-    dot_product = v1[0] * v2[0] + v1[1] * v2[1]
-    mag_v1 = math.sqrt(v1[0]**2 + v1[1]**2)
-    mag_v2 = math.sqrt(v2[0]**2 + v2[1]**2)
-    
-    # 如果其中一個向量為零，則無法計算角度
-    if mag_v1 == 0 or mag_v2 == 0:
-        return None  # 或者返回特定值，根據需要設置
-    
-    # 限制範圍避免數值問題
-    cosine_value = max(-1, min(1, dot_product / (mag_v1 * mag_v2)))
-
-    # 計算角度（弧度），並轉換為角度
-    angle_rad = math.acos(cosine_value)
-    angle_deg = math.degrees(angle_rad)
-    
-    return angle_deg
 class FocalLossWithMask(nn.Module):
     """Wraps focal loss around existing loss_fcn(), i.e. criteria = FocalLoss(nn.BCEWithLogitsLoss(), gamma=1.5)."""
 
