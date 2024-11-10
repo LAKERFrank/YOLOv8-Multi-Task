@@ -425,9 +425,10 @@ class TrackNetValidator(BaseValidator):
 
         # 計算 hit v2 效果
         # 先填充 hit 前後兩幀
-        for frame_idx in range(10):
-            # print(batch_target[frame_idx][6])
+        frame_idx = 0
+        while frame_idx < 10:
             if batch_target[frame_idx][6] == 1:
+                # 檢查並設定範圍內的相鄰元素
                 if frame_idx - 2 >= 0:
                     batch_target[frame_idx - 2][6] = 1
                 if frame_idx - 1 >= 0:
@@ -436,6 +437,10 @@ class TrackNetValidator(BaseValidator):
                     batch_target[frame_idx + 1][6] = 1
                 if frame_idx + 2 < len(batch_target):
                     batch_target[frame_idx + 2][6] = 1
+                # 跳過已處理過的範圍
+                frame_idx += 3
+            else:
+                frame_idx += 1
 
         for frame_idx in range(10):
             label = ''
