@@ -113,7 +113,7 @@ class TrackNetDataset(Dataset):
 
                 frames = img_files[i: i + self.num_input*3: 3]
 
-                target = ball_trajectory_df.iloc[i: i + self.num_input*3: 2].values
+                target = ball_trajectory_df.iloc[i: i + self.num_input*3: 3].values
                 target = self.transform_coordinates(target, 1280, 720)
 
                 # Avoid invalid data
@@ -135,7 +135,7 @@ class TrackNetDataset(Dataset):
 
                 frames = img_files[i: i + self.num_input*4: 4]
 
-                target = ball_trajectory_df.iloc[i: i + self.num_input*4: 2].values
+                target = ball_trajectory_df.iloc[i: i + self.num_input*4: 4].values
                 target = self.transform_coordinates(target, 1280, 720)
 
                 # Avoid invalid data
