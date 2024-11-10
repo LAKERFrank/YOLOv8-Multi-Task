@@ -26,8 +26,7 @@ class TrackNetDataset(Dataset):
         image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
         self.pbar = tqdm(total=image_count+(image_count-self.num_input*2+1)
-                         +(image_count-self.num_input*3+1)
-                         +(image_count-self.num_input*4+1), miniters=1, smoothing=1)
+                         +(image_count-self.num_input*3+1), miniters=1, smoothing=1)
         # Traverse all matches
         for match_name in glob("*/", root_dir=root_dir):
             match_name = match_name.strip('/')
