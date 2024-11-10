@@ -1,4 +1,5 @@
 from datetime import datetime
+from matplotlib import pyplot as plt
 import numpy as np
 import torch
 from ultralytics.tracknet.dataset import TrackNetDataset
@@ -315,6 +316,15 @@ class TrackNetValidator(BaseValidator):
         self.hitV1_FP = 0  # False Positives
         self.hitV1_TN = 0  # True Negatives
         self.hitV1_FN = 0  # False Negatives
+
+        # 一顆球半徑 = 3 pixel
+        self.tolerance3 = 3.0 # 50% 距離容忍度
+        self.conf_thresholds = [i * 0.05 for i in range(10, 20)]  # [0.5, 0.55, ..., 1.0]
+        self.cumulative_TP = [0] * len(self.conf_thresholds)
+        self.cumulative_FP = [0] * len(self.conf_thresholds)
+        self.cumulative_FN = [0] * len(self.conf_thresholds)
+        self.cumulative_TN = [0] * len(self.conf_thresholds)
+        self.fitness = 0
     
     def update_metrics(self, preds, batch):
         """Calculate and update metrics based on predictions and batch."""
@@ -414,7 +424,7 @@ class TrackNetValidator(BaseValidator):
 
         self.fast_count += mask_fast_ball.sum()
         self.hit_count += mask_hit_ball.sum()
-        mask_fast_hit_ball = (mask_fast_ball.bool()|mask_hit_ball.bool()).float()
+        mask_fast_hit_ball = (mask_fast_ball.bool()|mask_hit_ball_v2.bool()).float()
         self.fast_hit_count += mask_fast_hit_ball.sum()
 
         each_probs = pred_probs.view(10, 20, 20)
@@ -439,6 +449,8 @@ class TrackNetValidator(BaseValidator):
             else:
                 frame_idx += 1
 
+        
+        
         for frame_idx in range(10):
             label = ''
             if mask_fast_ball[frame_idx] == 1:
@@ -479,7 +491,7 @@ class TrackNetValidator(BaseValidator):
 
 
             ############## MAX ##############
-            conf_threshold = 0.7
+            conf_threshold = 0.6
             p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
             max_position = torch.argmax(p_conf_masked)
             # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
@@ -504,26 +516,28 @@ class TrackNetValidator(BaseValidator):
 
             ball_count = mask_has_ball.sum()
             self.ball_count += ball_count   
-            tolerance = 5.0
+
+            
             distance = torch.sqrt((pred_x - target_x) ** 2 + (pred_y - target_y) ** 2)
             
             box_color = 'red'
             if batch_target[frame_idx][1] == 0:
-                if max_conf >= 0.7:
+                if max_conf >= conf_threshold:
                     self.pos_FP += 1
                     box_color = 'blue'
                 else:
                     self.pos_TN += 1
             else:
-                if max_conf >= 0.7:
-                    if distance <= tolerance:
+                if max_conf >= conf_threshold:
+                    if distance <= self.tolerance3:
                         self.pos_TP += 1
                     else:
+                        self.pos_FN += 1
                         self.pos_FN_dis += 1
                         box_color = 'blue'
                     if mask_fast_ball[frame_idx] == 1:
                         self.fast_TP += 1
-                    if mask_hit_ball[frame_idx] == 1:
+                    if mask_hit_ball_v2[frame_idx] == 1:
                         self.hit_TP += 1
                     if mask_fast_hit_ball[frame_idx] == 1:
                         self.fast_hit_TP += 1
@@ -531,41 +545,38 @@ class TrackNetValidator(BaseValidator):
                     self.pos_FN += 1
                     if mask_fast_ball[frame_idx] == 1:
                         self.fast_FN += 1
-                    if mask_hit_ball[frame_idx] == 1:
+                    if mask_hit_ball_v2[frame_idx] == 1:
                         self.hit_FN += 1
                     if mask_fast_hit_ball[frame_idx] == 1:
                         self.fast_hit_FN += 1
             
-            ############## 獲取大於 threshold 的位置及其值 ##############
-            # indices = torch.nonzero(p_conf > 0.6, as_tuple=True)
-            # values = p_conf[indices]
 
-            # # 將 indices (y, x) 轉換為 (cell_y, cell_x)
-            # cells = list(zip(indices[0].tolist(), indices[1].tolist()))
-            # frame_results = [(cell, value.item()) for cell, value in zip(cells, values)]
-
-            # for ((y, x), value) in frame_results:
-
-            #     metric = {}
-            #     metric["grid_x"] = x
-            #     metric["grid_y"] = y
-            #     metric["x"] = p_cell_x[y][x]/16
-            #     metric["y"] = p_cell_y[y][x]/16
-            #     metric["conf"] = value
-            #     metrics.append(metric)
-                
+            for threshold_idx in range(len(self.conf_thresholds)):
+                conf_threshold = self.conf_thresholds[threshold_idx]
+                if batch_target[frame_idx][1] == 0:
+                    if max_conf >= conf_threshold:
+                        self.cumulative_FP[threshold_idx] += 1
+                    else:
+                        self.cumulative_TN[threshold_idx] += 1
+                else:
+                    if max_conf >= conf_threshold:
+                        if distance <= self.tolerance3:
+                            self.cumulative_TP[threshold_idx] += 1
+                        else:
+                            self.cumulative_FN[threshold_idx] += 1
+                    else:
+                        self.cumulative_FN[threshold_idx] += 1
             
             now = datetime.now()
             # Format the datetime object as a string
             formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
-            # display_predict_image(
-            #         batch_img[frame_idx],  
-            #         metrics, 
-            #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-            #         box_color=box_color,
-            #         label=label
-            #         )  
-            
+            display_predict_image(
+                    batch_img[frame_idx],  
+                    metrics, 
+                    'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                    box_color=box_color,
+                    label=label
+                    ) 
 
         # 計算 conf 的 confusion matrix
         threshold = 0.7
@@ -596,18 +607,62 @@ class TrackNetValidator(BaseValidator):
         
     def finalize_metrics(self):
         """Calculate final metrics for this validation run."""
-        if (self.pos_FN+self.pos_FN_dis+self.pos_FP+self.pos_TN + self.pos_TP) != 0:
-            self.pos_acc = (self.pos_TN + self.pos_TP) / (self.pos_FN+self.pos_FN_dis+self.pos_FP+self.pos_TN + self.pos_TP)
+        if (self.pos_FN+self.pos_FP+self.pos_TN + self.pos_TP) != 0:
+            self.pos_acc = (self.pos_TN + self.pos_TP) / (self.pos_FN+self.pos_FP+self.pos_TN + self.pos_TP)
+        if (self.pos_TP+self.pos_FP) != 0:
+            self.pos_precision = self.pos_TP/(self.pos_TP+self.pos_FP)
+
         if (self.conf_FN+self.conf_FP+self.conf_TN + self.conf_TP) != 0:
             self.conf_acc = (self.conf_TN + self.conf_TP) / (self.conf_FN+self.conf_FP+self.conf_TN + self.conf_TP)
         if (self.conf_TP+self.conf_FP) != 0:
             self.conf_precision = self.conf_TP/(self.conf_TP+self.conf_FP)
-        if (self.pos_TP+self.pos_FP) != 0:
-            self.pos_precision = self.pos_TP/(self.pos_TP+self.pos_FP)
+
+        self.calculate_precision_recall(True)
+
+    def calculate_precision_recall(self, plot = False):
+        # 繪製 Precision-Recall 曲線
+        precision_list = []
+        recall_list = []
+
+        for idx in range(len(self.conf_thresholds)):
+            TP = self.cumulative_TP[idx]
+            FP = self.cumulative_FP[idx]
+            FN = self.cumulative_FN[idx]
+            
+            # 計算 Precision 和 Recall
+            precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+            recall = TP / (TP + FN) if (TP + FN) > 0 else 0
+
+            precision_list.append(precision)
+            recall_list.append(recall)
+
+        # 繪製 Precision-Recall 曲線
+        if plot:
+            plt.figure()
+            plt.plot(recall_list, precision_list, marker='o')
+            plt.xlabel('Recall')
+            plt.ylabel('Precision')
+            plt.title('Precision-Recall Curve')
+            now = datetime.now()
+            # Format the datetime object as a string
+            formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
+            plt.savefig(self.metrics.save_dir/'precision_recall'/f'precision_recall_curve_{formatted_date}.png')
+            plt.close()
+
+        # 計算平均 Precision (AP) 作為 fitness
+        ap = 0.0
+        for i in range(1, len(recall_list)):
+            ap += (recall_list[i] - recall_list[i - 1]) * precision_list[i]
+
+        self.fitness = ap
+        print("Average Precision (AP):", ap)
 
     def get_stats(self):
+        # 繪製 Precision-Recall 曲線
+        self.calculate_precision_recall(False)
+
         """Return the stats."""
-        return {'pos_FN': self.pos_FN, 'pos_FN_dis': self.pos_FN_dis, 'pos_FP': self.pos_FP, 'pos_TN': self.pos_TN, 
+        return {'fitness': self.fitness, 'pos_FN': self.pos_FN, 'pos_FN_dis': self.pos_FN_dis, 'pos_FP': self.pos_FP, 'pos_TN': self.pos_TN, 
                 'pos_TP': self.pos_TP, 'pos_acc': self.pos_acc, 'pos_precision': self.pos_precision,
                 "fast_TP": self.fast_TP, "fast_FN": self.fast_FN, 
                 "hit_TP": self.hit_TP, "hit_FN": self.hit_FN, 
@@ -622,11 +677,10 @@ class TrackNetValidator(BaseValidator):
         print(f'fast acc: {self.fast_TP/self.fast_count}, hit acc: {self.hit_TP/self.hit_count}')
         print(f'fast or hit count: {self.fast_hit_count}, fast or hit acc: {self.fast_hit_TP/self.fast_hit_count}')
         
-        print(f'target hit count: {self.target_hit_count}')
-        print(f"hitV2- TP: {self.hitV2_TP}, FP: {self.hitV2_FP}, TN: {self.hitV2_TN}, FN: {self.hitV2_FN}")
-        print(f"hitV1- TP: {self.hitV1_TP}, FP: {self.hitV1_FP}, TN: {self.hitV1_TN}, FN: {self.hitV1_FN}")
+        # print(f'target hit count: {self.target_hit_count}')
+        # print(f"hitV2- TP: {self.hitV2_TP}, FP: {self.hitV2_FP}, TN: {self.hitV2_TN}, FN: {self.hitV2_FN}")
+        # print(f"hitV1- TP: {self.hitV1_TP}, FP: {self.hitV1_FP}, TN: {self.hitV1_TN}, FN: {self.hitV1_FN}")
 
-        
         print(self.get_stats())
         # precision = 0
         # recall = 0
