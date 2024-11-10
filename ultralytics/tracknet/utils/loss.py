@@ -332,6 +332,7 @@ class TrackNetLoss:
         mask_fast_ball = mask_fast_ball.view(b, self.num_groups*20*20, 1).bool()
         mask_hit_ball = mask_hit_ball.view(b, self.num_groups*20*20, 1).bool()
         mask_hit_ball_v2 = mask_hit_ball_v2.view(b, self.num_groups*20*20, 1).bool()
+        mask_hit_ball_v2[~mask_has_ball] = False
         
         loss = torch.zeros(2, device=self.device)
         _, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball, mask_hit_ball_v2)
@@ -525,7 +526,7 @@ class FocalLossWithMask(nn.Module):
         loss[FN_mask] *= negative_ratio*10*w
         loss[FP_mask & ~may_has_ball] *= negative_ratio*10*w
         loss[TP_mask] *= negative_ratio*10
-        #loss[mask_hit_ball] *= negative_ratio*10*w
+        loss[mask_hit_ball] *= negative_ratio*10*w
 
         # print(f'fast and hit count: {(mask_fast_ball|mask_hit_ball).sum()}')
         # print(f'fast and hit with relevant count: {(loss[mask_fast_ball|mask_hit_ball] > 0).sum()}')
