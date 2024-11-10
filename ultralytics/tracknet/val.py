@@ -362,7 +362,8 @@ class TrackNetValidator(BaseValidator):
 
             # 找出快球 => 慢球, 慢球 => 快球
             if target_idx > 1 and target_idx < len(batch_target)-2 and \
-                batch_target[target_idx-2][1] == 1 and batch_target[target_idx][1] == 1 and batch_target[target_idx+2][1] == 1:
+                batch_target[target_idx-2][1] == 1 and batch_target[target_idx][1] == 1 and batch_target[target_idx+2][1] == 1 and \
+                batch_target[target_idx-1][1] == 1 and batch_target[target_idx+1][1] == 1:
                 before_hit2 = [batch_target[target_idx-2][2], batch_target[target_idx-2][3]]
                 before_hit1 = [batch_target[target_idx-1][2], batch_target[target_idx-1][3]]
                 hit = [batch_target[target_idx][2], batch_target[target_idx][3]]
@@ -372,6 +373,7 @@ class TrackNetValidator(BaseValidator):
                 before_dist = calculate_dist(before_hit2, before_hit1) + calculate_dist(before_hit1, hit)
                 after_dist = calculate_dist(hit, after_hit1) + calculate_dist(after_hit1, after_hit2)
                 angle = calculate_angle(before_hit2, hit, after_hit2)
+                angle2 = calculate_angle(before_hit1, hit, after_hit1)
 
                 if angle and angle > 30 and (before_dist > 10 or after_dist > 10) and (before_dist > after_dist*2 or before_dist*2 < after_dist):
                     mask_hit_ball_v2[target_idx-2] = 1
