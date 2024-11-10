@@ -361,14 +361,18 @@ class TrackNetValidator(BaseValidator):
             grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], self.stride)
 
             # 找出快球 => 慢球, 慢球 => 快球
-            if target_idx > 1 and target_idx < len(batch_target)-2:
+            if target_idx > 1 and target_idx < len(batch_target)-2 and \
+                batch_target[target_idx-2][1] == 1 and batch_target[target_idx][1] == 1 and batch_target[target_idx+2][1] == 1:
                 before_hit2 = [batch_target[target_idx-2][2], batch_target[target_idx-2][3]]
                 before_hit1 = [batch_target[target_idx-1][2], batch_target[target_idx-1][3]]
                 hit = [batch_target[target_idx][2], batch_target[target_idx][3]]
                 after_hit1 = [batch_target[target_idx+1][2], batch_target[target_idx+1][3]]
                 after_hit2 = [batch_target[target_idx+2][2], batch_target[target_idx+2][3]]
+
                 before_dist = calculate_dist(before_hit2, hit)
                 after_dist = calculate_dist(hit, after_hit2)
+                angle = calculate_angle(before_hit2, hit, after_hit2)
+
                 if before_dist > after_dist*3 or before_dist*3 < after_dist:
                     mask_hit_ball_v2[target_idx-2] = 1
                     mask_hit_ball_v2[target_idx-1] = 1
