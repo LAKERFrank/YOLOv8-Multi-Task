@@ -305,6 +305,12 @@ class TrackNetValidator(BaseValidator):
         self.fast_count = 0
         self.hit_count = 0
         self.fast_hit_count = 0
+
+        self.target_hit_count = 0
+        self.hitV2_TP = 0  # True Positives
+        self.hitV2_FP = 0  # False Positives
+        self.hitV2_TN = 0  # True Negatives
+        self.hitV2_FN = 0  # False Negatives
     
     def update_metrics(self, preds, batch):
         """Calculate and update metrics based on predictions and batch."""
@@ -345,9 +351,27 @@ class TrackNetValidator(BaseValidator):
         cls_targets = torch.zeros(self.num_groups, 20, 20, 1, device=self.device)
         mask_fast_ball = torch.zeros(self.num_groups, 1, device=self.device)
         mask_hit_ball = torch.zeros(self.num_groups, 1, device=self.device)
+        mask_hit_ball_v2 = torch.zeros(self.num_groups, 1, device=self.device)
 
         for target_idx, target in enumerate(batch_target):
             grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], self.stride)
+
+            # 找出快球 => 慢球, 慢球 => 快球
+            if target_idx > 1 and target_idx < len(batch_target)-2:
+                before_hit2 = [batch_target[target_idx-2][2], batch_target[target_idx-2][3]]
+                before_hit1 = [batch_target[target_idx-1][2], batch_target[target_idx-1][3]]
+                hit = [batch_target[target_idx][2], batch_target[target_idx][3]]
+                after_hit1 = [batch_target[target_idx+1][2], batch_target[target_idx+1][3]]
+                after_hit2 = [batch_target[target_idx+2][2], batch_target[target_idx+2][3]]
+                before_dist = calculate_dist(before_hit2, hit)
+                after_dist = calculate_dist(hit, after_hit2)
+                if before_dist > after_dist*2 or before_dist*2 < after_dist:
+                    mask_hit_ball_v2[target_idx-2] = 1
+                    mask_hit_ball_v2[target_idx-1] = 1
+                    mask_hit_ball_v2[target_idx] = 1
+                    mask_hit_ball_v2[target_idx+1] = 1
+                    mask_hit_ball_v2[target_idx+2] = 1
+
             if target_idx < len(batch_target)-1 and batch_target[target_idx+1][1] == 1 and \
                 batch_target[target_idx][1] == 1 and target[4]**2 + target[5]**2 >= 20**2:
                 mask_fast_ball[target_idx] = 1
@@ -388,13 +412,43 @@ class TrackNetValidator(BaseValidator):
 
         each_probs = pred_probs.view(10, 20, 20)
         each_pos_x, each_pos_y = pred_pos.view(10, 20, 20, 2).split([1, 1], dim=3)
-        ## save image
+
+        # 計算 hit v2 效果
+        # 先填充 hit 前後兩幀
+        for frame_idx in range(10):
+            if batch_target[frame_idx][6] == 1:
+                if frame_idx - 2 >= 0:
+                    batch_target[frame_idx - 2][6] = 1
+                if frame_idx - 1 >= 0:
+                    batch_target[frame_idx - 1][6] = 1
+                if frame_idx + 1 < len(batch_target):
+                    batch_target[frame_idx + 1][6] = 1
+                if frame_idx + 2 < len(batch_target):
+                    batch_target[frame_idx + 2][6] = 1
+
         for frame_idx in range(10):
             label = ''
             if mask_fast_ball[frame_idx] == 1:
                 label += '_fast_'
             if mask_hit_ball[frame_idx] == 1:
                 label += '_hit_'
+            if mask_hit_ball_v2[frame_idx] == 1:
+                label += '_hitV2_'
+            if batch_target[frame_idx][6] == 1:
+                label += '_targetHit_'
+                self.target_hit_count+=1
+
+            if batch_target[frame_idx][6] == 1 and mask_hit_ball_v2[frame_idx] == 1:
+                self.hitV2_TP += 1
+            elif batch_target[frame_idx][6] == 0 and mask_hit_ball_v2[frame_idx] == 1:
+                self.hitV2_FP += 1
+            elif batch_target[frame_idx][6] == 0 and mask_hit_ball_v2[frame_idx] == 0:
+                self.hitV2_TN += 1
+            elif batch_target[frame_idx][6] == 1 and mask_hit_ball_v2[frame_idx] == 0:
+                self.hitV2_FN += 1
+            
+             
+
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
             metrics = []
@@ -482,13 +536,13 @@ class TrackNetValidator(BaseValidator):
             now = datetime.now()
             # Format the datetime object as a string
             formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
-            display_predict_image(
-                    batch_img[frame_idx],  
-                    metrics, 
-                    'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                    box_color=box_color,
-                    label=label
-                    )  
+            # display_predict_image(
+            #         batch_img[frame_idx],  
+            #         metrics, 
+            #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+            #         box_color=box_color,
+            #         label=label
+            #         )  
             
 
         # 計算 conf 的 confusion matrix
@@ -545,6 +599,12 @@ class TrackNetValidator(BaseValidator):
         print(f'fast count: {self.fast_count}, hit count: {self.hit_count}')
         print(f'fast acc: {self.fast_TP/self.fast_count}, hit acc: {self.hit_TP/self.hit_count}')
         print(f'fast or hit count: {self.fast_hit_count}, fast or hit acc: {self.fast_hit_TP/self.fast_hit_count}')
+        
+        print(f'target hit count: {self.target_hit_count}')
+        print(f"hitV2: TP: {self.hitV2_TP}, FP: {self.hitV2_FP}, 
+              TN: {self.hitV2_TN}, FN: {self.hitV2_FN}")
+
+        
         print(self.get_stats())
         # precision = 0
         # recall = 0
