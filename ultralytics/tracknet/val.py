@@ -647,7 +647,9 @@ class TrackNetValidator(BaseValidator):
             now = datetime.now()
             # Format the datetime object as a string
             formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
-            plt.savefig(self.metrics.save_dir/'precision_recall'/f'precision_recall_curve_{formatted_date}.png')
+            output_dir = self.metrics.save_dir / 'precision_recall'
+            output_dir.mkdir(parents=True, exist_ok=True)
+            plt.savefig(output_dir/f'precision_recall_curve_{formatted_date}.png')
             plt.close()
 
         # 計算平均 Precision (AP) 作為 fitness

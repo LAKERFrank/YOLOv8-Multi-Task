@@ -258,6 +258,7 @@ class TrackNetLoss:
                 # 找出快球 => 慢球, 慢球 => 快球
                 if target_idx > 1 and target_idx < len(batch_target[idx])-2 and \
                     batch_target[idx][target_idx-2][1] == 1 and batch_target[idx][target_idx][1] == 1 and batch_target[idx][target_idx+2][1] == 1:
+                    
                     before_hit2 = [batch_target[idx][target_idx-2][2], batch_target[idx][target_idx-2][3]]
                     hit = [batch_target[idx][target_idx][2], batch_target[idx][target_idx][3]]
                     after_hit2 = [batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3]]

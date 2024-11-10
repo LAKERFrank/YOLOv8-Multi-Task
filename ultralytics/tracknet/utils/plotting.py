@@ -210,5 +210,7 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         ax.text(img_width * 0.9, img_height * 0.1, text_to_display, color='black', fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
     # plt.show()
 
-    plt.savefig(save_dir/'predict_val_img'/fileName, bbox_inches='tight')
+    output_dir = save_dir / 'predict_val_img'
+    output_dir.mkdir(parents=True, exist_ok=True)
+    plt.savefig(output_dir/fileName, bbox_inches='tight')
     plt.close()
