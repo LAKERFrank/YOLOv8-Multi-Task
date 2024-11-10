@@ -346,7 +346,7 @@ class TrackNetLoss:
         # bce = nn.BCEWithLogitsLoss(reduction='none', weight=cls_weight)
 
         self.confusion_class.confusion_matrix(pred_scores.sigmoid(), cls_targets)
-        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, mask_fast_ball, mask_hit_ball, 2, 0.75)
+        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, mask_fast_ball, mask_hit_ball_v2, 2, 0.75)
 
         # print(f'conf loss: {fp_loss_weighted, fn_loss_weighted, tp_loss_weighted}\n')
         # print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
@@ -525,7 +525,7 @@ class FocalLossWithMask(nn.Module):
         loss = loss * relevant_mask.float()
         # TODO
         loss[loss<0] = 0
-        
+
         loss[FN_mask] *= negative_ratio*10*w
         loss[FP_mask & ~may_has_ball] *= negative_ratio*10*w
         loss[TP_mask] *= negative_ratio*10
@@ -562,6 +562,8 @@ class XYLoss(nn.Module):
         # DFL loss
         if self.use_dfl:
             loss_dfl = self._df_loss(pred_dist[fg_mask].view(-1, self.reg_max + 1), target_pos_distri[fg_mask]) * weight
+            # TODO
+            loss_dfl[loss_dfl<0] = 0
             loss_dfl_sum = loss_dfl.sum()
                 
             loss_dfl = (loss_dfl_sum / target_scores_sum) if loss_dfl_sum != 0 else 0
