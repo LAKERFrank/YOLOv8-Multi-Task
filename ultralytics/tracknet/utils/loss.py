@@ -523,10 +523,9 @@ class FocalLossWithMask(nn.Module):
         w = (alpha/(1-alpha))
 
         loss = loss * relevant_mask.float()
-        if (loss).sum() < 0:
-            print(f'error loss < 0: loss_sum {loss_sum}, relevant_mask sum {relevant_mask.float().sum()}')
-        if (loss < 0).sum() > 0:
-            print("error loss has negative value")
+        # TODO
+        loss[loss<0] = 0
+        
         loss[FN_mask] *= negative_ratio*10*w
         loss[FP_mask & ~may_has_ball] *= negative_ratio*10*w
         loss[TP_mask] *= negative_ratio*10
