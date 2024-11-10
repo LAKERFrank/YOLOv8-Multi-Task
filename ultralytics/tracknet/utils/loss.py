@@ -268,11 +268,18 @@ class TrackNetLoss:
 
                     if (angle and angle > 30 and (before_dist > 10 or after_dist > 10)) or \
                         ((before_dist > 32 or after_dist > 32) and (before_dist > after_dist*2 or before_dist*2 < after_dist)):
-                        mask_hit_ball_v2[target_idx-2] = 1
-                        mask_hit_ball_v2[target_idx-1] = 1
-                        mask_hit_ball_v2[target_idx] = 1
-                        mask_hit_ball_v2[target_idx+1] = 1
-                        mask_hit_ball_v2[target_idx+2] = 1
+
+                        grid_x_1, grid_y_1, _, _ = target_grid(batch_target[idx][target_idx-2][2], batch_target[idx][target_idx-2][3], stride)
+                        grid_x_2, grid_y_2, _, _ = target_grid(batch_target[idx][target_idx-1][2], batch_target[idx][target_idx-1][3], stride)
+                        grid_x_3, grid_y_3, _, _ = target_grid(batch_target[idx][target_idx][2], batch_target[idx][target_idx][3], stride)
+                        grid_x_4, grid_y_4, _, _ = target_grid(batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3], stride)
+                        grid_x_5, grid_y_5, _, _ = target_grid(batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3], stride)
+                        
+                        mask_hit_ball_v2[idx, target_idx-2, grid_y_1, grid_x_1] = 1
+                        mask_hit_ball_v2[idx, target_idx-1, grid_y_2, grid_x_2] = 1
+                        mask_hit_ball_v2[idx, target_idx, grid_y_3, grid_x_3] = 1
+                        mask_hit_ball_v2[idx, target_idx+1, grid_y_4, grid_x_4] = 1
+                        mask_hit_ball_v2[idx, target_idx+2, grid_y_5, grid_x_5] = 1
                 if target_idx < len(batch_target[idx])-1 and batch_target[idx][target_idx+1][1] == 1 and\
                     batch_target[idx][target_idx][1] == 1 and target[4]**2 + target[5]**2 >= 20**2:
 
