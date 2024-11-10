@@ -25,7 +25,9 @@ class TrackNetDataset(Dataset):
 
         image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
-        self.pbar = tqdm(total=image_count+(image_count-self.num_input*2+1), miniters=1, smoothing=1)
+        self.pbar = tqdm(total=image_count+(image_count-self.num_input*2+1)
+                         +(image_count-self.num_input*3+1)
+                         +(image_count-self.num_input*4+1), miniters=1, smoothing=1)
         # Traverse all matches
         for match_name in glob("*/", root_dir=root_dir):
             match_name = match_name.strip('/')
@@ -83,13 +85,57 @@ class TrackNetDataset(Dataset):
 
                     self.img_cache(match_name, video_name, frames, npy_path)
             
-            # 降低 FPS
+            # 降低 FPS 120 => 60
             for i in range(len(img_files) - (self.num_input*2-1)):
                 self.pbar.update(1)
 
                 frames = img_files[i: i + self.num_input*2: 2]
 
                 target = ball_trajectory_df.iloc[i: i + self.num_input*2: 2].values
+                target = self.transform_coordinates(target, 1280, 720)
+
+                # Avoid invalid data
+                if len(frames) == self.num_input and len(target) == self.num_input:
+                    npy_path = self.img_cache_dir(match_name, video_name, frames)
+
+                    self.samples.append({
+                        "match_name": match_name,
+                        "video_name": video_name,
+                        "cache_npy": npy_path,
+                        "img_files": frames,
+                        "target": target
+                    })
+
+                    self.img_cache(match_name, video_name, frames, npy_path)
+            # 降低 FPS 120 => 40
+            for i in range(len(img_files) - (self.num_input*3-1)):
+                self.pbar.update(1)
+
+                frames = img_files[i: i + self.num_input*3: 2]
+
+                target = ball_trajectory_df.iloc[i: i + self.num_input*3: 2].values
+                target = self.transform_coordinates(target, 1280, 720)
+
+                # Avoid invalid data
+                if len(frames) == self.num_input and len(target) == self.num_input:
+                    npy_path = self.img_cache_dir(match_name, video_name, frames)
+
+                    self.samples.append({
+                        "match_name": match_name,
+                        "video_name": video_name,
+                        "cache_npy": npy_path,
+                        "img_files": frames,
+                        "target": target
+                    })
+
+                    self.img_cache(match_name, video_name, frames, npy_path)
+            # 降低 FPS 120 => 30
+            for i in range(len(img_files) - (self.num_input*4-1)):
+                self.pbar.update(1)
+
+                frames = img_files[i: i + self.num_input*4: 2]
+
+                target = ball_trajectory_df.iloc[i: i + self.num_input*4: 2].values
                 target = self.transform_coordinates(target, 1280, 720)
 
                 # Avoid invalid data
@@ -144,7 +190,7 @@ class TrackNetDataset(Dataset):
         ball_trajectory_df['dX'] = -1*ball_trajectory_df['X'].diff(-1).fillna(0)
         ball_trajectory_df['dY'] = -1*ball_trajectory_df['Y'].diff(-1).fillna(0)
 
-        if 'hit' in ball_trajectory_df.columns:
+        if 'Event' in ball_trajectory_df.columns:
             ball_trajectory_df['hit'] = ((ball_trajectory_df['Event'] == 1) | (ball_trajectory_df['Event'] == 2)).astype(int)
         else:
             ball_trajectory_df['hit'] = 0
