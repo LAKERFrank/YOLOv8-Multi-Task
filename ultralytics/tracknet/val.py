@@ -616,6 +616,7 @@ class TrackNetValidator(BaseValidator):
         
         print(f'target hit count: {self.target_hit_count}')
         print(f"hitV2- TP: {self.hitV2_TP}, FP: {self.hitV2_FP}, TN: {self.hitV2_TN}, FN: {self.hitV2_FN}")
+        print(f"hitV1- TP: {self.hitV1_TP}, FP: {self.hitV1_FP}, TN: {self.hitV1_TN}, FN: {self.hitV1_FN}")
 
         
         print(self.get_stats())
