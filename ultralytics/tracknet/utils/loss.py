@@ -323,6 +323,7 @@ class TrackNetLoss:
         mask_may_has_ball = mask_may_has_ball.view(b, self.num_groups*20*20, 1).bool()
         mask_fast_ball = mask_fast_ball.view(b, self.num_groups*20*20, 1).bool()
         mask_hit_ball = mask_hit_ball.view(b, self.num_groups*20*20, 1).bool()
+        mask_hit_ball_v2 = mask_hit_ball_v2.view(b, self.num_groups*20*20, 1).bool()
         
         loss = torch.zeros(2, device=self.device)
         a, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball)
