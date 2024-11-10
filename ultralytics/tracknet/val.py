@@ -375,7 +375,8 @@ class TrackNetValidator(BaseValidator):
                 angle = calculate_angle(before_hit2, hit, after_hit2)
                 angle2 = calculate_angle(before_hit1, hit, after_hit1)
 
-                if (before_dist > 32 or after_dist > 32) and (before_dist > after_dist*2 or before_dist*2 < after_dist):
+                if (angle and angle > 30 and (before_dist > 20 or after_dist > 20)) or \
+                    ((before_dist > 32 or after_dist > 32) and (before_dist > after_dist*2 or before_dist*2 < after_dist)):
                     mask_hit_ball_v2[target_idx-2] = 1
                     mask_hit_ball_v2[target_idx-1] = 1
                     mask_hit_ball_v2[target_idx] = 1
@@ -561,13 +562,13 @@ class TrackNetValidator(BaseValidator):
             now = datetime.now()
             # Format the datetime object as a string
             formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
-            display_predict_image(
-                    batch_img[frame_idx],  
-                    metrics, 
-                    'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                    box_color=box_color,
-                    label=label
-                    )  
+            # display_predict_image(
+            #         batch_img[frame_idx],  
+            #         metrics, 
+            #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+            #         box_color=box_color,
+            #         label=label
+            #         )  
             
 
         # 計算 conf 的 confusion matrix
