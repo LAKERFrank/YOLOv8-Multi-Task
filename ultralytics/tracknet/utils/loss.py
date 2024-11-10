@@ -346,7 +346,7 @@ class TrackNetLoss:
         # bce = nn.BCEWithLogitsLoss(reduction='none', weight=cls_weight)
 
         self.confusion_class.confusion_matrix(pred_scores.sigmoid(), cls_targets)
-        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, mask_fast_ball, mask_hit_ball_v2, 2, 0.75)
+        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, mask_fast_ball, mask_hit_ball, 2, 0.75)
 
         # print(f'conf loss: {fp_loss_weighted, fn_loss_weighted, tp_loss_weighted}\n')
         # print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
@@ -498,21 +498,14 @@ class FocalLossWithMask(nn.Module):
 
     def forward(self, pred, label, may_has_ball, mask_fast_ball, mask_hit_ball, gamma=2, alpha=0.75, negative_ratio=3.0):
         """Calculates and updates confusion matrix for object detection/classification tasks."""
-        if torch.isnan(pred).any() or torch.isinf(pred).any():
-            print("Pred contains NaN or Inf values")
         loss = F.binary_cross_entropy_with_logits(pred, label, reduction='none')
-        if (loss < 0).sum() > 0:
-            print("Min logit:", pred.min().item())
-            print("Max logit:", pred.max().item())
-            print(loss[loss < 0])
-            print("bcs loss error loss has negative value")
         # p_t = torch.exp(-loss)
         # loss *= self.alpha * (1.000001 - p_t) ** self.gamma  # non-zero power for gradient stability
 
         # TF implementation https://github.com/tensorflow/addons/blob/v0.7.1/tensorflow_addons/losses/focal_loss.py
         pred_prob = pred.sigmoid()  # prob from logits
         p_t = label * pred_prob + (1 - label) * (1 - pred_prob)
-        modulating_factor = (1.0 - p_t) ** gamma
+        modulating_factor = (1.000001 - p_t) ** gamma
         loss *= modulating_factor
         if alpha > 0:
             alpha_factor = label * alpha + (1 - label) * (1 - alpha)
@@ -523,8 +516,6 @@ class FocalLossWithMask(nn.Module):
         FP_mask = (pred_prob >= 0.5) & (label == 0)  # False Positive
 
         # Combine the masks (we only care about TP, FN, FP)
-        if (loss < 0).sum() > 0:
-            print("org error loss has negative value")
         relevant_mask = self.hard_negative_mining(loss, label, negative_ratio)
 
         pos_no = label.sum() if label.sum() != 0 else 1
@@ -539,7 +530,7 @@ class FocalLossWithMask(nn.Module):
         loss[FN_mask] *= negative_ratio*10*w
         loss[FP_mask & ~may_has_ball] *= negative_ratio*10*w
         loss[TP_mask] *= negative_ratio*10
-        # loss[mask_hit_ball] *= negative_ratio*10*w
+        loss[mask_hit_ball] *= negative_ratio*10*w
 
         # print(f'fast and hit count: {(mask_fast_ball|mask_hit_ball).sum()}')
         # print(f'fast and hit with relevant count: {(loss[mask_fast_ball|mask_hit_ball] > 0).sum()}')
