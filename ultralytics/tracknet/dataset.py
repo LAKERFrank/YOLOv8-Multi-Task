@@ -130,27 +130,27 @@ class TrackNetDataset(Dataset):
 
                     self.img_cache(match_name, video_name, frames, npy_path)
             # 降低 FPS 120 => 30
-            for i in range(len(img_files) - (self.num_input*4-1)):
-                self.pbar.update(1)
+            # for i in range(len(img_files) - (self.num_input*4-1)):
+            #     self.pbar.update(1)
 
-                frames = img_files[i: i + self.num_input*4: 4]
+            #     frames = img_files[i: i + self.num_input*4: 4]
 
-                target = ball_trajectory_df.iloc[i: i + self.num_input*4: 4].values
-                target = self.transform_coordinates(target, 1280, 720)
+            #     target = ball_trajectory_df.iloc[i: i + self.num_input*4: 4].values
+            #     target = self.transform_coordinates(target, 1280, 720)
 
-                # Avoid invalid data
-                if len(frames) == self.num_input and len(target) == self.num_input:
-                    npy_path = self.img_cache_dir(match_name, video_name, frames)
+            #     # Avoid invalid data
+            #     if len(frames) == self.num_input and len(target) == self.num_input:
+            #         npy_path = self.img_cache_dir(match_name, video_name, frames)
 
-                    self.samples.append({
-                        "match_name": match_name,
-                        "video_name": video_name,
-                        "cache_npy": npy_path,
-                        "img_files": frames,
-                        "target": target
-                    })
+            #         self.samples.append({
+            #             "match_name": match_name,
+            #             "video_name": video_name,
+            #             "cache_npy": npy_path,
+            #             "img_files": frames,
+            #             "target": target
+            #         })
 
-                    self.img_cache(match_name, video_name, frames, npy_path)
+            #         self.img_cache(match_name, video_name, frames, npy_path)
 
             self.pbar.update(self.num_input-1)
 
