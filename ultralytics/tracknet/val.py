@@ -365,7 +365,7 @@ class TrackNetValidator(BaseValidator):
                 after_hit2 = [batch_target[target_idx+2][2], batch_target[target_idx+2][3]]
                 before_dist = calculate_dist(before_hit2, hit)
                 after_dist = calculate_dist(hit, after_hit2)
-                if before_dist > after_dist*2 or before_dist*2 < after_dist:
+                if before_dist > after_dist*3 or before_dist*3 < after_dist:
                     mask_hit_ball_v2[target_idx-2] = 1
                     mask_hit_ball_v2[target_idx-1] = 1
                     mask_hit_ball_v2[target_idx] = 1
@@ -418,7 +418,6 @@ class TrackNetValidator(BaseValidator):
         for frame_idx in range(10):
             # print(batch_target[frame_idx][6])
             if batch_target[frame_idx][6] == 1:
-                print("target hit")
                 if frame_idx - 2 >= 0:
                     batch_target[frame_idx - 2][6] = 1
                 if frame_idx - 1 >= 0:
