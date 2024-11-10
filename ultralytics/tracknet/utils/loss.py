@@ -257,7 +257,8 @@ class TrackNetLoss:
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
                 # 找出快球 => 慢球, 慢球 => 快球
                 if target_idx > 1 and target_idx < len(batch_target[idx])-2 and \
-                    batch_target[idx][target_idx-2][1] == 1 and batch_target[idx][target_idx][1] == 1 and batch_target[idx][target_idx+2][1] == 1:
+                    batch_target[idx][target_idx-2][1] == 1 and batch_target[idx][target_idx][1] == 1 and batch_target[idx][target_idx+2][1] == 1 and\
+                    batch_target[idx][target_idx-1][1] == 1 and batch_target[idx][target_idx+1][1] == 1:
                     
                     before_hit2 = [batch_target[idx][target_idx-2][2], batch_target[idx][target_idx-2][3]]
                     hit = [batch_target[idx][target_idx][2], batch_target[idx][target_idx][3]]
@@ -332,7 +333,6 @@ class TrackNetLoss:
         mask_fast_ball = mask_fast_ball.view(b, self.num_groups*20*20, 1).bool()
         mask_hit_ball = mask_hit_ball.view(b, self.num_groups*20*20, 1).bool()
         mask_hit_ball_v2 = mask_hit_ball_v2.view(b, self.num_groups*20*20, 1).bool()
-        mask_hit_ball_v2[~mask_has_ball] = False
         
         loss = torch.zeros(2, device=self.device)
         _, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball, mask_hit_ball_v2)
