@@ -83,6 +83,29 @@ class TrackNetValDataset(Dataset):
 
                     self.img_cache(match_name, video_name, frames, npy_path)
 
+            # 降低 FPS 120 => 60
+            for i in range(len(img_files)//20):
+                self.pbar.update(1)
+
+                frames = img_files[i*self.num_input*2: i*self.num_input*2 + self.num_input*2: 2]
+
+                target = ball_trajectory_df.iloc[i*self.num_input*2: i*self.num_input*2 + self.num_input*2: 2].values
+                target = self.transform_coordinates(target, 1280, 720)
+
+                # Avoid invalid data
+                if len(frames) == self.num_input and len(target) == self.num_input:
+                    npy_path = self.img_cache_dir(match_name, video_name, frames)
+
+                    self.samples.append({
+                        "match_name": match_name,
+                        "video_name": video_name,
+                        "cache_npy": npy_path,
+                        "img_files": frames,
+                        "target": target
+                    })
+
+                    self.img_cache(match_name, video_name, frames, npy_path)
+
             self.pbar.update(self.num_input-1)
 
     def img_cache_dir(self, match_name, video_name, img_files):
