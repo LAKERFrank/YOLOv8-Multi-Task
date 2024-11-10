@@ -75,6 +75,7 @@ def main(arg):
     overrides['plots'] = arg.plots
     overrides['val'] = arg.val
     overrides['use_dxdy_loss'] = arg.use_dxdy_loss
+    overrides['save_period'] = 10
 
     if arg.mode == 'train':
         trainer = TrackNetTrainer(overrides=overrides)
