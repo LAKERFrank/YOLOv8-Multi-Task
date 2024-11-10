@@ -532,7 +532,8 @@ class FocalLossWithMask(nn.Module):
         # print(f'relevant loss count: {(loss > 0).sum()}')
 
         # Apply the mask to the loss
-        loss = (loss).sum() / max(relevant_mask.float().sum(), 1)
+        loss_sum = (loss).sum()
+        loss = loss_sum / max(relevant_mask.float().sum(), 1) if loss_sum != 0 else 0
 
         return loss
 
@@ -557,7 +558,9 @@ class XYLoss(nn.Module):
         # DFL loss
         if self.use_dfl:
             loss_dfl = self._df_loss(pred_dist[fg_mask].view(-1, self.reg_max + 1), target_pos_distri[fg_mask]) * weight
-            loss_dfl = loss_dfl.sum() / target_scores_sum
+            loss_dfl_sum = loss_dfl.sum()
+                
+            loss_dfl = (loss_dfl_sum / target_scores_sum) if loss_dfl_sum != 0 else 0
         else:
             loss_dfl = torch.tensor(0.0).to(pred_dist.device)
 
