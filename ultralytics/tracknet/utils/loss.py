@@ -498,11 +498,10 @@ class FocalLossWithMask(nn.Module):
 
     def forward(self, pred, label, may_has_ball, mask_fast_ball, mask_hit_ball, gamma=2, alpha=0.75, negative_ratio=3.0):
         """Calculates and updates confusion matrix for object detection/classification tasks."""
-        if (label < 0).sum() > 0:
-            print(label[label < 0])
-            print("label has negative value")
         loss = F.binary_cross_entropy_with_logits(pred, label, reduction='none')
         if (loss < 0).sum() > 0:
+            print("Min logit:", pred.min().item())
+            print("Max logit:", pred.max().item())
             print(loss[loss < 0])
             print("bcs loss error loss has negative value")
         # p_t = torch.exp(-loss)
