@@ -416,8 +416,8 @@ class TrackNetValidator(BaseValidator):
         # 計算 hit v2 效果
         # 先填充 hit 前後兩幀
         for frame_idx in range(10):
-            print(batch_target[frame_idx][6])
-            if batch_target[frame_idx][6] == 1.0:
+            # print(batch_target[frame_idx][6])
+            if batch_target[frame_idx][6] == 1:
                 print("target hit")
                 if frame_idx - 2 >= 0:
                     batch_target[frame_idx - 2][6] = 1
