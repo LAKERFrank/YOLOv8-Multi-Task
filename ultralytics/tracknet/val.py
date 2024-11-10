@@ -311,6 +311,10 @@ class TrackNetValidator(BaseValidator):
         self.hitV2_FP = 0  # False Positives
         self.hitV2_TN = 0  # True Negatives
         self.hitV2_FN = 0  # False Negatives
+        self.hitV1_TP = 0  # True Positives
+        self.hitV1_FP = 0  # False Positives
+        self.hitV1_TN = 0  # True Negatives
+        self.hitV1_FN = 0  # False Negatives
     
     def update_metrics(self, preds, batch):
         """Calculate and update metrics based on predictions and batch."""
@@ -447,6 +451,15 @@ class TrackNetValidator(BaseValidator):
                 self.hitV2_TN += 1
             elif batch_target[frame_idx][6] == 1 and mask_hit_ball_v2[frame_idx] == 0:
                 self.hitV2_FN += 1
+
+            if batch_target[frame_idx][6] == 1 and mask_hit_ball[frame_idx] == 1:
+                self.hitV1_TP += 1
+            elif batch_target[frame_idx][6] == 0 and mask_hit_ball[frame_idx] == 1:
+                self.hitV1_FP += 1
+            elif batch_target[frame_idx][6] == 0 and mask_hit_ball[frame_idx] == 0:
+                self.hitV1_TN += 1
+            elif batch_target[frame_idx][6] == 1 and mask_hit_ball[frame_idx] == 0:
+                self.hitV1_FN += 1
             
              
 
