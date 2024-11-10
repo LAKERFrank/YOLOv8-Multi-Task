@@ -244,6 +244,7 @@ class TrackNetLoss:
 
         mask_fast_ball = torch.zeros(b, self.num_groups, 20, 20, device=self.device)
         mask_hit_ball = torch.zeros(b, self.num_groups, 20, 20, device=self.device)
+        mask_hit_ball_v2 = torch.zeros(b, self.num_groups, 20, 20, device=self.device)
 
         fast_ball_count = 0
         hit_ball_count = 0
@@ -254,6 +255,24 @@ class TrackNetLoss:
             for target_idx, target in enumerate(batch_target[idx]):
                 # target xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
+                # 找出快球 => 慢球, 慢球 => 快球
+                if target_idx > 1 and target_idx < len(batch_target[idx])-2 and \
+                    batch_target[idx][target_idx-2][1] == 1 and batch_target[idx][target_idx][1] == 1 and batch_target[idx][target_idx+2][1] == 1:
+                    before_hit2 = [batch_target[idx][target_idx-2][2], batch_target[idx][target_idx-2][3]]
+                    hit = [batch_target[idx][target_idx][2], batch_target[idx][target_idx][3]]
+                    after_hit2 = [batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3]]
+
+                    before_dist = calculate_dist(before_hit2, hit)
+                    after_dist = calculate_dist(hit, after_hit2)
+                    angle = calculate_angle(before_hit2, hit, after_hit2)
+
+                    if (angle and angle > 30 and (before_dist > 10 or after_dist > 10)) or \
+                        ((before_dist > 32 or after_dist > 32) and (before_dist > after_dist*2 or before_dist*2 < after_dist)):
+                        mask_hit_ball_v2[target_idx-2] = 1
+                        mask_hit_ball_v2[target_idx-1] = 1
+                        mask_hit_ball_v2[target_idx] = 1
+                        mask_hit_ball_v2[target_idx+1] = 1
+                        mask_hit_ball_v2[target_idx+2] = 1
                 if target_idx < len(batch_target[idx])-1 and batch_target[idx][target_idx+1][1] == 1 and\
                     batch_target[idx][target_idx][1] == 1 and target[4]**2 + target[5]**2 >= 20**2:
 
@@ -317,7 +336,7 @@ class TrackNetLoss:
         # bce = nn.BCEWithLogitsLoss(reduction='none', weight=cls_weight)
 
         self.confusion_class.confusion_matrix(pred_scores.sigmoid(), cls_targets)
-        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, mask_fast_ball, mask_hit_ball, 2, 0.75)
+        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, mask_fast_ball, mask_hit_ball_v2, 2, 0.75)
 
         # print(f'conf loss: {fp_loss_weighted, fn_loss_weighted, tp_loss_weighted}\n')
         # print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
@@ -497,7 +516,7 @@ class FocalLossWithMask(nn.Module):
         loss[FN_mask] *= negative_ratio*10*w
         loss[FP_mask & ~may_has_ball] *= negative_ratio*10*w
         loss[TP_mask] *= negative_ratio*10
-        loss[mask_fast_ball|mask_hit_ball] *= 20
+        loss[mask_hit_ball] *= 50
 
         # print(f'fast and hit count: {(mask_fast_ball|mask_hit_ball).sum()}')
         # print(f'fast and hit with relevant count: {(loss[mask_fast_ball|mask_hit_ball] > 0).sum()}')
