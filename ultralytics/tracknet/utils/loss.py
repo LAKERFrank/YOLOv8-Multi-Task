@@ -534,6 +534,8 @@ class FocalLossWithMask(nn.Module):
         # Apply the mask to the loss
         loss_sum = (loss).sum()
         loss = loss_sum / max(relevant_mask.float().sum(), 1) if loss_sum != 0 else 0
+        if loss < 0:
+            print(f'error loss < 0: loss_sum {loss_sum}, relevant_mask sum {relevant_mask.float().sum()}')
 
         return loss
 
