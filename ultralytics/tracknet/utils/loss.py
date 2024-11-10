@@ -516,6 +516,8 @@ class FocalLossWithMask(nn.Module):
         FP_mask = (pred_prob >= 0.5) & (label == 0)  # False Positive
 
         # Combine the masks (we only care about TP, FN, FP)
+        if (loss < 0).sum() > 0:
+            print("org error loss has negative value")
         relevant_mask = self.hard_negative_mining(loss, label, negative_ratio)
 
         pos_no = label.sum() if label.sum() != 0 else 1
