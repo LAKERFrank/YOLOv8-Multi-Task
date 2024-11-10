@@ -575,7 +575,8 @@ class TrackNetValidator(BaseValidator):
                     metrics, 
                     'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
                     box_color=box_color,
-                    label=label
+                    label=label,
+                    save_dir=self.metrics.save_dir
                     ) 
 
         # 計算 conf 的 confusion matrix

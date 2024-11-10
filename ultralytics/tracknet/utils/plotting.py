@@ -1,3 +1,4 @@
+from pathlib import Path
 from matplotlib import patches, patheffects, pyplot as plt
 import numpy as np
 import torch
@@ -139,7 +140,7 @@ def display_image_with_coordinates(img_tensor, target, pred, fileName, input_num
     plt.savefig(check_training_img_path+fileName, bbox_inches='tight')
     plt.close()
 
-def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue', target = None, label = None):
+def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue', target = None, label = None, save_dir = Path('.')):
     # Convert the image tensor to numpy array
     img_array = img_tensor.cpu().numpy()
 
@@ -209,5 +210,5 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         ax.text(img_width * 0.9, img_height * 0.1, text_to_display, color='black', fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
     # plt.show()
 
-    plt.savefig(check_predict_img+fileName, bbox_inches='tight')
+    plt.savefig(save_dir/'predict_val_img'/fileName, bbox_inches='tight')
     plt.close()
