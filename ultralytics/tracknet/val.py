@@ -373,7 +373,7 @@ class TrackNetValidator(BaseValidator):
                 after_dist = calculate_dist(hit, after_hit2)
                 angle = calculate_angle(before_hit2, hit, after_hit2)
 
-                if before_dist > after_dist*3 or before_dist*3 < after_dist:
+                if (before_dist > 10 or after_dist > 10) and (before_dist > after_dist*3 or before_dist*3 < after_dist):
                     mask_hit_ball_v2[target_idx-2] = 1
                     mask_hit_ball_v2[target_idx-1] = 1
                     mask_hit_ball_v2[target_idx] = 1
