@@ -333,7 +333,7 @@ class TrackNetLoss:
         mask_hit_ball_v2 = mask_hit_ball_v2.view(b, self.num_groups*20*20, 1).bool()
         
         loss = torch.zeros(2, device=self.device)
-        a, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball)
+        _, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball, mask_hit_ball_v2)
         
         cls_targets = cls_targets.to(pred_scores.dtype)
 
@@ -543,8 +543,9 @@ class XYLoss(nn.Module):
         self.reg_max = reg_max
         self.use_dfl = use_dfl
 
-    def forward(self, pred_dist, pred_pos, target_pos_distri, target_scores, target_scores_sum, fg_mask):
+    def forward(self, pred_dist, pred_pos, target_pos_distri, target_scores, target_scores_sum, fg_mask, hit_weight):
         """IoU loss."""
+        target_scores[hit_weight] *= 10
         weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
         # iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
         # loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
