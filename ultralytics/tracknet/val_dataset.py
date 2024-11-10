@@ -121,7 +121,7 @@ class TrackNetValDataset(Dataset):
         ball_trajectory_df['dX'] = -1*ball_trajectory_df['X'].diff(-1).fillna(0)
         ball_trajectory_df['dY'] = -1*ball_trajectory_df['Y'].diff(-1).fillna(0)
 
-        if 'hit' in ball_trajectory_df.columns:
+        if 'Event' in ball_trajectory_df.columns:
             ball_trajectory_df['hit'] = ((ball_trajectory_df['Event'] == 1) | (ball_trajectory_df['Event'] == 2)).astype(int)
         else:
             ball_trajectory_df['hit'] = 0
