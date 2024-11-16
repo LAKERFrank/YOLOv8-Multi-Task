@@ -341,7 +341,6 @@ class BaseTrainer:
 
                 # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
                 if ni - last_opt_step >= self.accumulate:
-                    print('do clip')
                     self.optimizer_step()
                     last_opt_step = ni
 
