@@ -339,15 +339,9 @@ class BaseTrainer:
                 # Backward
                 self.scaler.scale(self.loss).backward()
 
-                if i%1000 == 0:
-                    self.scaler.unscale_(self.optimizer)
-                    monitor_gradient_norm(self.model)
-                self.scaler.unscale_(self.optimizer)
-                # Gradient Clipping
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-
                 # Optimize - https://pytorch.org/docs/master/notes/amp_examples.html
                 if ni - last_opt_step >= self.accumulate:
+                    print('do clip')
                     self.optimizer_step()
                     last_opt_step = ni
 
@@ -466,7 +460,7 @@ class BaseTrainer:
     def optimizer_step(self):
         """Perform a single step of the training optimizer with gradient clipping and EMA update."""
         self.scaler.unscale_(self.optimizer)  # unscale gradients
-        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)  # clip gradients
+        torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)  # clip gradients
         self.scaler.step(self.optimizer)
         self.scaler.update()
         self.optimizer.zero_grad()
