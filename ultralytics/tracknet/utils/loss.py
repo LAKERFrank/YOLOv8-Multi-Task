@@ -352,8 +352,8 @@ class TrackNetLoss:
         # print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
         # print(f'hit_ball_count: {hit_ball_count}, total ball: {target_scores_sum}\n')
 
-        loss[0] *= 3  # dfl gain
-        loss[1] *= 100  # cls gain
+        loss[0] *= 1  # dfl gain
+        loss[1] *= 5  # cls gain
         # loss[2] *= 1  # iou gain
 
         tlose = loss.sum() * b
