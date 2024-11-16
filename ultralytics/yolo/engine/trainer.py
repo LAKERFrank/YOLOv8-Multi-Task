@@ -340,7 +340,9 @@ class BaseTrainer:
                 self.scaler.scale(self.loss).backward()
 
                 if i%1000 == 0:
+                    self.scaler.unscale_(self.optimizer)
                     monitor_gradient_norm(self.model)
+                self.scaler.unscale_(self.optimizer)
                 # Gradient Clipping
                 torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
 
