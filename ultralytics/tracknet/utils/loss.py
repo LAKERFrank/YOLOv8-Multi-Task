@@ -530,7 +530,7 @@ class FocalLossWithMask(nn.Module):
 
         loss = loss * relevant_mask.float()
         # TODO
-        loss[loss<0] = 0
+        # loss[loss<0] = 0
 
         loss[FN_mask] *= negative_ratio*10*w
         loss[FP_mask & ~may_has_ball] *= negative_ratio*10*w
@@ -569,7 +569,7 @@ class XYLoss(nn.Module):
         if self.use_dfl:
             loss_dfl = self._df_loss(pred_dist[fg_mask].view(-1, self.reg_max + 1), target_pos_distri[fg_mask]) * weight
             # TODO
-            loss_dfl[loss_dfl<0] = 0
+            # loss_dfl[loss_dfl<0] = 0
             loss_dfl_sum = loss_dfl.sum()
                 
             loss_dfl = (loss_dfl_sum / target_scores_sum) if loss_dfl_sum != 0 else 0
