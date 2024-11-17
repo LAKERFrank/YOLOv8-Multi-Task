@@ -497,11 +497,11 @@ class FocalLossWithMask(nn.Module):
         """Calculates and updates confusion matrix for object detection/classification tasks."""
         # pred = torch.clamp(pred, min=-10, max=10)
         loss = F.binary_cross_entropy_with_logits(pred, label, reduction='none')
-        if (loss < 0).sum() > 0:
-            print("Min logit:", pred.min().item())
-            print("Max logit:", pred.max().item())
-            print(loss[loss < 0])
-            print("bcs loss error loss has negative value")
+        # if (loss < 0).sum() > 0:
+        #     print("Min logit:", pred.min().item())
+        #     print("Max logit:", pred.max().item())
+        #     print(loss[loss < 0])
+        #     print("bcs loss error loss has negative value")
         # p_t = torch.exp(-loss)
         # loss *= self.alpha * (1.000001 - p_t) ** self.gamma  # non-zero power for gradient stability
 
@@ -510,7 +510,7 @@ class FocalLossWithMask(nn.Module):
         p_t = label * pred_prob + (1 - label) * (1 - pred_prob)
         
         min_value = torch.finfo(pred.dtype).eps  # 取當前數據類型的機器精度
-        p_t = torch.clamp(p_t, min=min_value, max=1 - min_value)
+        #p_t = torch.clamp(p_t, min=min_value, max=1 - min_value)
         modulating_factor = (1.000001 - p_t) ** gamma
         loss *= modulating_factor
         if alpha > 0:
