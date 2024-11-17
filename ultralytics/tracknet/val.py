@@ -664,8 +664,8 @@ class TrackNetValidator(BaseValidator):
 
                 precision_list.append(precision)
                 recall_list.append(recall)
-            precision_list = precision_list.reverse()
-            recall_list = recall_list.reverse()
+            precision_list.reverse()
+            recall_list.reverse()
             # 確保 Recall 是單調遞減的 (conf_threshold 小到大)
             for i in range(1, len(recall_list)):
                 if recall_list[i] < recall_list[i - 1]:
