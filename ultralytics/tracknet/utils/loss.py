@@ -481,18 +481,15 @@ class FocalLossWithMask(nn.Module):
         num_pos = pos_mask.sum(dim=1, keepdim=True)
         num_neg = negative_ratio * num_pos
 
-        original_loss = loss.clone()
-        loss[pos_mask] = 0
-
-        _, indices = loss.sort(dim=1, descending=True)
+        loss_for_sort = loss.clone()
+        loss_for_sort[pos_mask] = float('-inf')
+        _, indices = loss_for_sort.sort(dim=1, descending=True)
 
         neg_mask = torch.zeros_like(labels, dtype=torch.bool)
         for i in range(loss.size(0)):  
             num_neg_samples = int(num_neg[i].item()) if int(num_neg[i].item()) != 0 else int(negative_ratio)
             # num_neg_samples = int(num_neg[i].item())
             neg_mask[i, indices[i, :num_neg_samples]] = True 
-
-        loss[pos_mask] = original_loss[pos_mask]
 
         return pos_mask | neg_mask
 
@@ -511,7 +508,9 @@ class FocalLossWithMask(nn.Module):
         # TF implementation https://github.com/tensorflow/addons/blob/v0.7.1/tensorflow_addons/losses/focal_loss.py
         pred_prob = pred.sigmoid()  # prob from logits
         p_t = label * pred_prob + (1 - label) * (1 - pred_prob)
-        p_t = torch.clamp(p_t, min=1e-7, max=1 - 1e-7)
+        
+        min_value = torch.finfo(pred.dtype).eps  # 取當前數據類型的機器精度
+        p_t = torch.clamp(p_t, min=min_value, max=1 - min_value)
         modulating_factor = (1.000001 - p_t) ** gamma
         loss *= modulating_factor
         if alpha > 0:
