@@ -664,9 +664,10 @@ class TrackNetValidator(BaseValidator):
 
                 precision_list.append(precision)
                 recall_list.append(recall)
-
+            precision_list = precision_list.reverse()
+            recall_list = recall_list.reverse()
             # 確保 Recall 是單調遞減的 (conf_threshold 小到大)
-            assert all(recall_list[i] <= recall_list[i - 1] for i in range(1, len(recall_list))), \
+            assert all(recall_list[i] >= recall_list[i - 1] for i in range(1, len(recall_list))), \
                 f"Recall list must be non-decreasing for IoU index {iou_idx}: {recall_list}"
 
             # 確保 Precision 在 [0, 1] 範圍內
