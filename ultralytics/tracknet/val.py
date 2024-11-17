@@ -320,10 +320,12 @@ class TrackNetValidator(BaseValidator):
         # 一顆球半徑 = 3 pixel
         self.tolerance3 = 3.0 # 50% 距離容忍度
         self.conf_thresholds = [i * 0.05 for i in range(10, 20)]  # [0.5, 0.55, ..., 0.95]
-        self.cumulative_TP = [0] * len(self.conf_thresholds)
-        self.cumulative_FP = [0] * len(self.conf_thresholds)
-        self.cumulative_FN = [0] * len(self.conf_thresholds)
-        self.cumulative_TN = [0] * len(self.conf_thresholds)
+        self.iou_dist_thresholds = [i * 1 for i in range(1, 6)]  # [1, 2, ..., 5]
+        
+        self.cumulative_TP = [[0 for _ in self.conf_thresholds] for _ in self.iou_thresholds]
+        self.cumulative_FP = [[0 for _ in self.conf_thresholds] for _ in self.iou_thresholds]
+        self.cumulative_FN = [[0 for _ in self.conf_thresholds] for _ in self.iou_thresholds]
+        self.cumulative_TN = [[0 for _ in self.conf_thresholds] for _ in self.iou_thresholds]
         self.fitness = 0
     
     def update_metrics(self, preds, batch):
@@ -552,21 +554,23 @@ class TrackNetValidator(BaseValidator):
             
             # threshold = 0.5 ~ 0.95
             # threshold_idx = 0 ~ 9
-            for threshold_idx in range(len(self.conf_thresholds)):
-                conf_threshold = self.conf_thresholds[threshold_idx]
-                if batch_target[frame_idx][1] == 0:
-                    if max_conf >= conf_threshold:
-                        self.cumulative_FP[threshold_idx] += 1
-                    else:
-                        self.cumulative_TN[threshold_idx] += 1
-                else:
-                    if max_conf >= conf_threshold:
-                        if distance <= self.tolerance3:
-                            self.cumulative_TP[threshold_idx] += 1
+            # iou_dist = 1~5 (pixel 容忍距離)
+            for iou_dist_idx in range(len(self.iou_dist_thresholds)):
+                for threshold_idx in range(len(self.conf_thresholds)):
+                    conf_threshold = self.conf_thresholds[threshold_idx]
+                    if batch_target[frame_idx][1] == 0:
+                        if max_conf >= conf_threshold:
+                            self.cumulative_FP[iou_dist_idx][threshold_idx] += 1
                         else:
-                            self.cumulative_FN[threshold_idx] += 1
+                            self.cumulative_TN[iou_dist_idx][threshold_idx] += 1
                     else:
-                        self.cumulative_FN[threshold_idx] += 1
+                        if max_conf >= conf_threshold:
+                            if distance <= self.iou_dist_thresholds[iou_dist_idx]:
+                                self.cumulative_TP[iou_dist_idx][threshold_idx] += 1
+                            else:
+                                self.cumulative_FN[iou_dist_idx][threshold_idx] += 1
+                        else:
+                            self.cumulative_FN[iou_dist_idx][threshold_idx] += 1
             
             now = datetime.now()
             # Format the datetime object as a string
@@ -581,7 +585,7 @@ class TrackNetValidator(BaseValidator):
             #         ) 
 
         # 計算 conf 的 confusion matrix
-        threshold = 0.7
+        threshold = 0.6
         pred_binary = (pred_probs >= threshold)
         self.pred_ball_count += pred_binary.int().sum()
 
@@ -621,58 +625,88 @@ class TrackNetValidator(BaseValidator):
 
         self.calculate_precision_recall(True)
 
-    def calculate_precision_recall(self, plot = False):
-        assert len(self.cumulative_TP) == len(self.conf_thresholds), "TP and thresholds length mismatch"
-        assert len(self.cumulative_FP) == len(self.conf_thresholds), "FP and thresholds length mismatch"
-        assert len(self.cumulative_FN) == len(self.conf_thresholds), "FN and thresholds length mismatch"
+    def calculate_precision_recall(self, plot=False):
+        # 確保維度一致性
+        assert len(self.cumulative_TP) == len(self.iou_dist_thresholds), "TP and IoU thresholds length mismatch"
+        assert len(self.cumulative_FP) == len(self.iou_dist_thresholds), "FP and IoU thresholds length mismatch"
+        assert len(self.cumulative_FN) == len(self.iou_dist_thresholds), "FN and IoU thresholds length mismatch"
+        assert all(len(self.cumulative_TP[i]) == len(self.conf_thresholds) for i in range(len(self.iou_dist_thresholds))), \
+            "TP and confidence thresholds length mismatch in nested lists"
+        assert all(len(self.cumulative_FP[i]) == len(self.conf_thresholds) for i in range(len(self.iou_dist_thresholds))), \
+            "FP and confidence thresholds length mismatch in nested lists"
+        assert all(len(self.cumulative_FN[i]) == len(self.conf_thresholds) for i in range(len(self.iou_dist_thresholds))), \
+            "FN and confidence thresholds length mismatch in nested lists"
 
-        # 繪製 Precision-Recall 曲線
-        precision_list = []
-        recall_list = []
+        # Precision-Recall 曲線結果儲存
+        precision_recall_by_iou = []
 
-        for idx in range(len(self.conf_thresholds)):
-            TP = self.cumulative_TP[idx]
-            FP = self.cumulative_FP[idx]
-            FN = self.cumulative_FN[idx]
-            
-            # 計算 Precision 和 Recall，並檢查分母是否為零
-            if (TP + FP) == 0:
-                print(f"Warning: TP + FP is 0 at index {idx}. Precision set to 0.")
-                precision = 0
-            else:
-                precision = TP / (TP + FP)
+        for iou_idx in range(len(self.iou_dist_thresholds)):
+            precision_list = []
+            recall_list = []
 
-            if (TP + FN) == 0:
-                print(f"Warning: TP + FN is 0 at index {idx}. Recall set to 0.")
-                recall = 0
-            else:
-                recall = TP / (TP + FN)
+            for conf_idx in range(len(self.conf_thresholds)):
+                TP = self.cumulative_TP[iou_idx][conf_idx]
+                FP = self.cumulative_FP[iou_idx][conf_idx]
+                FN = self.cumulative_FN[iou_idx][conf_idx]
 
-            precision_list.append(precision)
-            recall_list.append(recall)
+                # 計算 Precision 和 Recall，處理分母為 0 的情況
+                if (TP + FP) == 0:
+                    print(f"Warning: TP + FP is 0 at IoU index {iou_idx}, Conf index {conf_idx}. Precision set to 0.")
+                    precision = 0
+                else:
+                    precision = TP / (TP + FP)
 
-        # 繪製 Precision-Recall 曲線
+                if (TP + FN) == 0:
+                    print(f"Warning: TP + FN is 0 at IoU index {iou_idx}, Conf index {conf_idx}. Recall set to 0.")
+                    recall = 0
+                else:
+                    recall = TP / (TP + FN)
+
+                precision_list.append(precision)
+                recall_list.append(recall)
+
+            # 確保 Recall 是單調遞增的
+            assert all(recall_list[i] >= recall_list[i - 1] for i in range(1, len(recall_list))), \
+                f"Recall list must be non-decreasing for IoU index {iou_idx}: {recall_list}"
+
+            # 確保 Precision 在 [0, 1] 範圍內
+            assert all(0 <= p <= 1 for p in precision_list), f"Invalid precision values for IoU index {iou_idx}: {precision_list}"
+
+            # 儲存 Precision-Recall 結果
+            precision_recall_by_iou.append((precision_list, recall_list))
+
+        # 平均 Precision-Recall 曲線繪製
         if plot:
-            plt.figure()
-            plt.plot(recall_list, precision_list, marker='o')
-            plt.xlabel('Recall')
-            plt.ylabel('Precision')
-            plt.title('Precision-Recall Curve')
-            now = datetime.now()
-            # Format the datetime object as a string
-            formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
-            output_dir = self.metrics.save_dir / 'precision_recall'
-            output_dir.mkdir(parents=True, exist_ok=True)
-            plt.savefig(output_dir/f'precision_recall_curve_{formatted_date}.png')
-            plt.close()
+            for iou_idx, (precision_list, recall_list) in enumerate(precision_recall_by_iou):
+                plt.figure()
+                plt.plot(recall_list, precision_list, marker='o', label=f"IoU={self.iou_dist_thresholds[iou_idx]:.2f}")
+                plt.xlabel('Recall')
+                plt.ylabel('Precision')
+                plt.title(f'Precision-Recall Curve for IoU={self.iou_dist_thresholds[iou_idx]:.2f}')
+                plt.legend()
+                now = datetime.now()
+                formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
+                output_dir = self.metrics.save_dir / 'precision_recall'
+                output_dir.mkdir(parents=True, exist_ok=True)
+                plt.savefig(output_dir / f'precision_recall_curve_iou_{iou_idx}_{formatted_date}.png')
+                plt.close()
 
         # 計算平均 Precision (AP) 作為 fitness
-        ap = 0.0
-        for i in range(1, len(recall_list)):
-            ap += (recall_list[i] - recall_list[i - 1]) * precision_list[i]
+        ap_list = []
+        for iou_idx, (precision_list, recall_list) in enumerate(precision_recall_by_iou):
+            ap = 0.0
+            for i in range(1, len(recall_list)):
+                ap += (recall_list[i] - recall_list[i - 1]) * precision_list[i]
+            ap_list.append(ap)
 
-        self.fitness = ap
-        print("Average Precision (AP):", ap)
+            # 檢查 AP 是否合理
+            assert ap >= 0, f"AP is negative for IoU index {iou_idx}: {ap}"
+
+            print(f"Average Precision (AP) for IoU={self.iou_dist_thresholds[iou_idx]:.2f}: {ap}")
+
+        # 最終的平均 AP
+        self.fitness = sum(ap_list) / len(ap_list) if ap_list else 0
+        print("Overall Average Precision (AP):", self.fitness)
 
     def get_stats(self):
         # 繪製 Precision-Recall 曲線
