@@ -482,7 +482,7 @@ class FocalLossWithMask(nn.Module):
         num_neg = negative_ratio * num_pos
 
         original_loss = loss.clone()
-        loss[pos_mask] = -1e9
+        loss[pos_mask] = 0
 
         _, indices = loss.sort(dim=1, descending=True)
 
