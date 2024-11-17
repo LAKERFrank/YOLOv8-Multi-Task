@@ -319,7 +319,7 @@ class TrackNetValidator(BaseValidator):
 
         # 一顆球半徑 = 3 pixel
         self.tolerance3 = 3.0 # 50% 距離容忍度
-        self.conf_thresholds = [i * 0.05 for i in range(10, 20)]  # [0.5, 0.55, ..., 1.0]
+        self.conf_thresholds = [i * 0.05 for i in range(10, 20)]  # [0.5, 0.55, ..., 0.95]
         self.cumulative_TP = [0] * len(self.conf_thresholds)
         self.cumulative_FP = [0] * len(self.conf_thresholds)
         self.cumulative_FN = [0] * len(self.conf_thresholds)
@@ -423,7 +423,7 @@ class TrackNetValidator(BaseValidator):
         mask_has_ball = mask_has_ball.view(self.num_groups*20*20).bool()
 
         self.fast_count += mask_fast_ball.sum()
-        self.hit_count += mask_hit_ball.sum()
+        self.hit_count += mask_hit_ball_v2.sum()
         mask_fast_hit_ball = (mask_fast_ball.bool()|mask_hit_ball_v2.bool()).float()
         self.fast_hit_count += mask_fast_hit_ball.sum()
 
@@ -550,7 +550,8 @@ class TrackNetValidator(BaseValidator):
                     if mask_fast_hit_ball[frame_idx] == 1:
                         self.fast_hit_FN += 1
             
-
+            # threshold = 0.5 ~ 0.95
+            # threshold_idx = 0 ~ 9
             for threshold_idx in range(len(self.conf_thresholds)):
                 conf_threshold = self.conf_thresholds[threshold_idx]
                 if batch_target[frame_idx][1] == 0:
@@ -621,6 +622,10 @@ class TrackNetValidator(BaseValidator):
         self.calculate_precision_recall(True)
 
     def calculate_precision_recall(self, plot = False):
+        assert len(self.cumulative_TP) == len(self.conf_thresholds), "TP and thresholds length mismatch"
+        assert len(self.cumulative_FP) == len(self.conf_thresholds), "FP and thresholds length mismatch"
+        assert len(self.cumulative_FN) == len(self.conf_thresholds), "FN and thresholds length mismatch"
+
         # 繪製 Precision-Recall 曲線
         precision_list = []
         recall_list = []
@@ -630,9 +635,18 @@ class TrackNetValidator(BaseValidator):
             FP = self.cumulative_FP[idx]
             FN = self.cumulative_FN[idx]
             
-            # 計算 Precision 和 Recall
-            precision = TP / (TP + FP) if (TP + FP) > 0 else 0
-            recall = TP / (TP + FN) if (TP + FN) > 0 else 0
+            # 計算 Precision 和 Recall，並檢查分母是否為零
+            if (TP + FP) == 0:
+                print(f"Warning: TP + FP is 0 at index {idx}. Precision set to 0.")
+                precision = 0
+            else:
+                precision = TP / (TP + FP)
+
+            if (TP + FN) == 0:
+                print(f"Warning: TP + FN is 0 at index {idx}. Recall set to 0.")
+                recall = 0
+            else:
+                recall = TP / (TP + FN)
 
             precision_list.append(precision)
             recall_list.append(recall)
