@@ -496,6 +496,9 @@ class FocalLossWithMask(nn.Module):
     def forward(self, pred, label, may_has_ball, mask_fast_ball, mask_hit_ball, gamma=2, alpha=0.75, negative_ratio=3.0):
         """Calculates and updates confusion matrix for object detection/classification tasks."""
         # pred = torch.clamp(pred, min=-10, max=10)
+        print(f"Label unique values: {label.unique()}")
+        print(f"Pred min: {pred.min()}, Pred max: {pred.max()}, Pred mean: {pred.mean()}")
+
         loss = F.binary_cross_entropy_with_logits(pred, label, reduction='none')
         # if (loss < 0).sum() > 0:
         #     print("Min logit:", pred.min().item())
