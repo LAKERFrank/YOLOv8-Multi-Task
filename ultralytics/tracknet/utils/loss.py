@@ -562,8 +562,9 @@ class XYLoss(nn.Module):
 
     def forward(self, pred_dist, pred_pos, target_pos_distri, target_scores, target_scores_sum, fg_mask, hit_weight):
         """IoU loss."""
-        target_scores[hit_weight] *= 10
-        weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
+        target_scores_clone = target_scores.clone()
+        target_scores_clone[hit_weight] *= 10
+        weight = target_scores_clone.sum(-1)[fg_mask].unsqueeze(-1)
         # iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
         # loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
 
