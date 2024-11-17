@@ -497,11 +497,8 @@ class FocalLossWithMask(nn.Module):
         """Calculates and updates confusion matrix for object detection/classification tasks."""
         assert torch.all((label == 0) | (label == 1)), f"`label` contains invalid values: {label.unique()}"
         loss = F.binary_cross_entropy_with_logits(pred, label, reduction='none')
-        if (loss < 0).sum() > 0:
-            print("Min logit:", pred.min().item())
-            print("Max logit:", pred.max().item())
-            print(loss[loss < 0])
-            print("bcs loss error loss has negative value")
+        assert (loss >= 0).all(), f"`loss` contains negative values. Min: {loss.min()}, Max: {loss.max()}"
+
         # p_t = torch.exp(-loss)
         # loss *= self.alpha * (1.000001 - p_t) ** self.gamma  # non-zero power for gradient stability
 
@@ -509,7 +506,8 @@ class FocalLossWithMask(nn.Module):
         pred_prob = pred.sigmoid()  # prob from logits
         p_t = label * pred_prob + (1 - label) * (1 - pred_prob)
         
-        min_value = torch.finfo(pred.dtype).eps  # 取當前數據類型的機器精度
+        #避免梯度爆炸
+        #min_value = torch.finfo(pred.dtype).eps  # 取當前數據類型的機器精度
         #p_t = torch.clamp(p_t, min=min_value, max=1 - min_value)
         modulating_factor = (1.000001 - p_t) ** gamma
         loss *= modulating_factor
@@ -531,8 +529,6 @@ class FocalLossWithMask(nn.Module):
         w = (alpha/(1-alpha))
 
         loss = loss * relevant_mask.float()
-        # TODO
-        # loss[loss<0] = 0
 
         loss[FN_mask] *= negative_ratio*10*w
         loss[FP_mask & ~may_has_ball] *= negative_ratio*10*w
@@ -571,8 +567,7 @@ class XYLoss(nn.Module):
         # DFL loss
         if self.use_dfl:
             loss_dfl = self._df_loss(pred_dist[fg_mask].view(-1, self.reg_max + 1), target_pos_distri[fg_mask]) * weight
-            # TODO
-            # loss_dfl[loss_dfl<0] = 0
+            assert (loss_dfl >= 0).all(), f"`loss` contains negative values. Min: {loss_dfl.min()}, Max: {loss_dfl.max()}"
             loss_dfl_sum = loss_dfl.sum()
                 
             loss_dfl = (loss_dfl_sum / target_scores_sum) if loss_dfl_sum != 0 else 0
