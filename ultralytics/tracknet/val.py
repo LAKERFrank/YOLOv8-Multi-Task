@@ -322,10 +322,10 @@ class TrackNetValidator(BaseValidator):
         self.conf_thresholds = [i * 0.05 for i in range(10, 20)]  # [0.5, 0.55, ..., 0.95]
         self.iou_dist_thresholds = [i * 1 for i in range(1, 6)]  # [1, 2, ..., 5]
         
-        self.cumulative_TP = [[0 for _ in self.conf_thresholds] for _ in self.iou_thresholds]
-        self.cumulative_FP = [[0 for _ in self.conf_thresholds] for _ in self.iou_thresholds]
-        self.cumulative_FN = [[0 for _ in self.conf_thresholds] for _ in self.iou_thresholds]
-        self.cumulative_TN = [[0 for _ in self.conf_thresholds] for _ in self.iou_thresholds]
+        self.cumulative_TP = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
+        self.cumulative_FP = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
+        self.cumulative_FN = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
+        self.cumulative_TN = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
         self.fitness = 0
     
     def update_metrics(self, preds, batch):
