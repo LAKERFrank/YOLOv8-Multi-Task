@@ -482,7 +482,7 @@ class FocalLossWithMask(nn.Module):
         num_neg = negative_ratio * num_pos
 
         original_loss = loss.clone()
-        loss[pos_mask] = -float('inf')
+        loss[pos_mask] = -1e9
 
         _, indices = loss.sort(dim=1, descending=True)
 
@@ -511,10 +511,13 @@ class FocalLossWithMask(nn.Module):
         # TF implementation https://github.com/tensorflow/addons/blob/v0.7.1/tensorflow_addons/losses/focal_loss.py
         pred_prob = pred.sigmoid()  # prob from logits
         p_t = label * pred_prob + (1 - label) * (1 - pred_prob)
+        p_t = torch.clamp(p_t, min=1e-7, max=1 - 1e-7)
         modulating_factor = (1.000001 - p_t) ** gamma
         loss *= modulating_factor
         if alpha > 0:
             alpha_factor = label * alpha + (1 - label) * (1 - alpha)
+            if (alpha_factor < 0).any():
+                print("Negative alpha_factor detected:", alpha_factor[alpha_factor < 0])
             loss *= alpha_factor
         
         TP_mask = (pred_prob >= 0.5) & (label == 1)  # True Positive
