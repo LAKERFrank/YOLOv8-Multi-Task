@@ -319,7 +319,7 @@ class TrackNetValidator(BaseValidator):
 
         # 一顆球半徑 = 3 pixel
         self.tolerance3 = 3.0 # 50% 距離容忍度
-        self.conf_thresholds = [i * 0.05 for i in range(10, 20)]  # [0.5, 0.55, ..., 0.95]
+        self.conf_thresholds = [i * 0.05 for i in range(1, 20)]  # [0.5, 0.55, ..., 0.95]
         self.iou_dist_thresholds = [i * 1 for i in range(1, 6)]  # [1, 2, ..., 5]
         
         self.cumulative_TP = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
