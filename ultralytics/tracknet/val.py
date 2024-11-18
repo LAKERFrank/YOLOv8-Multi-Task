@@ -285,7 +285,7 @@ class TrackNetValidator(BaseValidator):
         self.pos_TN = 0
         self.pos_FP = 0
         self.pos_FN = 0
-        self.pos_FN_dis = 0
+        self.pos_FP_dis = 0
         self.fast_TP = 0
         self.hit_TP = 0
         self.fast_FN = 0
@@ -534,8 +534,8 @@ class TrackNetValidator(BaseValidator):
                     if distance <= self.tolerance3:
                         self.pos_TP += 1
                     else:
-                        self.pos_FN += 1
-                        self.pos_FN_dis += 1
+                        self.pos_FP += 1
+                        self.pos_FP_dis += 1
                         box_color = 'blue'
                     if mask_fast_ball[frame_idx] == 1:
                         self.fast_TP += 1
@@ -568,7 +568,7 @@ class TrackNetValidator(BaseValidator):
                             if distance <= self.iou_dist_thresholds[iou_dist_idx]:
                                 self.cumulative_TP[iou_dist_idx][threshold_idx] += 1
                             else:
-                                self.cumulative_FN[iou_dist_idx][threshold_idx] += 1
+                                self.cumulative_FP[iou_dist_idx][threshold_idx] += 1
                         else:
                             self.cumulative_FN[iou_dist_idx][threshold_idx] += 1
             
@@ -719,7 +719,7 @@ class TrackNetValidator(BaseValidator):
         self.calculate_precision_recall(False)
 
         """Return the stats."""
-        return {'fitness': self.fitness, 'pos_FN': self.pos_FN, 'pos_FN_dis': self.pos_FN_dis, 'pos_FP': self.pos_FP, 'pos_TN': self.pos_TN, 
+        return {'fitness': self.fitness, 'pos_FN': self.pos_FN, 'pos_FN_dis': self.pos_FP_dis, 'pos_FP': self.pos_FP, 'pos_TN': self.pos_TN, 
                 'pos_TP': self.pos_TP, 'pos_acc': self.pos_acc, 'pos_precision': self.pos_precision,
                 "fast_TP": self.fast_TP, "fast_FN": self.fast_FN, 
                 "hit_TP": self.hit_TP, "hit_FN": self.hit_FN, 
