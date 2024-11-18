@@ -719,7 +719,7 @@ class TrackNetValidator(BaseValidator):
         self.calculate_precision_recall(False)
 
         """Return the stats."""
-        return {'fitness': self.fitness, 'pos_FN': self.pos_FN, 'pos_FN_dis': self.pos_FP_dis, 'pos_FP': self.pos_FP, 'pos_TN': self.pos_TN, 
+        return {'fitness': self.fitness, 'pos_FN': self.pos_FN, 'pos_FP_dis': self.pos_FP_dis, 'pos_FP': self.pos_FP, 'pos_TN': self.pos_TN, 
                 'pos_TP': self.pos_TP, 'pos_acc': self.pos_acc, 'pos_precision': self.pos_precision,
                 "fast_TP": self.fast_TP, "fast_FN": self.fast_FN, 
                 "hit_TP": self.hit_TP, "hit_FN": self.hit_FN, 
