@@ -86,7 +86,7 @@ class TrackNetDataset(Dataset):
 
                     hit_exists = np.any(target[:, 6] == 1)
                     if hit_exists:
-                        for i in range(10):
+                        for i in range(5):
                             self.samples.append({
                                 "match_name": match_name,
                                 "video_name": video_name,
@@ -120,7 +120,7 @@ class TrackNetDataset(Dataset):
 
                     hit_exists = np.any(target[:, 6] == 1)
                     if hit_exists:
-                        for i in range(10):
+                        for i in range(5):
                             self.samples.append({
                                 "match_name": match_name,
                                 "video_name": video_name,
@@ -153,7 +153,7 @@ class TrackNetDataset(Dataset):
 
                     hit_exists = np.any(target[:, 6] == 1)
                     if hit_exists:
-                        for i in range(10):
+                        for i in range(5):
                             self.samples.append({
                                 "match_name": match_name,
                                 "video_name": video_name,
