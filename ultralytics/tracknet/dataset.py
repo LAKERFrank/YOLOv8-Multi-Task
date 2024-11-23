@@ -83,6 +83,17 @@ class TrackNetDataset(Dataset):
                     })
 
                     self.img_cache(match_name, video_name, frames, npy_path)
+
+                    hit_exists = np.any(target[:, 6] == 1)
+                    if hit_exists:
+                        for i in range(10):
+                            self.samples.append({
+                                "match_name": match_name,
+                                "video_name": video_name,
+                                "cache_npy": npy_path,
+                                "img_files": frames,
+                                "target": target
+                            })
             
             # 降低 FPS 120 => 60
             for i in range(len(img_files) - (self.num_input*2-1)):
@@ -106,6 +117,17 @@ class TrackNetDataset(Dataset):
                     })
 
                     self.img_cache(match_name, video_name, frames, npy_path)
+
+                    hit_exists = np.any(target[:, 6] == 1)
+                    if hit_exists:
+                        for i in range(10):
+                            self.samples.append({
+                                "match_name": match_name,
+                                "video_name": video_name,
+                                "cache_npy": npy_path,
+                                "img_files": frames,
+                                "target": target
+                            })
             # 降低 FPS 120 => 40
             for i in range(len(img_files) - (self.num_input*3-1)):
                 self.pbar.update(1)
@@ -128,6 +150,17 @@ class TrackNetDataset(Dataset):
                     })
 
                     self.img_cache(match_name, video_name, frames, npy_path)
+
+                    hit_exists = np.any(target[:, 6] == 1)
+                    if hit_exists:
+                        for i in range(10):
+                            self.samples.append({
+                                "match_name": match_name,
+                                "video_name": video_name,
+                                "cache_npy": npy_path,
+                                "img_files": frames,
+                                "target": target
+                            })
             # 降低 FPS 120 => 30
             # for i in range(len(img_files) - (self.num_input*4-1)):
             #     self.pbar.update(1)
