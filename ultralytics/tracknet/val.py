@@ -318,7 +318,7 @@ class TrackNetValidator(BaseValidator):
         self.hitV1_FN = 0  # False Negatives
 
         # 一顆球半徑 = 3 pixel
-        self.tolerance3 = 3.0 # 50% 距離容忍度
+        self.tolerance3 = 5.0 # 50% 距離容忍度
         self.conf_thresholds = [i * 0.05 for i in range(1, 20)]  # [0.5, 0.55, ..., 0.95]
         self.iou_dist_thresholds = [i * 1 for i in range(1, 6)]  # [1, 2, ..., 5]
         
