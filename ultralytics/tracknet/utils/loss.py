@@ -530,11 +530,10 @@ class FocalLossWithMask(nn.Module):
 
         loss = loss * relevant_mask.float()
 
-        # 測試將 conf 額外權重移除
-        # loss[FN_mask] *= negative_ratio*10*w
-        # loss[FP_mask & ~may_has_ball] *= negative_ratio*10*w
-        # loss[TP_mask] *= negative_ratio*10
-        # loss[mask_hit_ball] *= negative_ratio*10*w*3
+        loss[FN_mask] *= negative_ratio*10*w
+        loss[FP_mask & ~may_has_ball] *= negative_ratio*10*w
+        loss[TP_mask] *= negative_ratio*10
+        loss[mask_hit_ball] *= negative_ratio*10*w*3
 
         # print(f'fast and hit count: {(mask_fast_ball|mask_hit_ball).sum()}')
         # print(f'fast and hit with relevant count: {(loss[mask_fast_ball|mask_hit_ball] > 0).sum()}')
@@ -557,7 +556,7 @@ class XYLoss(nn.Module):
     def forward(self, pred_dist, pred_pos, target_pos_distri, target_scores, target_scores_sum, fg_mask, hit_weight):
         """IoU loss."""
         target_scores_clone = target_scores.clone()
-        target_scores_clone[hit_weight] *= 10
+        target_scores_clone[hit_weight] *= 30
         weight = target_scores_clone.sum(-1)[fg_mask].unsqueeze(-1)
         # iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
         # loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
