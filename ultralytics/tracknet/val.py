@@ -318,7 +318,7 @@ class TrackNetValidator(BaseValidator):
         self.hitV1_FN = 0  # False Negatives
 
         # 一顆球半徑 = 3 pixel
-        self.tolerance3 = 10.0 # 50% 距離容忍度
+        self.tolerance3 = 3.0 # 50% 距離容忍度
         self.conf_thresholds = [i * 0.05 for i in range(1, 20)]  # [0.5, 0.55, ..., 0.95]
         self.iou_dist_thresholds = [i * 1 for i in range(1, 6)]  # [1, 2, ..., 5]
         
@@ -685,7 +685,9 @@ class TrackNetValidator(BaseValidator):
         if plot:
             for iou_idx, (precision_list, recall_list) in enumerate(precision_recall_by_iou):
                 plt.figure()
-                plt.plot(recall_list, precision_list, marker='o', label=f"IoU={self.iou_dist_thresholds[iou_idx]:.2f}")
+                for idx, (recall, precision) in enumerate(zip(recall_list, precision_list)):
+                    plt.plot(recall, precision, marker='o', label=f"IoU={self.iou_dist_thresholds[iou_idx]:.2f}")
+                    plt.text(recall, precision, str(idx), fontsize=8, ha='right', va='bottom')
                 plt.xlabel('Recall')
                 plt.ylabel('Precision')
                 plt.title(f'Precision-Recall Curve for IoU={self.iou_dist_thresholds[iou_idx]:.2f}')
