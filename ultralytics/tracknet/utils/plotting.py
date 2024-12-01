@@ -140,7 +140,7 @@ def display_image_with_coordinates(img_tensor, target, pred, fileName, input_num
     plt.savefig(check_training_img_path+fileName, bbox_inches='tight')
     plt.close()
 
-def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue', target = None, label = None, save_dir = Path('.')):
+def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue', target = None, label = None, save_dir = Path('.'), stride = 32):
     # Convert the image tensor to numpy array
     img_array = img_tensor.cpu().numpy()
 
@@ -159,10 +159,10 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         y = pred["y"]
         conf = pred["conf"]
 
-        x_coordinates *= 32
-        y_coordinates *= 32
-        current_x = x_coordinates+x*32
-        current_y = y_coordinates+y*32
+        x_coordinates *= stride
+        y_coordinates *= stride
+        current_x = x_coordinates+x*stride
+        current_y = y_coordinates+y*stride
 
         if isinstance(current_x, torch.Tensor):
             current_x = current_x.cpu().numpy()
@@ -178,9 +178,9 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         
         # next_x = current_x+dx*640
         # next_y = current_y+dy*640
-        rect = patches.Rectangle(xy=(x_coordinates, y_coordinates), height=32, width=32, edgecolor=box_color, facecolor='none', linewidth=0.5)
+        rect = patches.Rectangle(xy=(x_coordinates, y_coordinates), height=stride, width=stride, edgecolor=box_color, facecolor='none', linewidth=0.5)
         ax.add_patch(rect)
-        text = ax.text(x_coordinates+32+1, y_coordinates+32, f'{str(conf)}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
+        text = ax.text(x_coordinates+stride+1, y_coordinates+stride, f'{str(conf)}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
         text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
                        patheffects.Normal()])
         ax.scatter(current_x, current_y, s=1.4, c='red', marker='o')
