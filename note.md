@@ -129,35 +129,46 @@ docker exec -it 0c3e1511776e /bin/bash
 
 ## 20241006
 - train322 epoch 200, DFL + conf + dxdy: eba7aca
+- train328 epoch 200, DFL + conf
+
+## 20241021
+- train341 epoch 200, DFL + conf: 4eec5a6, val mode + save val (此 val 是 training 沒有看過的資料)
+
+## 20241027
+- val total ball count = 3904
+
+## 20241027
+- train348 epoch 200, conf+xy val 目前最佳, 可拿來做為之後比較依據 (ac1ec91fd13b772af3670146b9c33fbdb674d7d0)
 
 
-ERROR training 最後出現錯誤，待排查
-Exception in thread Thread-5 (_pin_memory_loop):
-Traceback (most recent call last):
-  File "/opt/conda/lib/python3.10/threading.py", line 1016, in _bootstrap_inner
-    self.run()
-  File "/opt/conda/lib/python3.10/threading.py", line 953, in run
-    self._target(*self._args, **self._kwargs)
-  File "/opt/conda/lib/python3.10/site-packages/torch/utils/data/_utils/pin_memory.py", line 51, in _pin_memory_loop
-    do_one_step()
-  File "/opt/conda/lib/python3.10/site-packages/torch/utils/data/_utils/pin_memory.py", line 28, in do_one_step
-    r = in_queue.get(timeout=MP_STATUS_CHECK_INTERVAL)
-  File "/opt/conda/lib/python3.10/multiprocessing/queues.py", line 122, in get
-    return _ForkingPickler.loads(res)
-  File "/opt/conda/lib/python3.10/site-packages/torch/multiprocessing/reductions.py", line 307, in rebuild_storage_fd
-    fd = df.detach()
-  File "/opt/conda/lib/python3.10/multiprocessing/resource_sharer.py", line 57, in detach
-    with _resource_sharer.get_connection(self._id) as conn:
-  File "/opt/conda/lib/python3.10/multiprocessing/resource_sharer.py", line 86, in get_connection
-    c = Client(address, authkey=process.current_process().authkey)
-  File "/opt/conda/lib/python3.10/multiprocessing/connection.py", line 508, in Client
-    answer_challenge(c, authkey)
-  File "/opt/conda/lib/python3.10/multiprocessing/connection.py", line 752, in answer_challenge
-    message = connection.recv_bytes(256)         # reject large message
-  File "/opt/conda/lib/python3.10/multiprocessing/connection.py", line 216, in recv_bytes
-    buf = self._recv_bytes(maxlength)
-  File "/opt/conda/lib/python3.10/multiprocessing/connection.py", line 414, in _recv_bytes
-    buf = self._recv(4)
-  File "/opt/conda/lib/python3.10/multiprocessing/connection.py", line 379, in _recv
-    chunk = read(handle, remaining)
-ConnectionResetError: [Errno 104] Connection reset by peer
+## 20241101
+- train354 epoch 200, conf+xy, 增加快速球的權重 dist = 20
+
+12:50 包含 之前
+
+## 20241104
+- train371 60FPS + 120 FPS
+
+
+## 20241110
+- 距離相差2倍 hitV2- TP: 143, FP: 65, TN: 1806, FN: 236
+- 距離相差1.5倍 
+
+## 20241118
+- train429 f205932a7638d524ab513846956c37d334264d20
+  - 修好 fitness
+  - 找到 loss 有負數的原因
+  - precision-recall 圖，正確產出
+- train431 35583f087ad425f97d86c025971839c6efd064a5
+  - 修好 FP 的計算，IOU 太小也算預測有球但預測錯誤
+
+## 20241123
+- Ctrl + P 再加上 Ctrl + Q
+  - 可以不中斷 python 執行
+  - docker exec <container_name> ps aux => 可以檢查容器內執行的進程
+
+- 執行 python script.py & => Ctrl + P 再加上 Ctrl + Q
+  - 可以讓 python 在背景執行
+- train437 b91725148efcca01f362cf3a55e7a975f7045c92
+  - 不使用 conf weight
+  - hit duplicate: 5
