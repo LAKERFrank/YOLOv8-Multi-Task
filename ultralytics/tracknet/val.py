@@ -270,7 +270,7 @@ class TrackNetValidator(BaseValidator):
     def init_metrics(self, model):
         """Initialize some metrics."""
         # Placeholder for any metrics you might want to use.
-        
+
         # TODO val 時，stride 取得異常
         if isinstance(model.stride, torch.Tensor):
             self.stride = model.stride[0]
@@ -294,6 +294,7 @@ class TrackNetValidator(BaseValidator):
         self.pos_FP_dis = 0
         self.fast_TP = 0
         self.hit_TP = 0
+        self.hit_FP = 0
         self.fast_FN = 0
         self.hit_FN = 0
         self.fast_hit_TP = 0
@@ -539,14 +540,18 @@ class TrackNetValidator(BaseValidator):
                 if max_conf >= conf_threshold:
                     if distance <= self.tolerance3:
                         self.pos_TP += 1
+
+                        if mask_hit_ball_v2[frame_idx] == 1:
+                            self.hit_TP += 1
                     else:
                         self.pos_FP += 1
                         self.pos_FP_dis += 1
                         box_color = 'blue'
+
+                        if mask_hit_ball_v2[frame_idx] == 1:
+                            self.hit_FP += 1
                     if mask_fast_ball[frame_idx] == 1:
                         self.fast_TP += 1
-                    if mask_hit_ball_v2[frame_idx] == 1:
-                        self.hit_TP += 1
                     if mask_fast_hit_ball[frame_idx] == 1:
                         self.fast_hit_TP += 1
                 else:
@@ -727,11 +732,16 @@ class TrackNetValidator(BaseValidator):
         # 繪製 Precision-Recall 曲線
         self.calculate_precision_recall(False)
 
+        if (self.pos_FN+self.pos_FP+self.pos_TN + self.pos_TP) != 0:
+            self.pos_acc = (self.pos_TN + self.pos_TP) / (self.pos_FN+self.pos_FP+self.pos_TN + self.pos_TP)
+        if (self.pos_TP+self.pos_FP) != 0:
+            self.pos_precision = self.pos_TP/(self.pos_TP+self.pos_FP)
+
         """Return the stats."""
         return {'fitness': self.fitness, 'pos_FN': self.pos_FN, 'pos_FP_dis': self.pos_FP_dis, 'pos_FP': self.pos_FP, 'pos_TN': self.pos_TN, 
                 'pos_TP': self.pos_TP, 'pos_acc': self.pos_acc, 'pos_precision': self.pos_precision,
                 "fast_TP": self.fast_TP, "fast_FN": self.fast_FN, 
-                "hit_TP": self.hit_TP, "hit_FN": self.hit_FN, 
+                "hit_TP": self.hit_TP, "hit_FP": self.hit_FP, "hit_FN": self.hit_FN, 
                 "fast_hit_TP": self.fast_hit_TP, "fast_hit_FN": self.fast_hit_FN, 
                 'conf_FN': self.conf_FN, 'conf_FP': self.conf_FP, 'conf_TN': self.conf_TN, 
                 'conf_TP': self.conf_TP, 'conf_acc': self.conf_acc, 'conf_precision': self.conf_precision,
