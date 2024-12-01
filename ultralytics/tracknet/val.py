@@ -270,7 +270,7 @@ class TrackNetValidator(BaseValidator):
     def init_metrics(self, model):
         """Initialize some metrics."""
         # Placeholder for any metrics you might want to use.
-        self.stride = model.stride[0]
+        self.stride = int(model.stride[0])
         self.cell_num = int(640/self.stride)
         self.num_groups = 10
 
