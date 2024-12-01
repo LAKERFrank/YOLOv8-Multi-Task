@@ -172,3 +172,18 @@ docker exec -it 0c3e1511776e /bin/bash
 - train437 b91725148efcca01f362cf3a55e7a975f7045c92
   - 不使用 conf weight
   - hit duplicate: 5
+
+## 20241129
+- train440 weight+hit duplicate: 5
+  - 效果沒有比較好
+
+## 20241201
+- train442
+  - use p3
+  - only weight (without hit duplicate)
+- 單一 cell 只能偵測一個相同的物品
+- w h 可以大於 cell 大小
+  - .matmul(self.proj.type(pred_dist.dtype))
+  - 這裡的 self.proj，決定的物品最大範圍 （離散的區間大小）
+
+- train443 120, 60, 40 FPS (其餘同 442 程式碼)
