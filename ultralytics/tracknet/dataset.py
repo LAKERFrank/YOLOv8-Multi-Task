@@ -95,72 +95,72 @@ class TrackNetDataset(Dataset):
                                 "target": target
                             })
             
-            # # 降低 FPS 120 => 60
-            # for i in range(len(img_files) - (self.num_input*2-1)):
-            #     self.pbar.update(1)
+            # 降低 FPS 120 => 60
+            for i in range(len(img_files) - (self.num_input*2-1)):
+                self.pbar.update(1)
 
-            #     frames = img_files[i: i + self.num_input*2: 2]
+                frames = img_files[i: i + self.num_input*2: 2]
 
-            #     target = ball_trajectory_df.iloc[i: i + self.num_input*2: 2].values
-            #     target = self.transform_coordinates(target, 1280, 720)
+                target = ball_trajectory_df.iloc[i: i + self.num_input*2: 2].values
+                target = self.transform_coordinates(target, 1280, 720)
 
-            #     # Avoid invalid data
-            #     if len(frames) == self.num_input and len(target) == self.num_input:
-            #         npy_path = self.img_cache_dir(match_name, video_name, frames)
+                # Avoid invalid data
+                if len(frames) == self.num_input and len(target) == self.num_input:
+                    npy_path = self.img_cache_dir(match_name, video_name, frames)
 
-            #         self.samples.append({
-            #             "match_name": match_name,
-            #             "video_name": video_name,
-            #             "cache_npy": npy_path,
-            #             "img_files": frames,
-            #             "target": target
-            #         })
+                    self.samples.append({
+                        "match_name": match_name,
+                        "video_name": video_name,
+                        "cache_npy": npy_path,
+                        "img_files": frames,
+                        "target": target
+                    })
 
-            #         self.img_cache(match_name, video_name, frames, npy_path)
+                    self.img_cache(match_name, video_name, frames, npy_path)
 
-            #         hit_exists = np.any(target[:, 6] == 1)
-            #         if hit_exists:
-            #             for i in range(5):
-            #                 self.samples.append({
-            #                     "match_name": match_name,
-            #                     "video_name": video_name,
-            #                     "cache_npy": npy_path,
-            #                     "img_files": frames,
-            #                     "target": target
-            #                 })
-            # # 降低 FPS 120 => 40
-            # for i in range(len(img_files) - (self.num_input*3-1)):
-            #     self.pbar.update(1)
+                    hit_exists = np.any(target[:, 6] == 1)
+                    if hit_exists:
+                        for i in range(5):
+                            self.samples.append({
+                                "match_name": match_name,
+                                "video_name": video_name,
+                                "cache_npy": npy_path,
+                                "img_files": frames,
+                                "target": target
+                            })
+            # 降低 FPS 120 => 40
+            for i in range(len(img_files) - (self.num_input*3-1)):
+                self.pbar.update(1)
 
-            #     frames = img_files[i: i + self.num_input*3: 3]
+                frames = img_files[i: i + self.num_input*3: 3]
 
-            #     target = ball_trajectory_df.iloc[i: i + self.num_input*3: 3].values
-            #     target = self.transform_coordinates(target, 1280, 720)
+                target = ball_trajectory_df.iloc[i: i + self.num_input*3: 3].values
+                target = self.transform_coordinates(target, 1280, 720)
 
-            #     # Avoid invalid data
-            #     if len(frames) == self.num_input and len(target) == self.num_input:
-            #         npy_path = self.img_cache_dir(match_name, video_name, frames)
+                # Avoid invalid data
+                if len(frames) == self.num_input and len(target) == self.num_input:
+                    npy_path = self.img_cache_dir(match_name, video_name, frames)
 
-            #         self.samples.append({
-            #             "match_name": match_name,
-            #             "video_name": video_name,
-            #             "cache_npy": npy_path,
-            #             "img_files": frames,
-            #             "target": target
-            #         })
+                    self.samples.append({
+                        "match_name": match_name,
+                        "video_name": video_name,
+                        "cache_npy": npy_path,
+                        "img_files": frames,
+                        "target": target
+                    })
 
-            #         self.img_cache(match_name, video_name, frames, npy_path)
+                    self.img_cache(match_name, video_name, frames, npy_path)
 
-            #         hit_exists = np.any(target[:, 6] == 1)
-            #         if hit_exists:
-            #             for i in range(5):
-            #                 self.samples.append({
-            #                     "match_name": match_name,
-            #                     "video_name": video_name,
-            #                     "cache_npy": npy_path,
-            #                     "img_files": frames,
-            #                     "target": target
-            #                 })
+                    hit_exists = np.any(target[:, 6] == 1)
+                    if hit_exists:
+                        for i in range(5):
+                            self.samples.append({
+                                "match_name": match_name,
+                                "video_name": video_name,
+                                "cache_npy": npy_path,
+                                "img_files": frames,
+                                "target": target
+                            })
             # 降低 FPS 120 => 30
             # for i in range(len(img_files) - (self.num_input*4-1)):
             #     self.pbar.update(1)
