@@ -586,6 +586,7 @@ class TrackNetValidator(BaseValidator):
             now = datetime.now()
             # Format the datetime object as a string
             formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
+            
             display_predict_image(
                     batch_img[frame_idx],  
                     metrics, 
@@ -594,6 +595,18 @@ class TrackNetValidator(BaseValidator):
                     label=label,
                     save_dir=self.metrics.save_dir,
                     stride = self.stride
+                    ) 
+            
+            if box_color == 'blue':
+                display_predict_image(
+                    batch_img[frame_idx],  
+                    metrics, 
+                    'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                    box_color=box_color,
+                    label=label,
+                    save_dir=self.metrics.save_dir,
+                    stride = self.stride,
+                    path='predict_val_error_img'
                     ) 
 
         # 計算 conf 的 confusion matrix

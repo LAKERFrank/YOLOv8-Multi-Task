@@ -140,7 +140,7 @@ def display_image_with_coordinates(img_tensor, target, pred, fileName, input_num
     plt.savefig(check_training_img_path+fileName, bbox_inches='tight')
     plt.close()
 
-def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue', target = None, label = None, save_dir = Path('.'), stride = 32):
+def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue', target = None, label = None, save_dir = Path('.'), stride = 32, path = 'predict_val_img'):
     if isinstance(stride, torch.Tensor):
         stride = stride.item()  # 將 tensor 轉換為純數值
     # Convert the image tensor to numpy array
@@ -212,7 +212,7 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         ax.text(img_width * 0.9, img_height * 0.1, text_to_display, color='black', fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
     # plt.show()
 
-    output_dir = save_dir / 'predict_val_img'
+    output_dir = save_dir / path
     output_dir.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_dir/fileName, bbox_inches='tight')
     plt.close()
