@@ -178,6 +178,7 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         
         # next_x = current_x+dx*640
         # next_y = current_y+dy*640
+        print(x_coordinates, y_coordinates, stride)
         rect = patches.Rectangle(xy=(x_coordinates, y_coordinates), height=stride, width=stride, edgecolor=box_color, facecolor='none', linewidth=0.5)
         ax.add_patch(rect)
         text = ax.text(x_coordinates+stride+1, y_coordinates+stride, f'{str(conf)}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
