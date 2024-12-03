@@ -354,7 +354,7 @@ class TrackNetValidator(BaseValidator):
     def update_metrics_once(self, batch_idx, pred, batch_target, batch_img):
         # pred = [330 * self.cell_num * self.cell_num]
         # batch_target = [10*7]
-        feats = pred
+        feats = pred.clone()
         pred_distri, pred_scores = feats.view(self.no, -1).split(
             (self.reg_max * self.feat_no, self.nc), 0)
         
