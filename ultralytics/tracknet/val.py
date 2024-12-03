@@ -594,7 +594,8 @@ class TrackNetValidator(BaseValidator):
                     box_color=box_color,
                     label=label,
                     save_dir=self.metrics.save_dir,
-                    stride = self.stride
+                    stride = self.stride,
+                    target=(batch_target[frame_idx][2], batch_target[frame_idx][3])
                     ) 
             
             if box_color == 'blue':
