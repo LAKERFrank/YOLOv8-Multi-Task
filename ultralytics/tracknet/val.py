@@ -250,7 +250,7 @@ class TrackNetValidator(BaseValidator):
     
     def get_dataloader(self, dataset_path, batch_size):
         """For TrackNet, we can use the provided TrackNetDataset to get the dataloader."""
-        dataset = TrackNetDataset(root_dir=dataset_path)
+        dataset = TrackNetValDataset(root_dir=dataset_path)
         return build_dataloader(dataset, batch_size, self.args.workers, shuffle=False, rank=-1)
     
     def preprocess(self, batch):

@@ -18,7 +18,7 @@ class TrackNetTrainer(DetectionTrainer):
             dataset = TrackNetDataset(root_dir=img_path)
             return dataset
         else:
-            dataset = TrackNetDataset(root_dir=img_path)
+            dataset = TrackNetValDataset(root_dir=img_path)
             return dataset
 
     def get_model(self, cfg=None, weights=None, verbose=True):
