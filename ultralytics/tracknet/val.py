@@ -304,7 +304,7 @@ class TrackNetValidator(BaseValidator):
         self.ball_count = 0
         self.pred_ball_count = 0
         device = device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.reg_max = 16
+        self.reg_max = 20
         self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
         self.no = 33
         self.feat_no = 2
@@ -421,8 +421,8 @@ class TrackNetValidator(BaseValidator):
                 # xy
                 mask_has_ball[target_idx, grid_y, grid_x] = 1
                 
-                target_pos_distri[target_idx, grid_y, grid_x, 0] = offset_x*(self.reg_max-1)/self.stride
-                target_pos_distri[target_idx, grid_y, grid_x, 1] = offset_y*(self.reg_max-1)/self.stride
+                target_pos_distri[target_idx, grid_y, grid_x, 0] = offset_x*(self.reg_max)/self.stride
+                target_pos_distri[target_idx, grid_y, grid_x, 1] = offset_y*(self.reg_max)/self.stride
 
                 ## cls
                 cls_targets[target_idx, grid_y, grid_x, 0] = 1
