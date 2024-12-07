@@ -321,8 +321,8 @@ class TrackNetLoss:
                     center = stride/2
                     def clamp(x, min_value, max_value):
                         return max(min_value, min(x, max_value))
-                    t_x = (grid_x*self.stride+center-target[2])/self.stride
-                    t_y = (grid_y*self.stride+center-target[3])/self.stride
+                    t_x = (grid_x*self.stride+center*self.stride-target[2])/self.stride
+                    t_y = (grid_y*self.stride+center*self.stride-target[3])/self.stride
                     if t_x >= 0:
                         target_pos_distri[idx, target_idx, grid_y, grid_x, 0] = clamp(t_x, 0, self.reg_max - 0.01)
                         target_pos_distri[idx, target_idx, grid_y, grid_x, 1] = 0
