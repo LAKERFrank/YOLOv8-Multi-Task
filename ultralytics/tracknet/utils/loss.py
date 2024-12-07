@@ -192,6 +192,182 @@ class TrackNetLossWithHit:
             self.FN = 0
         return tlose, tlose_item
 
+# test dxdy
+class TrackNetLossV6:
+    def __init__(self, model):  # model must be de-paralleled
+
+        device = next(model.parameters()).device  # get model device
+        h = model.args  # hyperparameters
+        self.hyp = h
+
+        m = model.model[-1]  # Detect() module
+        self.mse = nn.MSELoss(reduction='sum')
+        self.FLM = FocalLossWithMask()
+        self.stride = m.stride  # model strides
+        self.cell_size = 640/self.stride
+        self.nc = m.nc  # number of classes
+        self.no = m.no
+        self.reg_max = m.reg_max
+        self.feat_no = m.feat_no
+        self.num_groups = 10
+        self.device = device
+
+        self.use_dfl = m.reg_max > 1
+        self.proj = torch.arange(m.reg_max, dtype=torch.float, device=device)
+        self.xy_loss = XYLoss(m.reg_max - 1, use_dfl=self.use_dfl).to(device)
+
+        self.sample_path = os.path.join(self.hyp.save_dir, "training_samples")
+
+        self.confusion_class = ConfConfusionMatrix()
+
+    def init_conf_confusion(self, confusion_class):
+        self.confusion_class = confusion_class
+
+    def __call__(self, preds, batch):
+        feats = preds[1] if isinstance(preds, tuple) else preds
+        pred_distri, pred_scores, pred_dxdy = torch.cat([xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2).split(
+            (self.reg_max * self.feat_no, self.nc, self.dxdy_no), 1)
+        
+        pred_scores = pred_scores.permute(0, 2, 1).contiguous()
+        pred_distri = pred_distri.permute(0, 2, 1).contiguous()
+        pred_distri_dxdy = pred_dxdy.permute(0, 2, 1).contiguous()
+
+        b, a, c = pred_distri.shape  # batch, anchors, channels
+        pred_pos_distri = pred_distri
+        pred_pos = pred_pos_distri.view(b, a, 2, c // 2).softmax(3).matmul(
+            self.proj.type(pred_distri.dtype))
+        
+        pred_dxdy = pred_distri_dxdy.view(b, a, 2, c // 2).softmax(3).matmul(
+            self.dxdy_proj.type(pred_distri.dtype))
+
+        batch_target = batch['target'].to(self.device)
+
+        cell_num = int(640/self.stride[0])
+        target_pos_distri = torch.zeros(b, self.num_groups, cell_num, cell_num, self.feat_no, device=self.device)
+        mask_has_ball = torch.zeros(b, self.num_groups, cell_num, cell_num, device=self.device)
+        cls_targets = torch.zeros(b, self.num_groups, cell_num, cell_num, 1, device=self.device)
+        mask_has_next_ball = torch.zeros(b, self.num_groups, cell_num, cell_num, device=self.device)
+
+        mask_fast_ball = torch.zeros(b, self.num_groups, cell_num, cell_num, device=self.device)
+        mask_hit_ball = torch.zeros(b, self.num_groups, cell_num, cell_num, device=self.device)
+        mask_hit_ball_v2 = torch.zeros(b, self.num_groups, cell_num, cell_num, device=self.device)
+
+        fast_ball_count = 0
+        hit_ball_count = 0
+        for idx, _ in enumerate(batch_target):
+            # pred = [330 * cell_num * cell_num]
+            stride = self.stride[0]
+            
+            for target_idx, target in enumerate(batch_target[idx]):
+                # target xy
+                grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
+                # 找出快球 => 慢球, 慢球 => 快球
+                if target_idx > 1 and target_idx < len(batch_target[idx])-2 and \
+                    batch_target[idx][target_idx-2][1] == 1 and batch_target[idx][target_idx][1] == 1 and batch_target[idx][target_idx+2][1] == 1 and\
+                    batch_target[idx][target_idx-1][1] == 1 and batch_target[idx][target_idx+1][1] == 1:
+                    
+                    before_hit2 = [batch_target[idx][target_idx-2][2], batch_target[idx][target_idx-2][3]]
+                    hit = [batch_target[idx][target_idx][2], batch_target[idx][target_idx][3]]
+                    after_hit2 = [batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3]]
+
+                    before_dist = calculate_dist(before_hit2, hit)
+                    after_dist = calculate_dist(hit, after_hit2)
+                    angle = calculate_angle(before_hit2, hit, after_hit2)
+
+                    if (angle and angle > 30 and (before_dist > 10 or after_dist > 10)) or \
+                        ((before_dist > stride or after_dist > stride) and (before_dist > after_dist*2 or before_dist*2 < after_dist)):
+
+                        grid_x_1, grid_y_1, _, _ = target_grid(batch_target[idx][target_idx-2][2], batch_target[idx][target_idx-2][3], stride)
+                        grid_x_2, grid_y_2, _, _ = target_grid(batch_target[idx][target_idx-1][2], batch_target[idx][target_idx-1][3], stride)
+                        grid_x_3, grid_y_3, _, _ = target_grid(batch_target[idx][target_idx][2], batch_target[idx][target_idx][3], stride)
+                        grid_x_4, grid_y_4, _, _ = target_grid(batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3], stride)
+                        grid_x_5, grid_y_5, _, _ = target_grid(batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3], stride)
+                        
+                        mask_hit_ball_v2[idx, target_idx-2, grid_y_1, grid_x_1] = 1
+                        mask_hit_ball_v2[idx, target_idx-1, grid_y_2, grid_x_2] = 1
+                        mask_hit_ball_v2[idx, target_idx, grid_y_3, grid_x_3] = 1
+                        mask_hit_ball_v2[idx, target_idx+1, grid_y_4, grid_x_4] = 1
+                        mask_hit_ball_v2[idx, target_idx+2, grid_y_5, grid_x_5] = 1
+                if target_idx < len(batch_target[idx])-1 and batch_target[idx][target_idx+1][1] == 1 and\
+                    batch_target[idx][target_idx][1] == 1 and target[4]**2 + target[5]**2 >= cell_num**2:
+
+                    mask_fast_ball[idx, target_idx, grid_y, grid_x] = 1
+
+                    next_grid_x, next_grid_y, _, _ = target_grid(batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3], stride)
+                    mask_fast_ball[idx, target_idx+1, next_grid_y, next_grid_x] = 1
+                    
+                    fast_ball_count+=1
+
+                if target_idx < len(batch_target[idx])-2 \
+                    and batch_target[idx][target_idx][1] == 1 and batch_target[idx][target_idx+1][1] == 1 \
+                    and batch_target[idx][target_idx+2][1] == 1:
+                    
+                    first = [batch_target[idx][target_idx][2], batch_target[idx][target_idx][3]]
+                    second = [batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3]]
+                    third = [batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3]]
+                    angle = calculate_angle(first, second, third)
+                    dist1 = calculate_dist(first, second)
+                    dist2 = calculate_dist(second, third)
+                    if angle and angle > 30 and (dist1 > 10 or dist2 > 10):
+                        second_grid_x, second_grid_y, _, _ = target_grid(batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3], stride)
+                        third_grid_x, third_grid_y, _, _ = target_grid(batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3], stride)
+                        mask_hit_ball[idx, target_idx, grid_y, grid_x] = 1
+                        mask_hit_ball[idx, target_idx+1, second_grid_y, second_grid_x] = 1
+                        mask_hit_ball[idx, target_idx+2, third_grid_y, third_grid_x] = 1
+                        hit_ball_count+=1
+
+                if target[1] == 1:
+                    mask_has_ball[idx, target_idx, grid_y, grid_x] = 1
+                    
+                    target_pos_distri[idx, target_idx, grid_y, grid_x, 0] = offset_x*self.reg_max/stride
+                    target_pos_distri[idx, target_idx, grid_y, grid_x, 1] = offset_y*self.reg_max/stride
+
+                    ## cls
+                    cls_targets[idx, target_idx, grid_y, grid_x, 0] = 1
+
+                    if target_idx != len(batch_target[idx])-1 and batch_target[idx][target_idx+1][1] == 1:
+                        mask_has_next_ball[idx, target_idx, grid_y, grid_x] = 1
+        
+        mask_may_has_ball = F.max_pool2d(mask_has_ball, kernel_size=3, stride=1, padding=1)
+
+        target_scores_sum = max(cls_targets.sum(), 1)
+
+        target_pos_distri = target_pos_distri.view(b, self.num_groups*cell_num*cell_num, self.feat_no)
+        cls_targets = cls_targets.view(b, self.num_groups*cell_num*cell_num, 1)
+        mask_has_ball = mask_has_ball.view(b, self.num_groups*cell_num*cell_num).bool()
+        mask_may_has_ball = mask_may_has_ball.view(b, self.num_groups*cell_num*cell_num, 1).bool()
+        mask_fast_ball = mask_fast_ball.view(b, self.num_groups*cell_num*cell_num, 1).bool()
+        mask_hit_ball = mask_hit_ball.view(b, self.num_groups*cell_num*cell_num, 1).bool()
+        mask_hit_ball_v2 = mask_hit_ball_v2.view(b, self.num_groups*cell_num*cell_num, 1).bool()
+        
+        loss = torch.zeros(2, device=self.device)
+        _, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball, mask_hit_ball_v2)
+        
+        cls_targets = cls_targets.to(pred_scores.dtype)
+
+        # fp_additional_penalty = 4000
+        # fn_additional_penalty = 400
+        # cls_weight = torch.where(cls_targets == 1, w_pos + false_negative*fn_additional_penalty, 
+        #                          w_neg + false_positive * fp_additional_penalty)
+        # bce = nn.BCEWithLogitsLoss(reduction='none', weight=cls_weight)
+
+        self.confusion_class.confusion_matrix(pred_scores.sigmoid(), cls_targets)
+        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, mask_fast_ball, mask_hit_ball_v2, 2, 0.75)
+
+        # print(f'conf loss: {fp_loss_weighted, fn_loss_weighted, tp_loss_weighted}\n')
+        # print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
+        # print(f'hit_ball_count: {hit_ball_count}, total ball: {target_scores_sum}\n')
+
+        loss[0] *= 3  # dfl gain
+        loss[1] *= 15  # cls gain
+        # loss[2] *= 1  # iou gain
+
+        tlose = loss.sum() * b
+        tlose_item = loss.detach()
+
+        return tlose, tlose_item
+
+# use p3
 class TrackNetLoss:
     def __init__(self, model):  # model must be de-paralleled
 
@@ -314,8 +490,8 @@ class TrackNetLoss:
                 if target[1] == 1:
                     mask_has_ball[idx, target_idx, grid_y, grid_x] = 1
                     
-                    target_pos_distri[idx, target_idx, grid_y, grid_x, 0] = offset_x*(self.reg_max-1)/stride
-                    target_pos_distri[idx, target_idx, grid_y, grid_x, 1] = offset_y*(self.reg_max-1)/stride
+                    target_pos_distri[idx, target_idx, grid_y, grid_x, 0] = offset_x*(self.reg_max)/stride
+                    target_pos_distri[idx, target_idx, grid_y, grid_x, 1] = offset_y*(self.reg_max)/stride
 
                     ## cls
                     cls_targets[idx, target_idx, grid_y, grid_x, 0] = 1
