@@ -193,7 +193,7 @@ class TrackNetLossWithHit:
         return tlose, tlose_item
 
 # test dxdy
-class TrackNetLossV6:
+class TrackNetLoss:
     def __init__(self, model):  # model must be de-paralleled
 
         device = next(model.parameters()).device  # get model device
@@ -225,20 +225,20 @@ class TrackNetLossV6:
 
     def __call__(self, preds, batch):
         feats = preds[1] if isinstance(preds, tuple) else preds
-        pred_distri, pred_scores, pred_dxdy = torch.cat([xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2).split(
-            (self.reg_max * self.feat_no, self.nc, self.dxdy_no), 1)
+        pred_distri, pred_scores = torch.cat([xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2).split(
+            (self.reg_max * self.feat_no, self.nc), 1)
         
         pred_scores = pred_scores.permute(0, 2, 1).contiguous()
         pred_distri = pred_distri.permute(0, 2, 1).contiguous()
-        pred_distri_dxdy = pred_dxdy.permute(0, 2, 1).contiguous()
+        # pred_distri_dxdy = pred_dxdy.permute(0, 2, 1).contiguous()
 
         b, a, c = pred_distri.shape  # batch, anchors, channels
         pred_pos_distri = pred_distri
-        pred_pos = pred_pos_distri.view(b, a, 2, c // 2).softmax(3).matmul(
+        pred_pos = pred_pos_distri.view(b, a, 4, c // 4).softmax(3).matmul(
             self.proj.type(pred_distri.dtype))
         
-        pred_dxdy = pred_distri_dxdy.view(b, a, 2, c // 2).softmax(3).matmul(
-            self.dxdy_proj.type(pred_distri.dtype))
+        # pred_dxdy = pred_distri_dxdy.view(b, a, 2, c // 2).softmax(3).matmul(
+        #     self.dxdy_proj.type(pred_distri.dtype))
 
         batch_target = batch['target'].to(self.device)
 
@@ -318,9 +318,24 @@ class TrackNetLossV6:
 
                 if target[1] == 1:
                     mask_has_ball[idx, target_idx, grid_y, grid_x] = 1
-                    
-                    target_pos_distri[idx, target_idx, grid_y, grid_x, 0] = offset_x*self.reg_max/stride
-                    target_pos_distri[idx, target_idx, grid_y, grid_x, 1] = offset_y*self.reg_max/stride
+                    center = stride/2
+                    def clamp(x, min_value, max_value):
+                        return max(min_value, min(x, max_value))
+                    t_x = (grid_x*self.stride+center-target[2])/self.stride
+                    t_y = (grid_y*self.stride+center-target[3])/self.stride
+                    if t_x >= 0:
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 0] = clamp(t_x, 0, self.reg_max - 0.01)
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 1] = 0
+                    else:
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 0] = 0
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 1] = clamp(-t_x, 0, self.reg_max - 0.01)
+
+                    if t_y >= 0:
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 2] = clamp(t_y, 0, self.reg_max - 0.01)
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 3] = 0
+                    else:
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 2] = 0
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 3] = clamp(t_y, 0, self.reg_max - 0.01)
 
                     ## cls
                     cls_targets[idx, target_idx, grid_y, grid_x, 0] = 1
@@ -368,7 +383,7 @@ class TrackNetLossV6:
         return tlose, tlose_item
 
 # use p3
-class TrackNetLoss:
+class TrackNetLossV5:
     def __init__(self, model):  # model must be de-paralleled
 
         device = next(model.parameters()).device  # get model device
