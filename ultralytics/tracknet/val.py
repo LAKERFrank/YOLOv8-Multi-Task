@@ -425,18 +425,18 @@ class TrackNetValidator(BaseValidator):
                 t_x = (grid_x*self.stride+center-target[2])/self.stride
                 t_y = (grid_y*self.stride+center-target[3])/self.stride
                 if t_x >= 0:
-                    target_pos_distri[target_idx, grid_y, grid_x, 0] = clamp(t_x, 0, self.reg_max - 0.01)
+                    target_pos_distri[target_idx, grid_y, grid_x, 0] = clamp(t_x, 0, self.reg_max-1 - 0.01)
                     target_pos_distri[target_idx, grid_y, grid_x, 1] = 0
                 else:
                     target_pos_distri[target_idx, grid_y, grid_x, 0] = 0
-                    target_pos_distri[target_idx, grid_y, grid_x, 1] = clamp(-t_x, 0, self.reg_max - 0.01)
+                    target_pos_distri[target_idx, grid_y, grid_x, 1] = clamp(-t_x, 0, self.reg_max-1 - 0.01)
 
                 if t_y >= 0:
-                    target_pos_distri[target_idx, grid_y, grid_x, 2] = clamp(t_y, 0, self.reg_max - 0.01)
+                    target_pos_distri[target_idx, grid_y, grid_x, 2] = clamp(t_y, 0, self.reg_max-1 - 0.01)
                     target_pos_distri[target_idx, grid_y, grid_x, 3] = 0
                 else:
                     target_pos_distri[target_idx, grid_y, grid_x, 2] = 0
-                    target_pos_distri[target_idx, grid_y, grid_x, 3] = clamp(-t_y, 0, self.reg_max - 0.01)
+                    target_pos_distri[target_idx, grid_y, grid_x, 3] = clamp(-t_y, 0, self.reg_max-1 - 0.01)
 
                 ## cls
                 cls_targets[target_idx, grid_y, grid_x, 0] = 1
