@@ -341,8 +341,8 @@ class TrackNetLoss:
 
                         next_gtx = batch_target[idx][target_idx+1][2]
                         next_gty = batch_target[idx][target_idx+1][3]
-                        next_t_x = (grid_x*stride+center*stride-next_gtx)/stride
-                        next_t_y = (grid_y*stride+center*stride-next_gty)/stride
+                        next_t_x = (grid_x*self.stride+center*self.stride-next_gtx)/stride
+                        next_t_y = (grid_y*self.stride+center*self.stride-next_gty)/stride
                         if next_t_x >= 0:
                             target_pos_distri[idx, target_idx, grid_y, grid_x, 4] = clamp(next_t_x, 0, self.reg_max - 0.05)
                         else:
