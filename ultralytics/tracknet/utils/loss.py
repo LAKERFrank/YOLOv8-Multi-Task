@@ -942,8 +942,6 @@ class XYLoss(nn.Module):
                 f"Target out of range: min={target_pos_distri.min()}, max={target_pos_distri.max()}"
 
             loss_dfl = self._df_loss(pred_dist[fg_mask].view(-1, self.reg_max + 1), target_pos_distri[fg_mask]) * weight
-            if (loss_dfl >= 0).all():
-                print(loss_dfl)
             assert (loss_dfl >= 0).all(), f"`loss` contains negative values. Min: {loss_dfl.min()}, Max: {loss_dfl.max()}"
             loss_dfl_sum = loss_dfl.sum()
                 
@@ -956,13 +954,52 @@ class XYLoss(nn.Module):
     @staticmethod
     def _df_loss(pred_dist, target):
         """Return sum of left and right DFL losses."""
-        # Distribution Focal Loss (DFL) proposed in Generalized Focal Loss https://ieeexplore.ieee.org/document/9792391
+        print("==== Debug Info ====")
+        print(f"Initial pred_dist shape: {pred_dist.shape}")
+        print(f"Initial target shape: {target.shape}")
+        print(f"Initial target values: {target}")
+
+        # Target conversion
         tl = target.long()  # target left
+        print(f"tl (target left) shape: {tl.shape}, values: {tl}")
+
         tr = tl + 1  # target right
+        print(f"tr (target right) shape: {tr.shape}, values: {tr}")
+
         wl = tr - target  # weight left
+        print(f"wl (weight left) shape: {wl.shape}, values: {wl}")
+
         wr = 1 - wl  # weight right
-        return (F.cross_entropy(pred_dist, tl.view(-1), reduction='none').view(tl.shape) * wl +
-                F.cross_entropy(pred_dist, tr.view(-1), reduction='none').view(tl.shape) * wr).mean(-1, keepdim=True)
+        print(f"wr (weight right) shape: {wr.shape}, values: {wr}")
+
+        # Calculate losses for left and right
+        try:
+            ce_left = F.cross_entropy(pred_dist, tl.view(-1), reduction='none')
+            print(f"Cross-entropy left shape: {ce_left.shape}, values: {ce_left}")
+        except Exception as e:
+            print(f"Error during left cross-entropy calculation: {e}")
+            raise
+
+        try:
+            ce_right = F.cross_entropy(pred_dist, tr.view(-1), reduction='none')
+            print(f"Cross-entropy right shape: {ce_right.shape}, values: {ce_right}")
+        except Exception as e:
+            print(f"Error during right cross-entropy calculation: {e}")
+            raise
+
+        # Reshape cross-entropy outputs to match target
+        ce_left_reshaped = ce_left.view(tl.shape)
+        ce_right_reshaped = ce_right.view(tl.shape)
+        print(f"ce_left reshaped shape: {ce_left_reshaped.shape}, values: {ce_left_reshaped}")
+        print(f"ce_right reshaped shape: {ce_right_reshaped.shape}, values: {ce_right_reshaped}")
+
+        # Weighted combination
+        combined_loss = (ce_left_reshaped * wl + ce_right_reshaped * wr).mean(-1, keepdim=True)
+        print(f"Combined loss shape: {combined_loss.shape}, values: {combined_loss}")
+
+        print("==== End of Debug Info ====")
+        return combined_loss
+
 def gaussian_iou(pred_pos, target_pos, sigma=1.0):
     """
     Compute Gaussian IoU for two sets of points in (x, y) format.
