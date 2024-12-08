@@ -603,7 +603,12 @@ class TrackNetValidator(BaseValidator):
             # Format the datetime object as a string
             formatted_date = now.strftime("%Y-%m-%d %H:%M:%S")
             
-            if frame_idx%10==0:
+
+            display_interval = 1
+            if self.mode == 'train':
+                display_interval = 10
+                
+            if frame_idx%display_interval==0:
                 display_predict_image(
                         batch_img[frame_idx],  
                         metrics, 
