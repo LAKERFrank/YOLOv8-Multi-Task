@@ -938,6 +938,9 @@ class XYLoss(nn.Module):
 
         # DFL loss
         if self.use_dfl:
+            assert target_pos_distri.min() >= 0 and target_pos_distri.max() <= self.reg_max, \
+                f"Target out of range: min={target_pos_distri.min()}, max={target_pos_distri.max()}"
+
             loss_dfl = self._df_loss(pred_dist[fg_mask].view(-1, self.reg_max + 1), target_pos_distri[fg_mask]) * weight
             assert (loss_dfl >= 0).all(), f"`loss` contains negative values. Min: {loss_dfl.min()}, Max: {loss_dfl.max()}"
             loss_dfl_sum = loss_dfl.sum()
