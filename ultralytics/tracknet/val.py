@@ -605,9 +605,9 @@ class TrackNetValidator(BaseValidator):
             
 
             display_interval = 1
-            if self.mode == 'train':
+            if self.args.mode == 'train':
                 display_interval = 10
-                
+
             if frame_idx%display_interval==0:
                 display_predict_image(
                         batch_img[frame_idx],  
