@@ -320,8 +320,6 @@ class TrackNetLoss:
                     mask_has_ball[idx, target_idx, grid_y, grid_x] = 1
                     center = stride/2
                     def clamp(x, min_value, max_value):
-                        if x >= 15:
-                            print("移動距離過長 => clamp")
                         return max(min_value, min(x, max_value))
                     t_x = (grid_x*stride+center*stride-target[2])/stride
                     t_y = (grid_y*stride+center*stride-target[3])/stride
