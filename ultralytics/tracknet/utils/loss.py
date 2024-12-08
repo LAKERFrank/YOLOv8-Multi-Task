@@ -344,6 +344,7 @@ class TrackNetLoss:
                         next_grid_x, next_grid_y, _, _ = target_grid(next_gtx, next_gty, stride)
                         next_t_x = (grid_x*stride+center*stride-next_gtx)/stride
                         next_t_y = (grid_y*stride+center*stride-next_gty)/stride
+                        print(next_t_x, next_t_y)
                         if next_t_x >= 0:
                             target_pos_distri[idx, target_idx, grid_y, grid_x, 4] = clamp(next_t_x, 0, self.reg_max - 0.01)
                         else:
