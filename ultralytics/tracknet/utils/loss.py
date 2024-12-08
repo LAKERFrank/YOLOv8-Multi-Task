@@ -320,6 +320,8 @@ class TrackNetLoss:
                     mask_has_ball[idx, target_idx, grid_y, grid_x] = 1
                     center = stride/2
                     def clamp(x, min_value, max_value):
+                        if x >= 15:
+                            print("移動距離過長 => clamp")
                         return max(min_value, min(x, max_value))
                     t_x = (grid_x*stride+center*stride-target[2])/stride
                     t_y = (grid_y*stride+center*stride-target[3])/stride
@@ -377,7 +379,7 @@ class TrackNetLoss:
         # bce = nn.BCEWithLogitsLoss(reduction='none', weight=cls_weight)
 
         self.confusion_class.confusion_matrix(pred_scores.sigmoid(), cls_targets)
-        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, mask_fast_ball, mask_hit_ball_v2, 2, 0.75)
+        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, mask_fast_ball, mask_hit_ball_v2, 1.5, 0.85)
 
         # print(f'conf loss: {fp_loss_weighted, fn_loss_weighted, tp_loss_weighted}\n')
         # print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
@@ -902,8 +904,8 @@ class FocalLossWithMask(nn.Module):
 
         loss = loss * relevant_mask.float()
 
-        loss[FN_mask] *= negative_ratio*10*w
-        loss[FP_mask & ~may_has_ball] *= negative_ratio*10*w
+        loss[FN_mask] *= negative_ratio*15*w
+        loss[FP_mask & ~may_has_ball] *= negative_ratio*5*w
         loss[TP_mask] *= negative_ratio*10
         loss[mask_hit_ball] *= negative_ratio*10*w*3
 
