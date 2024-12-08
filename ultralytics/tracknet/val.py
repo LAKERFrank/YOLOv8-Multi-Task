@@ -760,9 +760,33 @@ class TrackNetValidator(BaseValidator):
 
             print(f"Average Precision (AP) for IoU={self.iou_dist_thresholds[iou_idx]:.2f}: {ap}")
 
-        # 最終的平均 AP
-        self.fitness = sum(ap_list) / len(ap_list) if ap_list else 0
-        print("Overall Average Precision (AP):", self.fitness)
+        # 使用 f1
+        self.fitness = self.calculate_weighted_f1(self.pos_TP, self.pos_FP, self.pos_FN, 2.0)
+        print("Overall weighted_f1:", self.fitness)
+    def calculate_weighted_f1(self, tp, fp, fn, beta=1.0):
+        """
+        计算 Weighted F1 Score
+        Args:
+            tp (int): True Positives 数量
+            fp (int): False Positives 数量
+            fn (int): False Negatives 数量
+            beta (float): Recall 的权重参数
+        
+        Returns:
+            float: Weighted F1 Score
+        """
+        # Precision
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        
+        # Recall
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        
+        # Weighted F1 Score
+        beta_sq = beta ** 2
+        if precision + recall == 0:
+            return 0.0
+        weighted_f1 = (1 + beta_sq) * (precision * recall) / (beta_sq * precision + recall)
+        return weighted_f1
 
     def get_stats(self):
         # 繪製 Precision-Recall 曲線
