@@ -304,9 +304,9 @@ class TrackNetValidator(BaseValidator):
         device = device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.reg_max = 16
         self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
-        self.no = 65
-        self.feat_no = 4
+        self.feat_no = 8
         self.nc = 1
+        self.no = 16*self.feat_no+self.nc
 
         self.fast_count = 0
         self.hit_count = 0
@@ -342,7 +342,7 @@ class TrackNetValidator(BaseValidator):
         batch_target = batch['target']
         batch_img = batch['img']
         batch_img_file = batch['img_files']
-        if preds.shape == (650, self.cell_num, self.cell_num):
+        if preds.shape == (1290, self.cell_num, self.cell_num):
             self.update_metrics_once(0, preds, batch_target[0], batch_img[0])
         else:
             # for each batch
@@ -436,7 +436,7 @@ class TrackNetValidator(BaseValidator):
                     target_pos_distri[target_idx, grid_y, grid_x, 3] = 0
                 else:
                     target_pos_distri[target_idx, grid_y, grid_x, 2] = 0
-                    target_pos_distri[target_idx, grid_y, grid_x, 3] = clamp(t_y, 0, self.reg_max - 0.01)
+                    target_pos_distri[target_idx, grid_y, grid_x, 3] = clamp(-t_y, 0, self.reg_max - 0.01)
 
                 ## cls
                 cls_targets[target_idx, grid_y, grid_x, 0] = 1
@@ -451,7 +451,7 @@ class TrackNetValidator(BaseValidator):
         self.fast_hit_count += mask_fast_hit_ball.sum()
 
         each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y = pred_pos.view(10, self.cell_num, self.cell_num, 4).split([2, 2], dim=3)
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
         # 計算 hit v2 效果
         # 先填充 hit 前後兩幀
@@ -508,6 +508,8 @@ class TrackNetValidator(BaseValidator):
 
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
+            p_cell_nx = each_pos_ny[frame_idx]
+            p_cell_ny = each_pos_ny[frame_idx]
             metrics = []
             # 獲取當前圖片的 conf
             p_conf = each_probs[frame_idx]
@@ -528,6 +530,9 @@ class TrackNetValidator(BaseValidator):
             metric["x"] = center-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1]
             metric["y"] = center-p_cell_y[max_y][max_x][0]+p_cell_x[max_y][max_x][1]
             metric["conf"] = max_conf
+
+            metric["nx"] = center-p_cell_nx[max_y][max_x][0]+p_cell_nx[max_y][max_x][1]
+            metric["ny"] = center-p_cell_ny[max_y][max_x][0]+p_cell_ny[max_y][max_x][1]
             metrics = []
             if max_conf >= conf_threshold:
                 metrics.append(metric)

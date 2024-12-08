@@ -234,7 +234,7 @@ class TrackNetLoss:
 
         b, a, c = pred_distri.shape  # batch, anchors, channels
         pred_pos_distri = pred_distri
-        pred_pos = pred_pos_distri.view(b, a, 4, c // 4).softmax(3).matmul(
+        pred_pos = pred_pos_distri.view(b, a, self.feat_no, c // self.feat_no).softmax(3).matmul(
             self.proj.type(pred_distri.dtype))
         
         # pred_dxdy = pred_distri_dxdy.view(b, a, 2, c // 2).softmax(3).matmul(
@@ -321,30 +321,40 @@ class TrackNetLoss:
                     center = stride/2
                     def clamp(x, min_value, max_value):
                         return max(min_value, min(x, max_value))
-                    t_x = (grid_x*self.stride+center*self.stride-target[2])/self.stride
-                    t_y = (grid_y*self.stride+center*self.stride-target[3])/self.stride
+                    t_x = (grid_x*stride+center*stride-target[2])/stride
+                    t_y = (grid_y*stride+center*stride-target[3])/stride
                     if t_x >= 0:
                         target_pos_distri[idx, target_idx, grid_y, grid_x, 0] = clamp(t_x, 0, self.reg_max - 0.01)
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 1] = 0
                     else:
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 0] = 0
                         target_pos_distri[idx, target_idx, grid_y, grid_x, 1] = clamp(-t_x, 0, self.reg_max - 0.01)
 
                     if t_y >= 0:
                         target_pos_distri[idx, target_idx, grid_y, grid_x, 2] = clamp(t_y, 0, self.reg_max - 0.01)
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 3] = 0
                     else:
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 2] = 0
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 3] = clamp(t_y, 0, self.reg_max - 0.01)
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 3] = clamp(-t_y, 0, self.reg_max - 0.01)
 
                     ## cls
                     cls_targets[idx, target_idx, grid_y, grid_x, 0] = 1
 
                     if target_idx != len(batch_target[idx])-1 and batch_target[idx][target_idx+1][1] == 1:
                         mask_has_next_ball[idx, target_idx, grid_y, grid_x] = 1
-        
-        mask_may_has_ball = F.max_pool2d(mask_has_ball, kernel_size=3, stride=1, padding=1)
 
+                        next_gtx = batch_target[idx][target_idx+1][2]
+                        next_gty = batch_target[idx][target_idx+1][3]
+                        next_grid_x, next_grid_y, _, _ = target_grid(next_gtx, next_gty, stride)
+                        next_t_x = (next_grid_x*stride+center*stride-next_gtx)/stride
+                        next_t_y = (next_grid_y*stride+center*stride-next_gty)/stride
+                        if next_t_x >= 0:
+                            target_pos_distri[idx, target_idx, next_grid_y, next_grid_x, 4] = clamp(next_t_x, 0, self.reg_max - 0.01)
+                        else:
+                            target_pos_distri[idx, target_idx, next_grid_y, next_grid_x, 5] = clamp(-next_t_x, 0, self.reg_max - 0.01)
+
+                        if next_t_y >= 0:
+                            target_pos_distri[idx, target_idx, next_grid_y, next_grid_x, 6] = clamp(next_t_y, 0, self.reg_max - 0.01)
+                        else:
+                            target_pos_distri[idx, target_idx, next_grid_y, next_grid_x, 7] = clamp(-next_t_y, 0, self.reg_max - 0.01)
+
+        mask_may_has_ball = F.max_pool2d(mask_has_ball, kernel_size=3, stride=1, padding=1)
         target_scores_sum = max(cls_targets.sum(), 1)
 
         target_pos_distri = target_pos_distri.view(b, self.num_groups*cell_num*cell_num, self.feat_no)

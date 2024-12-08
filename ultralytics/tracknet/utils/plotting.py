@@ -160,6 +160,8 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         x = pred["x"]
         y = pred["y"]
         conf = pred["conf"]
+        nx = pred["nx"]
+        ny = pred["ny"]
 
         x_coordinates *= stride
         y_coordinates *= stride
@@ -177,6 +179,15 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         if isinstance(conf, torch.Tensor):
             conf = conf.cpu().item()
         conf = round(conf, 2)
+
+        
+        current_nx = x_coordinates+nx*stride
+        current_ny = y_coordinates+ny*stride
+
+        if isinstance(current_nx, torch.Tensor):
+            current_nx = current_nx.cpu().numpy()
+        if isinstance(current_ny, torch.Tensor):
+            current_ny = current_ny.cpu().numpy()
         
         # next_x = current_x+dx*640
         # next_y = current_y+dy*640
@@ -186,6 +197,7 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
                        patheffects.Normal()])
         ax.scatter(current_x, current_y, s=1.4, c='red', marker='o')
+        ax.scatter(current_nx, current_ny, s=1.4, c='green', marker='o')
     label_text = ax.text(0, 0, f'{label}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
     label_text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
                        patheffects.Normal()])
