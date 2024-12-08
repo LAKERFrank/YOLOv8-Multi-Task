@@ -508,7 +508,7 @@ class TrackNetValidator(BaseValidator):
 
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
-            p_cell_nx = each_pos_ny[frame_idx]
+            p_cell_nx = each_pos_nx[frame_idx]
             p_cell_ny = each_pos_ny[frame_idx]
             metrics = []
             # 獲取當前圖片的 conf
