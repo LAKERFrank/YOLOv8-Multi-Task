@@ -614,6 +614,11 @@ class TrackNetValidator(BaseValidator):
                 display_interval = 10
 
             if frame_idx%display_interval==0:
+                if frame_idx != len(batch_target)-1:
+                    target_xy = (batch_target[frame_idx][2], batch_target[frame_idx][3], batch_target[frame_idx+1][2], batch_target[frame_idx+1][3])
+                else:
+                    target_xy = (batch_target[frame_idx][2], batch_target[frame_idx][3], batch_target[frame_idx][2], batch_target[frame_idx][3])
+
                 display_predict_image(
                         batch_img[frame_idx],  
                         metrics, 
@@ -622,7 +627,7 @@ class TrackNetValidator(BaseValidator):
                         label=label,
                         save_dir=self.metrics.save_dir,
                         stride = self.stride,
-                        target=(batch_target[frame_idx][2], batch_target[frame_idx][3])
+                        target=target_xy
                         ) 
             
                 if box_color == 'blue':
@@ -634,6 +639,7 @@ class TrackNetValidator(BaseValidator):
                         label=label,
                         save_dir=self.metrics.save_dir,
                         stride = self.stride,
+                        target=target_xy,
                         path='predict_val_error_img'
                         ) 
 

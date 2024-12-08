@@ -202,12 +202,18 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
     label_text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
                        patheffects.Normal()])
     if target:
-        (x, y) = target
+        (x, y, nx, ny) = target
         if isinstance(x, torch.Tensor):
             x = x.cpu().item()
         if isinstance(y, torch.Tensor):
             y = y.cpu().item()
+        if isinstance(nx, torch.Tensor):
+            nx = nx.cpu().item()
+        if isinstance(ny, torch.Tensor):
+            ny = ny.cpu().item()
         ax.scatter(x, y, s=1.4, c='blue', marker='o')
+        if x != nx or y != ny:
+            ax.scatter(nx, ny, s=1.4, c='yellow', marker='o')
     # for i in range(p_array.shape[0]):
     #     for j in range(p_array.shape[1]):
     #         # Scaling the coordinates
