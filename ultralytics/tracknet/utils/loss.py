@@ -358,7 +358,6 @@ class TrackNetLoss:
         target_scores_sum = max(cls_targets.sum(), 1)
 
         target_pos_distri = target_pos_distri.view(b, self.num_groups*cell_num*cell_num, self.feat_no)
-        print(target_pos_distri.shape)
         cls_targets = cls_targets.view(b, self.num_groups*cell_num*cell_num, 1)
         mask_has_ball = mask_has_ball.view(b, self.num_groups*cell_num*cell_num).bool()
         mask_may_has_ball = mask_may_has_ball.view(b, self.num_groups*cell_num*cell_num, 1).bool()
@@ -943,6 +942,8 @@ class XYLoss(nn.Module):
                 f"Target out of range: min={target_pos_distri.min()}, max={target_pos_distri.max()}"
 
             loss_dfl = self._df_loss(pred_dist[fg_mask].view(-1, self.reg_max + 1), target_pos_distri[fg_mask]) * weight
+            if (loss_dfl >= 0).all():
+                print(loss_dfl)
             assert (loss_dfl >= 0).all(), f"`loss` contains negative values. Min: {loss_dfl.min()}, Max: {loss_dfl.max()}"
             loss_dfl_sum = loss_dfl.sum()
                 
