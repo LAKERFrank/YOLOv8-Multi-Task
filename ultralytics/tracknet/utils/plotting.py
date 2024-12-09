@@ -140,7 +140,7 @@ def display_image_with_coordinates(img_tensor, target, pred, fileName, input_num
     plt.savefig(check_training_img_path+fileName, bbox_inches='tight')
     plt.close()
 
-def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue', target = None, label = None, save_dir = Path('.'), stride = 32, path = 'predict_val_img', next = True):
+def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue', target = None, label = None, save_dir = Path('.'), stride = 32, path = 'predict_val_img', next = True, only_ball = False):
     if isinstance(stride, torch.Tensor):
         stride = stride.item()  # 將 tensor 轉換為純數值
     # Convert the image tensor to numpy array
@@ -191,14 +191,17 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         
         # next_x = current_x+dx*640
         # next_y = current_y+dy*640
-        rect = patches.Rectangle(xy=(x_coordinates, y_coordinates), height=stride, width=stride, edgecolor=box_color, facecolor='none', linewidth=0.5)
-        ax.add_patch(rect)
-        text = ax.text(x_coordinates+stride+1, y_coordinates+stride, f'{str(conf)}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
-        text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
-                       patheffects.Normal()])
-        ax.scatter(current_x, current_y, s=1.4, c='red', marker='o')
+        if not only_ball:
+            rect = patches.Rectangle(xy=(x_coordinates, y_coordinates), height=stride, width=stride, edgecolor=box_color, facecolor='none', linewidth=0.5)
+            ax.add_patch(rect)
+        if not only_ball:
+            text = ax.text(x_coordinates+stride+1, y_coordinates+stride, f'{str(conf)}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
+            text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
+                        patheffects.Normal()])
+        ax.scatter(current_x, current_y, s=1, c='red', marker='o')
         if next:
-            ax.scatter(current_nx, current_ny, s=1.4, c='green', marker='o')
+            ax.scatter(current_nx, current_ny, s=1, c='green', marker='o')
+    
     label_text = ax.text(0, 0, f'{label}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
     label_text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
                        patheffects.Normal()])
@@ -212,9 +215,9 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
             nx = nx.cpu().item()
         if isinstance(ny, torch.Tensor):
             ny = ny.cpu().item()
-        ax.scatter(x, y, s=1.4, c='blue', marker='o')
+        ax.scatter(x, y, s=1, c='blue', marker='o')
         if x != nx or y != ny:
-            ax.scatter(nx, ny, s=1.4, c='yellow', marker='o')
+            ax.scatter(nx, ny, s=1, c='yellow', marker='o')
     # for i in range(p_array.shape[0]):
     #     for j in range(p_array.shape[1]):
     #         # Scaling the coordinates

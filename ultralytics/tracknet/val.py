@@ -655,7 +655,8 @@ class TrackNetValidator(BaseValidator):
                     save_dir=self.metrics.save_dir,
                     stride = self.stride,
                     path='predict_val_10_frame_img',
-                    next=False
+                    next=False,
+                    only_ball=True
                     )
 
         # 計算 conf 的 confusion matrix
