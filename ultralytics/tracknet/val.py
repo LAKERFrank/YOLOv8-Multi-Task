@@ -582,6 +582,7 @@ class TrackNetValidator(BaseValidator):
                         self.fast_hit_TP += 1
                 else:
                     self.pos_FN += 1
+                    box_color = 'yellow'
                     if mask_fast_ball[frame_idx] == 1:
                         self.fast_FN += 1
                     if mask_hit_ball_v2[frame_idx] == 1:
@@ -635,7 +636,7 @@ class TrackNetValidator(BaseValidator):
                         # target=target_xy
                         ) 
             
-                if box_color == 'blue':
+                if box_color == 'yellow':
                     display_predict_image(
                         batch_img[frame_idx],  
                         metrics, 
@@ -648,31 +649,31 @@ class TrackNetValidator(BaseValidator):
                         path='predict_val_error_img'
                         ) 
 
-                display_predict_image(
-                            batch_img[frame_idx],  
-                            list(self.frame_10_metrics), 
-                            'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                            box_color=box_color,
-                            label=label,
-                            save_dir=self.metrics.save_dir,
-                            stride = self.stride,
-                            path='predict_val_10_frame_img',
-                            next=False,
-                            only_ball=True
-                            )
-                display_predict_image(
-                            batch_img[frame_idx],  
-                            list(self.frame_10_metrics), 
-                            'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                            box_color=box_color,
-                            label=label,
-                            save_dir=self.metrics.save_dir,
-                            stride = self.stride,
-                            path='predict_val_10_next_frame_img',
-                            next=False,
-                            only_ball=True,
-                            only_next=True
-                            )
+                # display_predict_image(
+                #             batch_img[frame_idx],  
+                #             list(self.frame_10_metrics), 
+                #             'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                #             box_color=box_color,
+                #             label=label,
+                #             save_dir=self.metrics.save_dir,
+                #             stride = self.stride,
+                #             path='predict_val_10_frame_img',
+                #             next=False,
+                #             only_ball=True
+                #             )
+                # display_predict_image(
+                #             batch_img[frame_idx],  
+                #             list(self.frame_10_metrics), 
+                #             'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                #             box_color=box_color,
+                #             label=label,
+                #             save_dir=self.metrics.save_dir,
+                #             stride = self.stride,
+                #             path='predict_val_10_next_frame_img',
+                #             next=False,
+                #             only_ball=True,
+                #             only_next=True
+                #             )
 
         # 計算 conf 的 confusion matrix
         threshold = 0.6
