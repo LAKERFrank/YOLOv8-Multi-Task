@@ -636,6 +636,19 @@ class TrackNetValidator(BaseValidator):
                         # target=target_xy
                         ) 
             
+                if box_color == 'blue':
+                    display_predict_image(
+                        batch_img[frame_idx],  
+                        metrics, 
+                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                        box_color=box_color,
+                        label=label,
+                        save_dir=self.metrics.save_dir,
+                        stride = self.stride,
+                        target=target_xy,
+                        path='predict_val_FP_img',
+                        next=False
+                        ) 
                 if box_color == 'yellow':
                     display_predict_image(
                         batch_img[frame_idx],  
@@ -646,7 +659,8 @@ class TrackNetValidator(BaseValidator):
                         save_dir=self.metrics.save_dir,
                         stride = self.stride,
                         target=target_xy,
-                        path='predict_val_error_img'
+                        path='predict_val_FN_img',
+                        next=False
                         ) 
 
                 # display_predict_image(
