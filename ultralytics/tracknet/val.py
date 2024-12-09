@@ -323,7 +323,8 @@ class TrackNetValidator(BaseValidator):
         self.hitV1_FN = 0  # False Negatives
 
         # 一顆球半徑 = 2 pixel (640*640)
-        self.tolerance3 = 2.0 # 50% 距離容忍度
+        self.tolerance2 = 2.0 # 50% 距離容忍度
+        self.tolerance5 = 2.0
         self.conf_thresholds = [i * 0.05 for i in range(1, 20)]  # [0.5, 0.55, ..., 0.95]
         self.iou_dist_thresholds = [i * 1 for i in range(1, 6)]  # [1, 2, ..., 5]
         
@@ -473,7 +474,7 @@ class TrackNetValidator(BaseValidator):
                 frame_idx += 1
 
         
-        
+        frame_10_metrics = []
         for frame_idx in range(10):
             label = ''
             if mask_fast_ball[frame_idx] == 1:
@@ -536,6 +537,7 @@ class TrackNetValidator(BaseValidator):
             metrics = []
             if max_conf >= conf_threshold:
                 metrics.append(metric)
+                frame_10_metrics.append(metric)
 
             # confusion metrics
             
@@ -559,14 +561,15 @@ class TrackNetValidator(BaseValidator):
                     self.pos_TN += 1
             else:
                 if max_conf >= conf_threshold:
-                    if distance <= self.tolerance3:
+                    if distance <= self.tolerance2:
                         self.pos_TP += 1
 
                         if mask_hit_ball_v2[frame_idx] == 1:
                             self.hit_TP += 1
                     else:
+                        if distance <= self.tolerance5:
+                            self.pos_FP_dis += 1
                         self.pos_FP += 1
-                        self.pos_FP_dis += 1
                         box_color = 'blue'
 
                         if mask_hit_ball_v2[frame_idx] == 1:
@@ -627,7 +630,7 @@ class TrackNetValidator(BaseValidator):
                         label=label,
                         save_dir=self.metrics.save_dir,
                         stride = self.stride,
-                        target=target_xy
+                        # target=target_xy
                         ) 
             
                 if box_color == 'blue':
@@ -642,6 +645,18 @@ class TrackNetValidator(BaseValidator):
                         target=target_xy,
                         path='predict_val_error_img'
                         ) 
+
+        display_predict_image(
+                    batch_img[0],  
+                    frame_10_metrics, 
+                    'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                    box_color=box_color,
+                    label=label,
+                    save_dir=self.metrics.save_dir,
+                    stride = self.stride,
+                    path='predict_val_10_frame_img',
+                    next=False
+                    )
 
         # 計算 conf 的 confusion matrix
         threshold = 0.6

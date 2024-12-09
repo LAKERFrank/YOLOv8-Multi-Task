@@ -140,7 +140,7 @@ def display_image_with_coordinates(img_tensor, target, pred, fileName, input_num
     plt.savefig(check_training_img_path+fileName, bbox_inches='tight')
     plt.close()
 
-def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue', target = None, label = None, save_dir = Path('.'), stride = 32, path = 'predict_val_img'):
+def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue', target = None, label = None, save_dir = Path('.'), stride = 32, path = 'predict_val_img', next = True):
     if isinstance(stride, torch.Tensor):
         stride = stride.item()  # 將 tensor 轉換為純數值
     # Convert the image tensor to numpy array
@@ -197,7 +197,8 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
                        patheffects.Normal()])
         ax.scatter(current_x, current_y, s=1.4, c='red', marker='o')
-        ax.scatter(current_nx, current_ny, s=1.4, c='green', marker='o')
+        if next:
+            ax.scatter(current_nx, current_ny, s=1.4, c='green', marker='o')
     label_text = ax.text(0, 0, f'{label}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
     label_text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
                        patheffects.Normal()])
