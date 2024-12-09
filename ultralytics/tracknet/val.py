@@ -11,6 +11,7 @@ from ultralytics.yolo.engine.validator import BaseValidator
 from ultralytics.yolo.utils import LOGGER
 from ultralytics.yolo.utils.metrics import DetMetrics
 from sklearn.metrics import confusion_matrix
+from collections import deque
 
 class TrackNetValidatorV3(BaseValidator):
     def __init__(self, dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
@@ -333,6 +334,8 @@ class TrackNetValidator(BaseValidator):
         self.cumulative_FN = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
         self.cumulative_TN = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
         self.fitness = 0
+
+        self.frame_10_metrics = deque(maxlen=10)
     
     def update_metrics(self, preds, batch):
         """Calculate and update metrics based on predictions and batch."""
@@ -474,7 +477,6 @@ class TrackNetValidator(BaseValidator):
                 frame_idx += 1
 
         
-        frame_10_metrics = []
         for frame_idx in range(10):
             label = ''
             if mask_fast_ball[frame_idx] == 1:
@@ -537,7 +539,7 @@ class TrackNetValidator(BaseValidator):
             metrics = []
             if max_conf >= conf_threshold:
                 metrics.append(metric)
-                frame_10_metrics.append(metric)
+                self.frame_10_metrics.append(metric)
 
             # confusion metrics
             
@@ -646,18 +648,18 @@ class TrackNetValidator(BaseValidator):
                         path='predict_val_error_img'
                         ) 
 
-        display_predict_image(
-                    batch_img[0],  
-                    frame_10_metrics, 
-                    'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                    box_color=box_color,
-                    label=label,
-                    save_dir=self.metrics.save_dir,
-                    stride = self.stride,
-                    path='predict_val_10_frame_img',
-                    next=False,
-                    only_ball=True
-                    )
+                display_predict_image(
+                            batch_img[0],  
+                            list(self.frame_10_metrics), 
+                            'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                            box_color=box_color,
+                            label=label,
+                            save_dir=self.metrics.save_dir,
+                            stride = self.stride,
+                            path='predict_val_10_frame_img',
+                            next=False,
+                            only_ball=True
+                            )
 
         # 計算 conf 的 confusion matrix
         threshold = 0.6
