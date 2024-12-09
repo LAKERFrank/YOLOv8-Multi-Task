@@ -649,7 +649,7 @@ class TrackNetValidator(BaseValidator):
                         ) 
 
                 display_predict_image(
-                            batch_img[0],  
+                            batch_img[frame_idx],  
                             list(self.frame_10_metrics), 
                             'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
                             box_color=box_color,
