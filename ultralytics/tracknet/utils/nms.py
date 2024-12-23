@@ -22,18 +22,10 @@ def non_max_suppression(pred_conf, pred_x, pred_y, conf_threshold=0.6, dis_toler
         conf_values = pred_conf[mask]
         indices = torch.nonzero(mask)
 
-        # 取得對應的 x, y 座標
-        x_values = pred_x[indices[:, 0], indices[:, 1]]
-        y_values = pred_y[indices[:, 0], indices[:, 1]]
-
         # 2. 依照置信度降序排序
         sorted_indices = torch.argsort(conf_values, descending=True)
         sorted_conf_values = conf_values[sorted_indices]
         sorted_positions = indices[sorted_indices]
-        
-        # 對應排序後的座標
-        sorted_x = x_values[sorted_indices]
-        sorted_y = y_values[sorted_indices]
 
         # 3. 初始化結果列表
         keep = []
@@ -41,11 +33,11 @@ def non_max_suppression(pred_conf, pred_x, pred_y, conf_threshold=0.6, dis_toler
         center = stride/2
         # 4. 應用距離檢查的 NMS
         for i in range(len(sorted_conf_values)):
-            x1 = center - sorted_x[i][0] + sorted_x[i][1]
-            y1 = center - sorted_y[i][0] + sorted_y[i][1]
-            conf = sorted_conf_values[i].item()
 
             x_coordinates, y_coordinates = sorted_positions[i].tolist()
+            x1 = center - pred_x[y_coordinates][x_coordinates][0]+pred_x[y_coordinates][x_coordinates][1]
+            y1 = center - pred_y[y_coordinates][x_coordinates][0]+pred_y[y_coordinates][x_coordinates][1]
+            conf = sorted_conf_values[i].item()
 
             x_coordinates *= stride
             y_coordinates *= stride
