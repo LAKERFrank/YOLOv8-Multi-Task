@@ -538,7 +538,7 @@ class TrackNetValidator(BaseValidator):
                 metric["grid_y"] = y
                 
                 metric["x"] = center-p_cell_x[int(y)][int(x)][0]+p_cell_x[int(y)][int(x)][1]
-                metric["y"] = center-p_cell_y[int(y)][int(x)][0]+p_cell_x[int(y)][int(x)][1]
+                metric["y"] = center-p_cell_y[int(y)][int(x)][0]+p_cell_y[int(y)][int(x)][1]
                 metric["conf"] = conf
 
                 metric["nx"] = center-p_cell_nx[int(y)][int(x)][0]+p_cell_nx[int(y)][int(x)][1]
