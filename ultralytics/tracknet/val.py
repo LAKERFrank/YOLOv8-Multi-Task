@@ -520,6 +520,17 @@ class TrackNetValidator(BaseValidator):
             # 獲取當前圖片的 conf
             p_conf = each_probs[frame_idx]
 
+            
+
+            ############## MAX ##############
+            conf_threshold = 0.6
+            p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
+            max_position = torch.argmax(p_conf_masked)
+            # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
+            max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
+            max_conf = p_conf[max_y, max_x]
+            
+            ##### 多球
             preds = non_max_suppression(p_conf, p_cell_x, p_cell_y)
             for (x, y, conf) in preds:
                 metric = {}
@@ -537,14 +548,6 @@ class TrackNetValidator(BaseValidator):
                     metrics.append(metric)
                     self.frame_10_metrics.append(metric)
 
-            ############## MAX ##############
-            conf_threshold = 0.6
-            p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
-            max_position = torch.argmax(p_conf_masked)
-            # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
-            max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
-            max_conf = p_conf[max_y, max_x]
-            
             # metric = {}
             # metric["grid_x"] = max_x
             # metric["grid_y"] = max_y
