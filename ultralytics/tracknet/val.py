@@ -515,6 +515,7 @@ class TrackNetValidator(BaseValidator):
             p_cell_y = each_pos_y[frame_idx]
             p_cell_nx = each_pos_nx[frame_idx]
             p_cell_ny = each_pos_ny[frame_idx]
+            center = self.stride/2
             metrics = []
             # 獲取當前圖片的 conf
             p_conf = each_probs[frame_idx]
@@ -524,7 +525,7 @@ class TrackNetValidator(BaseValidator):
                 metric = {}
                 metric["grid_x"] = x
                 metric["grid_y"] = y
-                center = self.stride/2
+                
                 metric["x"] = center-p_cell_x[int(y)][int(x)][0]+p_cell_x[int(y)][int(x)][1]
                 metric["y"] = center-p_cell_y[int(y)][int(x)][0]+p_cell_x[int(y)][int(x)][1]
                 metric["conf"] = conf
