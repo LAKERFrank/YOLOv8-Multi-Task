@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 import torch
 from ultralytics.tracknet.dataset import TrackNetDataset
+from ultralytics.tracknet.utils.nms import non_max_suppression
 from ultralytics.tracknet.utils.plotting import display_predict_image
 from ultralytics.tracknet.utils.transform import calculate_angle, calculate_dist, target_grid
 from ultralytics.tracknet.val_dataset import TrackNetValDataset
@@ -518,6 +519,22 @@ class TrackNetValidator(BaseValidator):
             # 獲取當前圖片的 conf
             p_conf = each_probs[frame_idx]
 
+            preds = non_max_suppression(p_conf, p_cell_x, p_cell_y)
+            for (x, y, conf) in preds:
+                metric = {}
+                metric["grid_x"] = x
+                metric["grid_y"] = y
+                center = self.stride/2
+                metric["x"] = center-p_cell_x[y][x][0]+p_cell_x[y][x][1]
+                metric["y"] = center-p_cell_y[y][x][0]+p_cell_x[y][x][1]
+                metric["conf"] = conf
+
+                metric["nx"] = center-p_cell_nx[y][x][0]+p_cell_nx[y][x][1]
+                metric["ny"] = center-p_cell_ny[y][x][0]+p_cell_ny[y][x][1]
+
+                if max_conf >= conf_threshold:
+                    metrics.append(metric)
+                    self.frame_10_metrics.append(metric)
 
             ############## MAX ##############
             conf_threshold = 0.6
@@ -527,20 +544,20 @@ class TrackNetValidator(BaseValidator):
             max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
             max_conf = p_conf[max_y, max_x]
             
-            metric = {}
-            metric["grid_x"] = max_x
-            metric["grid_y"] = max_y
-            center = self.stride/2
-            metric["x"] = center-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1]
-            metric["y"] = center-p_cell_y[max_y][max_x][0]+p_cell_x[max_y][max_x][1]
-            metric["conf"] = max_conf
+            # metric = {}
+            # metric["grid_x"] = max_x
+            # metric["grid_y"] = max_y
+            # center = self.stride/2
+            # metric["x"] = center-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1]
+            # metric["y"] = center-p_cell_y[max_y][max_x][0]+p_cell_x[max_y][max_x][1]
+            # metric["conf"] = max_conf
 
-            metric["nx"] = center-p_cell_nx[max_y][max_x][0]+p_cell_nx[max_y][max_x][1]
-            metric["ny"] = center-p_cell_ny[max_y][max_x][0]+p_cell_ny[max_y][max_x][1]
-            metrics = []
-            if max_conf >= conf_threshold:
-                metrics.append(metric)
-                self.frame_10_metrics.append(metric)
+            # metric["nx"] = center-p_cell_nx[max_y][max_x][0]+p_cell_nx[max_y][max_x][1]
+            # metric["ny"] = center-p_cell_ny[max_y][max_x][0]+p_cell_ny[max_y][max_x][1]
+            # metrics = []
+            # if max_conf >= conf_threshold:
+            #     metrics.append(metric)
+            #     self.frame_10_metrics.append(metric)
 
             # confusion metrics
             
@@ -637,32 +654,32 @@ class TrackNetValidator(BaseValidator):
                         # target=target_xy
                         ) 
             
-                if box_color == 'blue':
-                    display_predict_image(
-                        batch_img[frame_idx],  
-                        metrics, 
-                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                        box_color=box_color,
-                        label=label,
-                        save_dir=self.metrics.save_dir,
-                        stride = self.stride,
-                        target=target_xy,
-                        path='predict_val_FP_img',
-                        next=False
-                        ) 
-                if box_color == 'yellow':
-                    display_predict_image(
-                        batch_img[frame_idx],  
-                        metrics, 
-                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                        box_color=box_color,
-                        label=label,
-                        save_dir=self.metrics.save_dir,
-                        stride = self.stride,
-                        target=target_xy,
-                        path='predict_val_FN_img',
-                        next=False
-                        ) 
+                # if box_color == 'blue':
+                #     display_predict_image(
+                #         batch_img[frame_idx],  
+                #         metrics, 
+                #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                #         box_color=box_color,
+                #         label=label,
+                #         save_dir=self.metrics.save_dir,
+                #         stride = self.stride,
+                #         target=target_xy,
+                #         path='predict_val_FP_img',
+                #         next=False
+                #         ) 
+                # if box_color == 'yellow':
+                #     display_predict_image(
+                #         batch_img[frame_idx],  
+                #         metrics, 
+                #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                #         box_color=box_color,
+                #         label=label,
+                #         save_dir=self.metrics.save_dir,
+                #         stride = self.stride,
+                #         target=target_xy,
+                #         path='predict_val_FN_img',
+                #         next=False
+                #         ) 
 
                 # display_predict_image(
                 #             batch_img[frame_idx],  
