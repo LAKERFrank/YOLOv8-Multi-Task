@@ -525,12 +525,12 @@ class TrackNetValidator(BaseValidator):
                 metric["grid_x"] = x
                 metric["grid_y"] = y
                 center = self.stride/2
-                metric["x"] = center-p_cell_x[y][x][0]+p_cell_x[y][x][1]
-                metric["y"] = center-p_cell_y[y][x][0]+p_cell_x[y][x][1]
+                metric["x"] = center-p_cell_x[int(y)][int(x)][0]+p_cell_x[int(y)][int(x)][1]
+                metric["y"] = center-p_cell_y[int(y)][int(x)][0]+p_cell_x[int(y)][int(x)][1]
                 metric["conf"] = conf
 
-                metric["nx"] = center-p_cell_nx[y][x][0]+p_cell_nx[y][x][1]
-                metric["ny"] = center-p_cell_ny[y][x][0]+p_cell_ny[y][x][1]
+                metric["nx"] = center-p_cell_nx[int(y)][int(x)][0]+p_cell_nx[int(y)][int(x)][1]
+                metric["ny"] = center-p_cell_ny[int(y)][int(x)][0]+p_cell_ny[int(y)][int(x)][1]
 
                 if max_conf >= conf_threshold:
                     metrics.append(metric)
