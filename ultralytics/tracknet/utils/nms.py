@@ -54,6 +54,6 @@ def non_max_suppression(pred_conf, pred_x, pred_y, conf_threshold=0.6, dis_toler
 
             if is_far_enough:
                 keep.append((x1.item(), y1.item(), conf))
-                result.append((x_coordinates, y_coordinates, conf))
+                result.append((x_coordinates/stride, y_coordinates/stride, conf))
 
         return result
