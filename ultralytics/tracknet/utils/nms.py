@@ -34,7 +34,7 @@ def non_max_suppression(pred_conf, pred_x, pred_y, conf_threshold=0.6, dis_toler
         # 4. 應用距離檢查的 NMS
         for i in range(len(sorted_conf_values)):
 
-            x_coordinates, y_coordinates = sorted_positions[i].tolist()
+            y_coordinates, x_coordinates = sorted_positions[i].tolist()
             x1 = center - pred_x[y_coordinates][x_coordinates][0]+pred_x[y_coordinates][x_coordinates][1]
             y1 = center - pred_y[y_coordinates][x_coordinates][0]+pred_y[y_coordinates][x_coordinates][1]
             conf = sorted_conf_values[i].item()
