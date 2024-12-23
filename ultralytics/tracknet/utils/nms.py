@@ -3,7 +3,7 @@
 import torch
 
 
-def non_max_suppression(pred_conf, pred_x, pred_y, conf_threshold=0.6, dis_tolerance=3, stride=8):
+def non_max_suppression(pred_conf, pred_x, pred_y, conf_threshold=0.7, dis_tolerance=12, stride=8):
         """
         Apply non-maximum suppression (NMS) to filter out overlapping balls based on distance.
         
