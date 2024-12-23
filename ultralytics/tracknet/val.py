@@ -544,9 +544,8 @@ class TrackNetValidator(BaseValidator):
                 metric["nx"] = center-p_cell_nx[int(y)][int(x)][0]+p_cell_nx[int(y)][int(x)][1]
                 metric["ny"] = center-p_cell_ny[int(y)][int(x)][0]+p_cell_ny[int(y)][int(x)][1]
 
-                if max_conf >= conf_threshold:
-                    metrics.append(metric)
-                    self.frame_10_metrics.append(metric)
+                metrics.append(metric)
+                self.frame_10_metrics.append(metric)
 
             # metric = {}
             # metric["grid_x"] = max_x
@@ -647,16 +646,16 @@ class TrackNetValidator(BaseValidator):
                 else:
                     target_xy = (batch_target[frame_idx][2], batch_target[frame_idx][3], batch_target[frame_idx][2], batch_target[frame_idx][3])
 
-                display_predict_image(
-                        batch_img[frame_idx],  
-                        metrics, 
-                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                        box_color=box_color,
-                        label=label,
-                        save_dir=self.metrics.save_dir,
-                        stride = self.stride,
-                        # target=target_xy
-                        ) 
+                # display_predict_image(
+                #         batch_img[frame_idx],  
+                #         metrics, 
+                #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                #         box_color=box_color,
+                #         label=label,
+                #         save_dir=self.metrics.save_dir,
+                #         stride = self.stride,
+                #         target=target_xy
+                #         ) 
             
                 # if box_color == 'blue':
                 #     display_predict_image(
@@ -685,18 +684,18 @@ class TrackNetValidator(BaseValidator):
                 #         next=False
                 #         ) 
 
-                # display_predict_image(
-                #             batch_img[frame_idx],  
-                #             list(self.frame_10_metrics), 
-                #             'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #             box_color=box_color,
-                #             label=label,
-                #             save_dir=self.metrics.save_dir,
-                #             stride = self.stride,
-                #             path='predict_val_10_frame_img',
-                #             next=False,
-                #             only_ball=True
-                #             )
+                display_predict_image(
+                            batch_img[frame_idx],  
+                            list(self.frame_10_metrics), 
+                            'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                            box_color=box_color,
+                            label=label,
+                            save_dir=self.metrics.save_dir,
+                            stride = self.stride,
+                            path='predict_val_10_frame_img',
+                            next=False,
+                            only_ball=True
+                            )
                 # display_predict_image(
                 #             batch_img[frame_idx],  
                 #             list(self.frame_10_metrics), 
