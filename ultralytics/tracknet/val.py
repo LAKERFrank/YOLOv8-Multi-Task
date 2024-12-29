@@ -520,8 +520,6 @@ class TrackNetValidator(BaseValidator):
             # 獲取當前圖片的 conf
             p_conf = each_probs[frame_idx]
 
-            
-
             ############## MAX ##############
             conf_threshold = 0.6
             p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
@@ -696,19 +694,19 @@ class TrackNetValidator(BaseValidator):
                             next=False,
                             only_ball=True
                             )
-                # display_predict_image(
-                #             batch_img[frame_idx],  
-                #             list(self.frame_10_metrics), 
-                #             'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #             box_color=box_color,
-                #             label=label,
-                #             save_dir=self.metrics.save_dir,
-                #             stride = self.stride,
-                #             path='predict_val_10_next_frame_img',
-                #             next=False,
-                #             only_ball=True,
-                #             only_next=True
-                #             )
+                display_predict_image(
+                            batch_img[frame_idx],  
+                            list(self.frame_10_metrics), 
+                            'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                            box_color=box_color,
+                            label=label,
+                            save_dir=self.metrics.save_dir,
+                            stride = self.stride,
+                            path='predict_val_10_next_frame_img',
+                            next=False,
+                            only_ball=True,
+                            only_next=True
+                            )
 
         # 計算 conf 的 confusion matrix
         threshold = 0.6
