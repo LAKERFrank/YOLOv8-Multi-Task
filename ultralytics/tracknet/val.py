@@ -529,7 +529,7 @@ class TrackNetValidator(BaseValidator):
             max_conf = p_conf[max_y, max_x]
             
             ##### 多球
-            preds = non_max_suppression(p_conf, p_cell_x, p_cell_y)
+            preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, dis_tolerance=30)
             for (x, y, conf) in preds:
                 metric = {}
                 metric["grid_x"] = x
