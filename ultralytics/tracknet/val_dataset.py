@@ -242,12 +242,24 @@ class TrackNetValDataset(Dataset):
             #ax.add_patch(rect)
 
         plt.show()
+    def display_image(self, img_array):
+
+        # Create a figure and axes
+        fig, ax = plt.subplots(1)
+
+        # Display the image
+        ax.imshow(img_array, cmap='gray')
+
+        plt.show()
+        plt.close()
 
     @lru_cache(maxsize=10)
     def __preprocess_img(self, path, pad_value=0):
         img = self.open_image(path)
         img = self.pad_to_square(img, pad_value)
-        img.resize((1, 640, 640))
+        #self.display_image(img)
+        img = cv2.resize(img, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
+        # self.display_image(img)
         return img
 
     def open_image(self, path):
