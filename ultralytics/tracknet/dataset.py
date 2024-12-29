@@ -231,7 +231,7 @@ class TrackNetDataset(Dataset):
         #ball_trajectory_df['next_hit'] = ball_trajectory_df['hit'].shift(-1, fill_value=0)
         #ball_trajectory_df['hit'] = ball_trajectory_df[['hit', 'prev_hit', 'next_hit']].max(axis=1)
 
-        drop_columns = ['Fast', 'Event', 'Z', 'Shot', 'player_X', 'player_Y', 'prev_hit', 'next_hit']
+        drop_columns = ['Fast', 'Event', 'Z', 'Shot', 'player_X', 'player_Y', 'prev_hit', 'next_hit', 'Timestamp']
         
         ball_trajectory_df = ball_trajectory_df.drop(drop_columns, axis=1, errors='ignore')
 
