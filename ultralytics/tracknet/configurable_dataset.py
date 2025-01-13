@@ -13,7 +13,7 @@ from functools import lru_cache
 from glob import glob
 
 class TrackNetConfigurableDataset(Dataset):
-    def __init__(self, root_dir, num_input=10, transform=None, prefix='', path_counts={}):
+    def __init__(self, root_dir, num_input=10, transform=None, prefix=''):
 
         self.root_dir = root_dir
         self.transform = transform
@@ -21,10 +21,10 @@ class TrackNetConfigurableDataset(Dataset):
         self.samples = []
         self.prefix = prefix
         self.path_counts = { 
-            "profession_match_1" : 4000, 
-            "profession_match_2" : 4000, 
-            "profession_match_3" : 4000,
-            "profession_match_4" : 4000 }
+            "profession_match_1" : 20, 
+            "profession_match_2" : 20, 
+            "profession_match_3" : 20,
+            "profession_match_4" : 20 }
 
         self.idx = set()
 
