@@ -21,10 +21,10 @@ class TrackNetConfigurableDataset(Dataset):
         self.samples = []
         self.prefix = prefix
         self.path_counts = { 
-            "profession_match_1" : 150, 
-            "profession_match_2" : 150, 
-            "profession_match_3" : 150,
-            "profession_match_4" : 150 }
+            "profession_match_1" : 1000, 
+            "profession_match_2" : 1000, 
+            "profession_match_3" : 1000,
+            "profession_match_4" : 1000 }
 
         self.idx = set()
 
