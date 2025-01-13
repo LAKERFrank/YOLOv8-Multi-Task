@@ -37,19 +37,33 @@ class TrackNetConfigurableDataset(Dataset):
             match_name = match_name.strip('/')
 
             match_dir_path = os.path.join(root_dir, match_name)
+
+            # Check if it is a match directory
+            if not os.path.isdir(match_dir_path):
+                continue
+
+            # 计算当前 match 的总样本数
+            total_samples = image_count + (image_count - self.num_input * 2 + 1) + (image_count - self.num_input * 3 + 1)
+
+            # 创建一个独立的 tqdm bar
+            with tqdm(total=total_samples, desc=f"Processing {match_name}", miniters=1, smoothing=1) as pbar:
+                self.read_match(match_name, pbar)  # 将 pbar 传递给 read_match
+        for match_name in glob("*/", root_dir=root_dir):
+            match_name = match_name.strip('/')
+
+            match_dir_path = os.path.join(root_dir, match_name)
             
             # Check if it is a match directory
             if not os.path.isdir(match_dir_path):
                 continue
 
             self.read_match(match_name)
-        self.pbar.close()
 
-    def read_match(self, match_name):
+    def read_match(self, match_name, pbar):
         video_dir = os.path.join(self.root_dir, match_name, 'video')
         csv_dir = os.path.join(self.root_dir, match_name, 'csv')
 
-        self.pbar.set_description(f'{self.prefix} Generating image cache: {match_name}/ ')
+        pbar.set_description(f'{self.prefix} Generating image cache: {match_name}/ ')
 
         if match_name in self.path_counts:
             # Traverse all videos in the match directory
@@ -75,7 +89,7 @@ class TrackNetConfigurableDataset(Dataset):
 
                 # Create sliding windows of num_input frames
                 for i in range(min_len - (self.num_input-1)):
-                    self.pbar.update(1)
+                    pbar.update(1)
 
                     frames = img_files[i: i + self.num_input]
 
@@ -109,7 +123,7 @@ class TrackNetConfigurableDataset(Dataset):
                 
                 # 降低 FPS 120 => 60
                 for i in range(min_len - (self.num_input*2-1)):
-                    self.pbar.update(1)
+                    pbar.update(1)
 
                     frames = img_files[i: i + self.num_input*2: 2]
 
@@ -142,7 +156,7 @@ class TrackNetConfigurableDataset(Dataset):
                                 })
                 # # 降低 FPS 120 => 40
                 # for i in range(max_len - (self.num_input*3-1)):
-                #     self.pbar.update(1)
+                #     pbar.update(1)
 
                 #     frames = img_files[i: i + self.num_input*3: 3]
 
@@ -175,7 +189,7 @@ class TrackNetConfigurableDataset(Dataset):
                 #                 })
                 # 降低 FPS 120 => 30
                 # for i in range(max_len - (self.num_input*4-1)):
-                #     self.pbar.update(1)
+                #     pbar.update(1)
 
                 #     frames = img_files[i: i + self.num_input*4: 4]
 
@@ -197,7 +211,7 @@ class TrackNetConfigurableDataset(Dataset):
                 #         self.img_cache(match_name, video_name, frames, npy_path)
                 
                 self.path_counts[match_name] = self.path_counts[match_name] - limit_count
-                self.pbar.update(self.num_input-1)
+                pbar.update(self.num_input-1)
 
     def img_cache_dir(self, match_name, video_name, img_files):
         s = '|'.join([match_name]+[video_name]+img_files)
