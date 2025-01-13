@@ -48,16 +48,6 @@ class TrackNetConfigurableDataset(Dataset):
             # 创建一个独立的 tqdm bar
             with tqdm(total=total_samples, desc=f"Processing {match_name}", miniters=1, smoothing=1) as pbar:
                 self.read_match(match_name, pbar)  # 将 pbar 传递给 read_match
-        for match_name in glob("*/", root_dir=root_dir):
-            match_name = match_name.strip('/')
-
-            match_dir_path = os.path.join(root_dir, match_name)
-            
-            # Check if it is a match directory
-            if not os.path.isdir(match_dir_path):
-                continue
-
-            self.read_match(match_name)
 
     def read_match(self, match_name, pbar):
         video_dir = os.path.join(self.root_dir, match_name, 'video')
