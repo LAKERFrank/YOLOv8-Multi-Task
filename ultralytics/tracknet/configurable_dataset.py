@@ -69,6 +69,7 @@ class TrackNetConfigurableDataset(Dataset):
                 total_img_len = len(img_files)
                 limit_count = self.path_counts[match_name]
                 min_len = min(limit_count, total_img_len)
+                print(f"{video_name}:total_img_len: {total_img_len}, limit_count: {limit_count}, min_len: {min_len}")
                 img = cv2.imread(frame_dir+"/"+img_files[0])
                 height, width, _ = img.shape
 
