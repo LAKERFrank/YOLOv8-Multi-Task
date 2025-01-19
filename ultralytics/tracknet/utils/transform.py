@@ -3,11 +3,19 @@ import math
 import torch
 
 
-def target_grid(target_x, target_y, stride):
+def target_grid(target_x, target_y, stride, target_shape = 640):
     grid_x = int(target_x / stride)
     grid_y = int(target_y / stride)
     offset_x = (target_x % stride)
     offset_y = (target_y % stride)
+
+    if grid_x == target_shape / stride:
+        grid_x = target_shape / stride - 1
+        offset_x = stride - 1
+    if grid_y == target_shape / stride:
+        grid_y = target_shape / stride - 1
+        offset_y = stride - 1
+    assert grid_x < target_shape / stride and grid_y < target_shape / stride
     return grid_x, grid_y, offset_x, offset_y
 
 def calculate_dist(p1, p2):
