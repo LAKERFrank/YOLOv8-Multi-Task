@@ -24,10 +24,10 @@ class TrackNetConfigurableDataset(Dataset):
             "match_1" : 100, 
             "match_2" : 20, 
             "blion_tracknet_partial": 473,
-            "profession_match_1" : 500, 
-            "profession_match_2" : 500, 
-            "profession_match_3" : 500,
-            "profession_match_4" : 500 }
+            "profession_match_1" : 100, 
+            "profession_match_2" : 100, 
+            "profession_match_3" : 100,
+            "profession_match_4" : 100 }
 
         self.idx = set()
 
