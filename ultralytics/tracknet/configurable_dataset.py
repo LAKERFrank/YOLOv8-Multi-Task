@@ -27,7 +27,15 @@ class TrackNetConfigurableDataset(Dataset):
             "profession_match_1" : 100, 
             "profession_match_2" : 100, 
             "profession_match_3" : 100,
-            "profession_match_4" : 100 }
+            "profession_match_4" : 100,
+            "profession_match_5" : 100,
+            "profession_match_6" : 100,
+            "profession_match_7" : 100,
+            "profession_match_8" : 100,
+            "profession_match_9" : 100,
+            "profession_match_10" : 100,
+            "profession_match_11" : 100,
+            "profession_match_12" : 100}
 
         self.idx = set()
 
