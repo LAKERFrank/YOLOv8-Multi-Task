@@ -21,6 +21,9 @@ class TrackNetConfigurableDataset(Dataset):
         self.samples = []
         self.prefix = prefix
         self.path_counts = { 
+            "match_1" : 100, 
+            "match_2" : 20, 
+            "blion_tracknet_partial": 473,
             "profession_match_1" : 5000, 
             "profession_match_2" : 5000, 
             "profession_match_3" : 5000,
@@ -30,8 +33,6 @@ class TrackNetConfigurableDataset(Dataset):
 
         image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
-        self.pbar = tqdm(total=image_count+(image_count-self.num_input*2+1)
-                         +(image_count-self.num_input*3+1), miniters=1, smoothing=1)
         # Traverse all matches
         for match_name in glob("*/", root_dir=root_dir):
             match_name = match_name.strip('/')
@@ -42,10 +43,12 @@ class TrackNetConfigurableDataset(Dataset):
             if not os.path.isdir(match_dir_path):
                 continue
 
-            total_samples = image_count + (image_count - self.num_input * 2 + 1) + (image_count - self.num_input * 3 + 1)
+            if match_name in self.path_counts:
+                image_count = len(glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*/", "*.png")))
+                total_samples = image_count
 
-            with tqdm(total=total_samples, desc=f"Processing {match_name}", miniters=1, smoothing=1) as pbar:
-                self.read_match(match_name, pbar)
+                with tqdm(total=total_samples, desc=f"Processing {match_name}", miniters=1, smoothing=1) as pbar:
+                    self.read_match(match_name, pbar)
 
     def read_match(self, match_name, pbar):
         video_dir = os.path.join(self.root_dir, match_name, 'video')
@@ -71,13 +74,13 @@ class TrackNetConfigurableDataset(Dataset):
                 total_img_len = len(img_files)
                 limit_count = self.path_counts[match_name]
                 min_len = min(limit_count, total_img_len)
-                print(f"{video_name}:total_img_len: {total_img_len}, limit_count: {limit_count}, min_len: {min_len}")
+                # print(f"{video_name}:total_img_len: {total_img_len}, limit_count: {limit_count}, min_len: {min_len}")
                 img = cv2.imread(frame_dir+"/"+img_files[0])
                 height, width, _ = img.shape
 
                 # Create sliding windows of num_input frames
                 for i in range(min_len - (self.num_input-1)):
-                    pbar.update(1)
+                    #pbar.update(1)
 
                     frames = img_files[i: i + self.num_input]
 
@@ -198,8 +201,8 @@ class TrackNetConfigurableDataset(Dataset):
 
                 #         self.img_cache(match_name, video_name, frames, npy_path)
                 
-                self.path_counts[match_name] = self.path_counts[match_name] - limit_count
-                pbar.update(self.num_input-1)
+                self.path_counts[match_name] = self.path_counts[match_name] - min_len
+                pbar.update(min_len)
 
     def img_cache_dir(self, match_name, video_name, img_files):
         s = '|'.join([match_name]+[video_name]+img_files)
