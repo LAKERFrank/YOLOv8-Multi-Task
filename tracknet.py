@@ -774,7 +774,7 @@ if __name__ == "__main__":
     parser.add_argument('--plots', type=bool, default=False, help='Whether to plot or not')
     parser.add_argument('--batch', type=int, default=16, help='Batch size')
     parser.add_argument('--source', type=str, default=r'/Users/bartek/git/BartekTao/datasets/tracknet/train_data/match_1/frame/1_00_01/', help='source')
-    parser.add_argument('--val', type=bool, default=False, help='run val')
+    parser.add_argument('--val', type=bool, default=True, help='run val')
     parser.add_argument('--use_dxdy_loss', type=bool, default=True, help='use dxdy loss or not')
     
     args = parser.parse_args()
