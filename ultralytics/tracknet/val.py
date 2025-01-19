@@ -356,7 +356,6 @@ class TrackNetValidator(BaseValidator):
                 self.update_metrics_once(idx, pred, batch_target[idx], batch_img[idx])
         #print((self.TP, self.FP, self.FN))
     def update_metrics_once(self, batch_idx, pred, batch_target, batch_img):
-        print("start predict")
         # pred = [330 * self.cell_num * self.cell_num]
         # batch_target = [10*7]
         feats = pred.clone()
@@ -536,7 +535,6 @@ class TrackNetValidator(BaseValidator):
             max_conf = p_conf[max_y, max_x]
             
             ##### 多球
-            print("start 多球")
             preds = [(max_x, max_y, max_conf)]
             # preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, dis_tolerance=30)
             for (x, y, conf) in preds:
@@ -555,7 +553,6 @@ class TrackNetValidator(BaseValidator):
 
                 metrics.append(metric)
                 self.frame_10_metrics.append(metric)
-            print("end 多球")
             # metric = {}
             # metric["grid_x"] = max_x
             # metric["grid_y"] = max_y
@@ -691,7 +688,6 @@ class TrackNetValidator(BaseValidator):
                 #         path='predict_val_FN_img',
                 #         next=False
                 #         ) 
-                print("start display_predict_image")
 
                 display_predict_image(
                             batch_img[frame_idx],  
@@ -705,7 +701,6 @@ class TrackNetValidator(BaseValidator):
                             next=False,
                             only_ball=True
                             )
-                print("end display_predict_image")
 
                 # display_predict_image(
                 #             batch_img[frame_idx],  
