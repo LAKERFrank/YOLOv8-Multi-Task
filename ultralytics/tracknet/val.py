@@ -356,6 +356,7 @@ class TrackNetValidator(BaseValidator):
                 self.update_metrics_once(idx, pred, batch_target[idx], batch_img[idx])
         #print((self.TP, self.FP, self.FN))
     def update_metrics_once(self, batch_idx, pred, batch_target, batch_img):
+        print("start predict")
         # pred = [330 * self.cell_num * self.cell_num]
         # batch_target = [10*7]
         feats = pred.clone()
@@ -535,6 +536,7 @@ class TrackNetValidator(BaseValidator):
             max_conf = p_conf[max_y, max_x]
             
             ##### 多球
+            print("start 多球")
             preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, dis_tolerance=30)
             for (x, y, conf) in preds:
                 if len(metrics) > 5 :
@@ -689,18 +691,18 @@ class TrackNetValidator(BaseValidator):
                 #         next=False
                 #         ) 
 
-                # display_predict_image(
-                #             batch_img[frame_idx],  
-                #             list(self.frame_10_metrics), 
-                #             'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #             box_color=box_color,
-                #             label=label,
-                #             save_dir=self.metrics.save_dir,
-                #             stride = self.stride,
-                #             path='predict_val_10_frame_img',
-                #             next=False,
-                #             only_ball=True
-                #             )
+                display_predict_image(
+                            batch_img[frame_idx],  
+                            list(self.frame_10_metrics), 
+                            'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                            box_color=box_color,
+                            label=label,
+                            save_dir=self.metrics.save_dir,
+                            stride = self.stride,
+                            path='predict_val_10_frame_img',
+                            next=False,
+                            only_ball=True
+                            )
                 # display_predict_image(
                 #             batch_img[frame_idx],  
                 #             list(self.frame_10_metrics), 
