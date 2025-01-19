@@ -261,6 +261,8 @@ class TrackNetLoss:
             for target_idx, target in enumerate(batch_target[idx]):
                 # target xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
+                if grid_x >= 80 or grid_y >= 80:
+                    print(grid_x, grid_y, offset_x, offset_y)
                 # 找出快球 => 慢球, 慢球 => 快球
                 if target_idx > 1 and target_idx < len(batch_target[idx])-2 and \
                     batch_target[idx][target_idx-2][1] == 1 and batch_target[idx][target_idx][1] == 1 and batch_target[idx][target_idx+2][1] == 1 and\
