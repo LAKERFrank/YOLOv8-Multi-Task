@@ -643,7 +643,7 @@ class TrackNetValidator(BaseValidator):
 
             display_interval = 1
             if self.args.mode == 'train':
-                display_interval = 10
+                display_interval = 20
 
             if frame_idx%display_interval==0:
                 if frame_idx != len(batch_target)-1:
@@ -651,16 +651,16 @@ class TrackNetValidator(BaseValidator):
                 else:
                     target_xy = (batch_target[frame_idx][2], batch_target[frame_idx][3], batch_target[frame_idx][2], batch_target[frame_idx][3])
 
-                # display_predict_image(
-                #         batch_img[frame_idx],  
-                #         metrics, 
-                #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #         box_color=box_color,
-                #         label=label,
-                #         save_dir=self.metrics.save_dir,
-                #         stride = self.stride,
-                #         target=target_xy
-                #         ) 
+                display_predict_image(
+                        batch_img[frame_idx],  
+                        metrics, 
+                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                        box_color=box_color,
+                        label=label,
+                        save_dir=self.metrics.save_dir,
+                        stride = self.stride,
+                        target=target_xy
+                        ) 
             
                 # if box_color == 'blue':
                 #     display_predict_image(
