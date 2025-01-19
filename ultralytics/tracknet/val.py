@@ -621,22 +621,22 @@ class TrackNetValidator(BaseValidator):
             # threshold = 0.5 ~ 0.95
             # threshold_idx = 0 ~ 9
             # iou_dist = 1~5 (pixel 容忍距離)
-            for iou_dist_idx in range(len(self.iou_dist_thresholds)):
-                for threshold_idx in range(len(self.conf_thresholds)):
-                    conf_threshold = self.conf_thresholds[threshold_idx]
-                    if batch_target[frame_idx][1] == 0:
-                        if max_conf >= conf_threshold:
-                            self.cumulative_FP[iou_dist_idx][threshold_idx] += 1
-                        else:
-                            self.cumulative_TN[iou_dist_idx][threshold_idx] += 1
-                    else:
-                        if max_conf >= conf_threshold:
-                            if distance <= self.iou_dist_thresholds[iou_dist_idx]:
-                                self.cumulative_TP[iou_dist_idx][threshold_idx] += 1
-                            else:
-                                self.cumulative_FP[iou_dist_idx][threshold_idx] += 1
-                        else:
-                            self.cumulative_FN[iou_dist_idx][threshold_idx] += 1
+            # for iou_dist_idx in range(len(self.iou_dist_thresholds)):
+            #     for threshold_idx in range(len(self.conf_thresholds)):
+            #         conf_threshold = self.conf_thresholds[threshold_idx]
+            #         if batch_target[frame_idx][1] == 0:
+            #             if max_conf >= conf_threshold:
+            #                 self.cumulative_FP[iou_dist_idx][threshold_idx] += 1
+            #             else:
+            #                 self.cumulative_TN[iou_dist_idx][threshold_idx] += 1
+            #         else:
+            #             if max_conf >= conf_threshold:
+            #                 if distance <= self.iou_dist_thresholds[iou_dist_idx]:
+            #                     self.cumulative_TP[iou_dist_idx][threshold_idx] += 1
+            #                 else:
+            #                     self.cumulative_FP[iou_dist_idx][threshold_idx] += 1
+            #             else:
+            #                 self.cumulative_FN[iou_dist_idx][threshold_idx] += 1
             
             now = datetime.now()
             # Format the datetime object as a string
