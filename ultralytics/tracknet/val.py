@@ -690,6 +690,7 @@ class TrackNetValidator(BaseValidator):
                 #         path='predict_val_FN_img',
                 #         next=False
                 #         ) 
+                print("start display_predict_image")
 
                 display_predict_image(
                             batch_img[frame_idx],  
@@ -703,6 +704,8 @@ class TrackNetValidator(BaseValidator):
                             next=False,
                             only_ball=True
                             )
+                print("end display_predict_image")
+
                 # display_predict_image(
                 #             batch_img[frame_idx],  
                 #             list(self.frame_10_metrics), 
