@@ -537,6 +537,8 @@ class TrackNetValidator(BaseValidator):
             ##### 多球
             preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, dis_tolerance=30)
             for (x, y, conf) in preds:
+                if len(metrics) > 5 :
+                    break
                 metric = {}
                 metric["grid_x"] = x
                 metric["grid_y"] = y
