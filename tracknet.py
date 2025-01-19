@@ -750,6 +750,9 @@ def main(arg):
     elif arg.mode == 'val_v2':
         model = TrackNet(overrides)
         model.val()
+    elif arg.mode == 'predict_v2':
+        model = TrackNet(overrides)
+        model.predict(arg.source)
 
 def confusion_matrix_gpu(y_true, y_pred):
     conf_matrix = torch.zeros(2, 2, dtype=torch.int64, device=y_true.device)
@@ -771,7 +774,7 @@ if __name__ == "__main__":
     parser.add_argument('--plots', type=bool, default=False, help='Whether to plot or not')
     parser.add_argument('--batch', type=int, default=16, help='Batch size')
     parser.add_argument('--source', type=str, default=r'/Users/bartek/git/BartekTao/datasets/tracknet/train_data/match_1/frame/1_00_01/', help='source')
-    parser.add_argument('--val', type=bool, default=True, help='run val')
+    parser.add_argument('--val', type=bool, default=False, help='run val')
     parser.add_argument('--use_dxdy_loss', type=bool, default=True, help='use dxdy loss or not')
     
     args = parser.parse_args()
@@ -779,6 +782,7 @@ if __name__ == "__main__":
 
     # for val
     # args.batch = 1
-    # args.mode = 'val_v2'
-    # args.model_path = r'/Users/bartek/git/BartekTao/ultralytics/runs/detect/train110/weights/last.pt'
+    # # args.mode = 'val_v2'
+    # args.mode = 'predict_v2'
+    # args.model_path = r'/Users/bartek/git/BartekTao/ultralytics/runs/detect/train178/weights/last.pt'
     main(args)
