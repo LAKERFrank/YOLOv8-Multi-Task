@@ -59,6 +59,8 @@ class TrackNetValDataset(Dataset):
             frame_dir = os.path.join(self.root_dir, match_name, 'frame', video_name)
 
             img_files = sorted(glob("*.png", root_dir=frame_dir), key=lambda x: int(x.removesuffix(".png")))
+            img = cv2.cvtColor(cv2.imread(os.path.join(frame_dir, img_files[0])), cv2.COLOR_BGR2GRAY)
+            h, w = img.shape
 
             # Create sliding windows of num_input frames, stride = 10
             for i in range(len(img_files)//10):
@@ -67,7 +69,7 @@ class TrackNetValDataset(Dataset):
                 frames = img_files[i*self.num_input: i*self.num_input + self.num_input]
 
                 target = ball_trajectory_df.iloc[i*self.num_input: i*self.num_input + self.num_input].values
-                target = self.transform_coordinates(target, 1280, 720)
+                target = self.transform_coordinates(target, w, h)
                 # target = self.transform_coordinates(target, 1440, 1080)
 
                 # Avoid invalid data
@@ -91,7 +93,7 @@ class TrackNetValDataset(Dataset):
             #     frames = img_files[i*self.num_input*2: i*self.num_input*2 + self.num_input*2: 2]
 
             #     target = ball_trajectory_df.iloc[i*self.num_input*2: i*self.num_input*2 + self.num_input*2: 2].values
-            #     target = self.transform_coordinates(target, 1280, 720)
+            #     target = self.transform_coordinates(target, w, h)
 
             #     # Avoid invalid data
             #     if len(frames) == self.num_input and len(target) == self.num_input:
