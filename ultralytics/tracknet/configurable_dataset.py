@@ -235,9 +235,6 @@ class TrackNetConfigurableDataset(Dataset):
         frames = np.array(frames)
         median_frame = np.median(frames, axis=0, overwrite_input=True).astype(frames[0].dtype)
 
-        #median_frame_uint8 = cv2.normalize(median_frame, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-        
-        #processed_frames = frames - median_frame
         processed_frames = np.clip(frames.astype(np.int16) - median_frame.astype(np.int16), 0, 255).astype(np.uint8)
         images = []
         for i, processed_frame in enumerate(processed_frames):
