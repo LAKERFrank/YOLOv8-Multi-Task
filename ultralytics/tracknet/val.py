@@ -534,9 +534,14 @@ class TrackNetValidator(BaseValidator):
             max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
             max_conf = p_conf[max_y, max_x]
             
-            ##### 多球
-            # preds = [(max_x, max_y, max_conf)]
-            preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, dis_tolerance=30)
+            ############# 多球 #############
+
+            ### 只拿最大值
+            preds = [(max_x, max_y, max_conf)]
+
+            ### 拿多顆球
+            # preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, dis_tolerance=30)
+            
             for (x, y, conf) in preds:
                 if len(metrics) > 5 :
                     break
@@ -553,20 +558,6 @@ class TrackNetValidator(BaseValidator):
 
                 metrics.append(metric)
                 self.frame_10_metrics.append(metric)
-            # metric = {}
-            # metric["grid_x"] = max_x
-            # metric["grid_y"] = max_y
-            # center = self.stride/2
-            # metric["x"] = center-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1]
-            # metric["y"] = center-p_cell_y[max_y][max_x][0]+p_cell_x[max_y][max_x][1]
-            # metric["conf"] = max_conf
-
-            # metric["nx"] = center-p_cell_nx[max_y][max_x][0]+p_cell_nx[max_y][max_x][1]
-            # metric["ny"] = center-p_cell_ny[max_y][max_x][0]+p_cell_ny[max_y][max_x][1]
-            # metrics = []
-            # if max_conf >= conf_threshold:
-            #     metrics.append(metric)
-            #     self.frame_10_metrics.append(metric)
 
             # confusion metrics
             
