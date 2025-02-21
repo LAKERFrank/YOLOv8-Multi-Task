@@ -231,7 +231,21 @@ class TrackNetConfigurableDataset(Dataset):
             return
 
         # generate cache
-        images = [self.__preprocess_img(os.path.join(self.root_dir, match_name, 'frame', video_name, img_file)) for img_file in img_files]
+        frames = [cv2.imread(os.path.join(self.root_dir, match_name, 'frame', video_name, fp), cv2.IMREAD_GRAYSCALE) for fp in img_files]
+        frames = np.array(frames)
+        median_frame = np.median(frames, axis=0, overwrite_input=True).astype(frames[0].dtype)
+
+        #median_frame_uint8 = cv2.normalize(median_frame, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        
+        #processed_frames = frames - median_frame
+        processed_frames = np.clip(frames.astype(np.int16) - median_frame.astype(np.int16), 0, 255).astype(np.uint8)
+        images = []
+        for i, processed_frame in enumerate(processed_frames):
+            img = self.pad_to_square(processed_frame)
+            img = cv2.resize(img, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
+            #img.resize((1, 640, 640))
+            img = np.expand_dims(img, axis=0)
+            images.append(img)
         img = np.concatenate(images, 0)
 
         np.save(npy_path, img)
@@ -363,7 +377,7 @@ class TrackNetConfigurableDataset(Dataset):
         # Reduce the resolution to half
         h, w = img.shape
 
-        return cv2.resize(img, dsize=(w // 2, h // 2), interpolation=cv2.INTER_CUBIC)
+        return img
         
     def pad_to_square(self, img, pad_value=0):
         """Adjust 2D tensor to square by padding {pad_value}

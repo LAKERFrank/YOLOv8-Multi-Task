@@ -61,6 +61,10 @@ class TrackNetDataset(Dataset):
 
             img_files = sorted(glob("*.png", root_dir=frame_dir), key=lambda x: int(x.removesuffix(".png")))
 
+            # open first image with out coordinates
+            img = cv2.cvtColor(cv2.imread(os.path.join(frame_dir, img_files[0])), cv2.COLOR_BGR2GRAY)
+            h, w = img.shape
+
             # Create sliding windows of num_input frames
             for i in range(len(img_files) - (self.num_input-1)):
                 self.pbar.update(1)
@@ -68,7 +72,7 @@ class TrackNetDataset(Dataset):
                 frames = img_files[i: i + self.num_input]
 
                 target = ball_trajectory_df.iloc[i: i + self.num_input].values
-                target = self.transform_coordinates(target, 1280, 720)
+                target = self.transform_coordinates(target, w, h)
 
                 # Avoid invalid data
                 if len(frames) == self.num_input and len(target) == self.num_input:
@@ -102,7 +106,7 @@ class TrackNetDataset(Dataset):
                 frames = img_files[i: i + self.num_input*2: 2]
 
                 target = ball_trajectory_df.iloc[i: i + self.num_input*2: 2].values
-                target = self.transform_coordinates(target, 1280, 720)
+                target = self.transform_coordinates(target, w, h)
 
                 # Avoid invalid data
                 if len(frames) == self.num_input and len(target) == self.num_input:
@@ -135,7 +139,7 @@ class TrackNetDataset(Dataset):
             #     frames = img_files[i: i + self.num_input*3: 3]
 
             #     target = ball_trajectory_df.iloc[i: i + self.num_input*3: 3].values
-            #     target = self.transform_coordinates(target, 1280, 720)
+            #     target = self.transform_coordinates(target, w, h)
 
             #     # Avoid invalid data
             #     if len(frames) == self.num_input and len(target) == self.num_input:
@@ -168,7 +172,7 @@ class TrackNetDataset(Dataset):
             #     frames = img_files[i: i + self.num_input*4: 4]
 
             #     target = ball_trajectory_df.iloc[i: i + self.num_input*4: 4].values
-            #     target = self.transform_coordinates(target, 1280, 720)
+            #     target = self.transform_coordinates(target, w, h)
 
             #     # Avoid invalid data
             #     if len(frames) == self.num_input and len(target) == self.num_input:
