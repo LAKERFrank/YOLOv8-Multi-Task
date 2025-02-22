@@ -125,8 +125,8 @@ class TrackNetValDataset(Dataset):
         return f
 
     def img_cache(self, match_name, video_name, img_files, npy_path):
-        # if os.path.isfile(npy_path):
-        #     return
+        if os.path.isfile(npy_path):
+            return
         # generate cache
         # 讀取影像並轉換為 `float32`，確保計算精度
         frames = [cv2.imread(os.path.join(self.root_dir, match_name, 'frame', video_name, fp), cv2.IMREAD_GRAYSCALE).astype(np.float32) 
