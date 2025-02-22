@@ -125,21 +125,24 @@ class TrackNetValDataset(Dataset):
         return f
 
     def img_cache(self, match_name, video_name, img_files, npy_path):
-
         if os.path.isfile(npy_path):
             return
 
         # generate cache
-        frames = [cv2.imread(os.path.join(self.root_dir, match_name, 'frame', video_name, fp), cv2.IMREAD_GRAYSCALE) for fp in img_files]
-        frames = np.array(frames)
-        median_frame = np.median(frames, axis=0, overwrite_input=True).astype(frames[0].dtype)
+        # 讀取影像並轉換為 `float32`，確保計算精度
+        frames = [cv2.imread(os.path.join(self.root_dir, match_name, 'frame', video_name, fp), cv2.IMREAD_GRAYSCALE).astype(np.float32) 
+                for fp in img_files]
+        frames = np.array(frames)  # 轉換為 NumPy 陣列
 
-        processed_frames = np.clip(frames.astype(np.int16) - median_frame.astype(np.int16), 0, 255).astype(np.uint8)
+        # 計算中位數影像，確保 dtype 為 float32
+        median_frame = np.median(frames, axis=0, overwrite_input=True).astype(np.float32)
+
+        # 影像減去中位數影像，確保計算不發生溢出
+        processed_frames = np.clip(frames - median_frame, 0, 255).astype(np.float32)
         images = []
         for i, processed_frame in enumerate(processed_frames):
             img = self.pad_to_square(processed_frame)
             img = cv2.resize(img, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
-            #img.resize((1, 640, 640))
             img = np.expand_dims(img, axis=0)
             images.append(img)
         img = np.concatenate(images, 0)
