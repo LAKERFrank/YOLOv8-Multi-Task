@@ -30,12 +30,14 @@ class TrackNetTrainer(DetectionTrainer):
             self.tracknet_model.load(weights)
         return self.tracknet_model
     def preprocess_batch(self, batch):
-        batch['img'] = batch['img'].to(self.device, non_blocking=True)
+        batch['img'] = batch['img'].to(self.device, non_blocking=True).float() / 255
 
-        if self.args.half and self.device.type == "cuda":
-            batch['img'] = batch['img'].half() / 255.0  # `float16`
-        else:
-            batch['img'] = batch['img'].float() / 255.0  # `float32`
+        # batch['img'] = batch['img'].to(self.device, non_blocking=True)
+
+        # if self.args.half and self.device.type == "cuda":
+        #     batch['img'] = batch['img'].half() / 255.0  # `float16`
+        # else:
+        #     batch['img'] = batch['img'].float() / 255.0  # `float32`
 
         for k in ['target']:
             batch[k] = batch[k].to(self.device)
