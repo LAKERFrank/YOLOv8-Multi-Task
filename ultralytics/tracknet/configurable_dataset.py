@@ -24,7 +24,7 @@ class TrackNetConfigurableDataset(Dataset):
             "match_1" : 100, 
             "match_2" : 20, 
             "blion_tracknet_partial": 473,
-            "profession_match_1" : 2000, 
+            "profession_match_1" : 5000, 
             "profession_match_2" : 3000, 
             "profession_match_3" : 3000,
             "profession_match_4" : 5000,
