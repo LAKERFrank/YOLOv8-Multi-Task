@@ -29,10 +29,14 @@ class TrackNetValidatorV3(BaseValidator):
         dataset = TrackNetDataset(root_dir=dataset_path)
         return build_dataloader(dataset, batch_size, self.args.workers, shuffle=False, rank=-1)
     
-    def preprocess(self, batch):
-        """In this case, the preprocessing step is mainly handled by the dataloader."""
+    def preprocess_batch(self, batch):
         batch['img'] = batch['img'].to(self.device, non_blocking=True)
-        batch['img'] = (batch['img'].half() if self.args.half else batch['img'].float()) / 255
+
+        if self.args.half and self.device.type == "cuda":
+            batch['img'] = batch['img'].half() / 255.0  # `float16`
+        else:
+            batch['img'] = batch['img'].float() / 255.0  # `float32`
+
         for k in ['target']:
             batch[k] = batch[k].to(self.device)
 
@@ -253,10 +257,14 @@ class TrackNetValidator(BaseValidator):
         dataset = TrackNetValDataset(root_dir=dataset_path)
         return build_dataloader(dataset, batch_size, self.args.workers, shuffle=False, rank=-1)
     
-    def preprocess(self, batch):
-        """In this case, the preprocessing step is mainly handled by the dataloader."""
+    def preprocess_batch(self, batch):
         batch['img'] = batch['img'].to(self.device, non_blocking=True)
-        batch['img'] = (batch['img'].half() if self.args.half else batch['img'].float()) / 255
+
+        if self.args.half and self.device.type == "cuda":
+            batch['img'] = batch['img'].half() / 255.0  # `float16`
+        else:
+            batch['img'] = batch['img'].float() / 255.0  # `float32`
+
         for k in ['target']:
             batch[k] = batch[k].to(self.device)
 
@@ -541,7 +549,7 @@ class TrackNetValidator(BaseValidator):
 
             ### 拿多顆球
             # preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, dis_tolerance=30)
-            
+
             for (x, y, conf) in preds:
                 if len(metrics) > 5 :
                     break
@@ -923,12 +931,18 @@ class TrackNetValidatorV2(BaseValidator):
         dataset = TrackNetValDataset(root_dir=dataset_path)
         return build_dataloader(dataset, batch_size, self.args.workers, shuffle=False, rank=-1)
     
-    def preprocess(self, batch):
-        """In this case, the preprocessing step is mainly handled by the dataloader."""
+    def preprocess_batch(self, batch):
         batch['img'] = batch['img'].to(self.device, non_blocking=True)
-        batch['img'] = (batch['img'].half() if self.args.half else batch['img'].float()) / 255
+
+        if self.args.half and self.device.type == "cuda":
+            batch['img'] = batch['img'].half() / 255.0  # `float16`
+        else:
+            batch['img'] = batch['img'].float() / 255.0  # `float32`
+
         for k in ['target']:
             batch[k] = batch[k].to(self.device)
+
+        return batch
 
         return batch
     
@@ -1476,10 +1490,14 @@ class TrackNetValidatorWithHit(BaseValidator):
         dataset = TrackNetDataset(root_dir=dataset_path)
         return build_dataloader(dataset, batch_size, self.args.workers, shuffle=False, rank=-1)
     
-    def preprocess(self, batch):
-        """In this case, the preprocessing step is mainly handled by the dataloader."""
+    def preprocess_batch(self, batch):
         batch['img'] = batch['img'].to(self.device, non_blocking=True)
-        batch['img'] = (batch['img'].half() if self.args.half else batch['img'].float()) / 255
+
+        if self.args.half and self.device.type == "cuda":
+            batch['img'] = batch['img'].half() / 255.0  # `float16`
+        else:
+            batch['img'] = batch['img'].float() / 255.0  # `float32`
+
         for k in ['target']:
             batch[k] = batch[k].to(self.device)
 
