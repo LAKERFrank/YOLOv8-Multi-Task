@@ -128,19 +128,13 @@ class TrackNetValDataset(Dataset):
         # if os.path.isfile(npy_path):
         #     return
         # generate cache
-        images = [self.__preprocess_img(os.path.join(self.root_dir, match_name, 'frame', video_name, img_file)) for img_file in img_files]
-        img = np.concatenate(images, 0)
-
-        np.save(npy_path, img)
-        return
-        # generate cache
         # 讀取影像並轉換為 `float32`，確保計算精度
         frames = [cv2.imread(os.path.join(self.root_dir, match_name, 'frame', video_name, fp), cv2.IMREAD_GRAYSCALE).astype(np.float32) 
                 for fp in img_files]
         frames = np.array(frames)  # 轉換為 NumPy 陣列
 
         # 計算中位數影像，確保 dtype 為 float32
-        median_frame = np.median(frames, axis=0, overwrite_input=True).astype(np.float32)
+        median_frame = np.median(frames, axis=0).astype(np.float32)
 
         # 影像減去中位數影像，確保計算不發生溢出
         processed_frames = np.clip(frames - median_frame, 0, 255).astype(np.float32)
