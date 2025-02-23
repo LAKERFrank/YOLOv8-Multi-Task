@@ -461,9 +461,7 @@ class TrackNetValidatorV4(BaseValidator):
                     f.write("img_path,x,y,nx,ny,conf\n")
 
             with open(csv_path, "a") as f:
-                f.write(f"{img_path[frame_idx][0]},
-                        {metrics[0]['x']}, {metrics[0]['y']},
-                        {metrics[0]['nx']},{metrics[0]['ny']},{metrics[0]['conf']}\n")
+                f.write(f"{img_path[frame_idx][0]},{metrics[0]['x']},{metrics[0]['y']},{metrics[0]['nx']},{metrics[0]['ny']},{metrics[0]['conf']}\n")
 
 
 # stable version
