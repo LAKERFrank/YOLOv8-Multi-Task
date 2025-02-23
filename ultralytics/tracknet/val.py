@@ -759,7 +759,7 @@ class TrackNetValidator(BaseValidator):
             p_conf = each_probs[frame_idx]
 
             ############## MAX ##############
-            conf_threshold = 0.8
+            conf_threshold = 0.7
             p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
             max_position = torch.argmax(p_conf_masked)
             # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
@@ -874,56 +874,56 @@ class TrackNetValidator(BaseValidator):
                 else:
                     target_xy = (batch_target[frame_idx][2], batch_target[frame_idx][3], batch_target[frame_idx][2], batch_target[frame_idx][3])
 
-                # display_predict_image(
-                #         batch_img[frame_idx],  
-                #         metrics, 
-                #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #         box_color=box_color,
-                #         label=label,
-                #         save_dir=self.metrics.save_dir,
-                #         stride = self.stride,
-                #         next=False
-                #         ) 
+                display_predict_image(
+                        batch_img[frame_idx],  
+                        metrics, 
+                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                        box_color=box_color,
+                        label=label,
+                        save_dir=self.metrics.save_dir,
+                        stride = self.stride,
+                        next=False
+                        ) 
             
-                # if box_color == 'blue':
-                #     display_predict_image(
-                #         batch_img[frame_idx],  
-                #         metrics, 
-                #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #         box_color=box_color,
-                #         label=label,
-                #         save_dir=self.metrics.save_dir,
-                #         stride = self.stride,
-                #         target=target_xy,
-                #         path='predict_val_FP_img',
-                #         next=False
-                #         ) 
-                # if box_color == 'yellow':
-                #     display_predict_image(
-                #         batch_img[frame_idx],  
-                #         metrics, 
-                #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #         box_color=box_color,
-                #         label=label,
-                #         save_dir=self.metrics.save_dir,
-                #         stride = self.stride,
-                #         target=target_xy,
-                #         path='predict_val_FN_img',
-                #         next=False
-                #         ) 
+                if box_color == 'blue':
+                    display_predict_image(
+                        batch_img[frame_idx],  
+                        metrics, 
+                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                        box_color=box_color,
+                        label=label,
+                        save_dir=self.metrics.save_dir,
+                        stride = self.stride,
+                        target=target_xy,
+                        path='predict_val_FP_img',
+                        next=False
+                        ) 
+                if box_color == 'yellow':
+                    display_predict_image(
+                        batch_img[frame_idx],  
+                        metrics, 
+                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                        box_color=box_color,
+                        label=label,
+                        save_dir=self.metrics.save_dir,
+                        stride = self.stride,
+                        target=target_xy,
+                        path='predict_val_FN_img',
+                        next=False
+                        ) 
 
-                # display_predict_image(
-                #             batch_img[frame_idx],  
-                #             list(self.frame_10_metrics), 
-                #             'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #             box_color=box_color,
-                #             label=label,
-                #             save_dir=self.metrics.save_dir,
-                #             stride = self.stride,
-                #             path='predict_val_10_frame_img',
-                #             next=False,
-                #             only_ball=True
-                #             )
+                display_predict_image(
+                            batch_img[frame_idx],  
+                            list(self.frame_10_metrics), 
+                            'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                            box_color=box_color,
+                            label=label,
+                            save_dir=self.metrics.save_dir,
+                            stride = self.stride,
+                            path='predict_val_10_frame_img',
+                            next=False,
+                            only_ball=True
+                            )
 
                 # display_predict_image(
                 #             batch_img[frame_idx],  
