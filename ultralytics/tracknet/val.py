@@ -759,7 +759,7 @@ class TrackNetValidator(BaseValidator):
             p_conf = each_probs[frame_idx]
 
             ############## MAX ##############
-            conf_threshold = 0.9
+            conf_threshold = 0.8
             p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
             max_position = torch.argmax(p_conf_masked)
             # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
