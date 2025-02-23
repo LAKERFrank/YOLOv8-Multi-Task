@@ -20,3 +20,6 @@ python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/ultralytics
 
 python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train345/weights/last.pt --source /usr/src/datasets/tracknet/val_data
 ```
+
+## TODO
+- 挑影片的方式目前是寫死的

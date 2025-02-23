@@ -197,14 +197,36 @@ docker run --gpus all --ipc=host \
 -v /hdd/dataset/tracknetv4/val_confusion_matrix:/usr/src/datasets/tracknet/val_confusion_matrix \
 -it tracknetv4
 
+# 20241229
 docker run --gpus all --ipc=host \
 -v /hdd/dataset/alex_tracknet:/usr/src/datasets/tracknet/train_data/profession_match_1 \
--v /hdd/dataset/sport_ai_2048_1536:/usr/src/datasets/tracknet/val_data/profession_match_20 \
--v /hdd/dataset/blion_tracknet_partial:/usr/src/datasets/tracknet/blion_tracknet_partial/profession_match_20 \
+-v /hdd/dataset/AUX_nycu_new_court:/usr/src/datasets/tracknet/val_data/profession_match_20 \
 -v /hdd/dataset/tracknetv4/runs:/usr/src/ultralytics/runs \
 -v /hdd/dataset/tracknetv4/visualize_train_img:/usr/src/datasets/tracknet/visualize_train_img \
 -v /hdd/dataset/tracknetv4/visualize_predict_img:/usr/src/datasets/tracknet/visualize_predict_img \
 -v /hdd/dataset/tracknetv4/val_confusion_matrix:/usr/src/datasets/tracknet/val_confusion_matrix \
+-it tracknetv4
+
+# 20250113
+docker run --gpus all --ipc=host \
+-v /hdd/dataset/alex_tracknet:/usr/src/datasets/tracknet/train_data/profession_match_1 \
+-v /hdd/dataset/sportxai_serve_machine:/usr/src/datasets/tracknet/train_data/profession_match_2 \
+-v /hdd/dataset/AUX_nycu_new_court:/usr/src/datasets/tracknet/train_data/profession_match_3 \
+-v /hdd/dataset/ces2025_all:/usr/src/datasets/tracknet/train_data/profession_match_4 \
+-v /hdd/dataset/profession_match_1:/usr/src/datasets/tracknet/train_data/profession_match_5 \
+-v /hdd/dataset/profession_match_2:/usr/src/datasets/tracknet/train_data/profession_match_6 \
+-v /hdd/dataset/profession_match_3:/usr/src/datasets/tracknet/train_data/profession_match_7 \
+-v /hdd/dataset/profession_match_4:/usr/src/datasets/tracknet/train_data/profession_match_8 \
+-v /hdd/dataset/profession_match_5:/usr/src/datasets/tracknet/train_data/profession_match_9 \
+-v /hdd/dataset/profession_match_6:/usr/src/datasets/tracknet/train_data/profession_match_10 \
+-v /hdd/dataset/profession_match_7:/usr/src/datasets/tracknet/train_data/profession_match_11 \
+-v /hdd/dataset/profession_match_8:/usr/src/datasets/tracknet/train_data/profession_match_12 \
+-v /hdd/dataset/ces2025_all_partial:/usr/src/datasets/tracknet/val_data/profession_match_20 \
+-v /hdd/dataset/tracknetv4/runs:/usr/src/ultralytics/runs \
+-v /hdd/dataset/tracknetv4/visualize_train_img:/usr/src/datasets/tracknet/visualize_train_img \
+-v /hdd/dataset/tracknetv4/visualize_predict_img:/usr/src/datasets/tracknet/visualize_predict_img \
+-v /hdd/dataset/tracknetv4/val_confusion_matrix:/usr/src/datasets/tracknet/val_confusion_matrix \
+-v /hdd/dataset/tracknetv4/.cache:/usr/src/datasets/tracknet/train_data/.cache \
 -it tracknetv4
 
 python tracknet.py --model_path /usr/src/ultralytics/ultralytics/models/v8/tracknetv4.yaml --epoch 200
@@ -238,6 +260,14 @@ python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/run
 python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train431/weights/epoch120.pt --source /usr/src/datasets/tracknet/val_data
 
 python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train437/weights/epoch50.pt --source /usr/src/datasets/tracknet/val_data
+
+python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train442/weights/epoch20.pt --source /usr/src/datasets/tracknet/val_data
+
+python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train443/weights/epoch30.pt --source /usr/src/datasets/tracknet/val_data
+
+python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train475/weights/best.pt --source /usr/src/datasets/tracknet/val_data
+
+python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train502/weights/epoch50.pt --source /usr/src/datasets/tracknet/val_data
 
 
 /hdd/dataset/alex_tracknet/frame/1_05_07/

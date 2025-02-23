@@ -178,6 +178,7 @@ docker exec -it 0c3e1511776e /bin/bash
   - 效果沒有比較好
 
 ## 20241201
+*更換分支到 feat/detect-on-p3*
 - train442
   - use p3
   - only weight (without hit duplicate)
@@ -187,3 +188,78 @@ docker exec -it 0c3e1511776e /bin/bash
   - 這裡的 self.proj，決定的物品最大範圍 （離散的區間大小）
 
 - train443 120, 60, 40 FPS (其餘同 442 程式碼)
+  - f22ecbe6597421e23eab493e513caac84b4bb6e0
+
+- blion: 1_05_03 271, 272 兩個 frame 相同
+
+## 20241203
+- TODO
+- 修正 val loss
+
+# 20241208
+- train450
+  - 改為中心點 anchor
+
+- train451
+  - add next x, y prediction
+  - in the same head with current x, y
+- train473
+  - 修復 next xy
+  - print next (x, y) when validate
+- train475
+  - adjust conf weight, more focus on FN
+  - change focal loss hyper param (0.85, 1.5) 
+
+# 20250120
+- train502
+  - 綜合可選的多樣 dataset 資料進行訓練
+  - 尚未實作隨機旋轉與縮放
+  - 關閉 nms (效能問題，待解決)
+
+# 20250219
+- training 點子
+  - 將同一份 dataset 切成 n 份，拿第 i 份訓練結果，當作第 i+1 份訓練時的 penalty 權重依據
+
+# 20250221
+- train506 -- epoch 200 (9e2c28f6efca44aeedf098231c752068d1e2827e)
+  - 引用 tracknetv3 Background Estimation
+  - ```
+    docker run --gpus all --ipc=host \
+    -v /hdd/dataset/alex_tracknet:/usr/src/datasets/tracknet/train_data/profession_match_1 \
+    -v /hdd/dataset/sportxai_serve_machine:/usr/src/datasets/tracknet/train_data/profession_match_2 \
+    -v /hdd/dataset/AUX_nycu_new_court:/usr/src/datasets/tracknet/train_data/profession_match_3 \
+    -v /hdd/dataset/ces2025_all:/usr/src/datasets/tracknet/train_data/profession_match_4 \
+    -v /hdd/dataset/ces2025_all_partial:/usr/src/datasets/tracknet/val_data/profession_match_20 \
+    -v /hdd/dataset/tracknetv4/runs:/usr/src/ultralytics/runs \
+    -v /hdd/dataset/tracknetv4/visualize_train_img:/usr/src/datasets/tracknet/visualize_train_img \
+    -v /hdd/dataset/tracknetv4/visualize_predict_img:/usr/src/datasets/tracknet/visualize_predict_img \
+    -v /hdd/dataset/tracknetv4/val_confusion_matrix:/usr/src/datasets/tracknet/val_confusion_matrix \
+    -it tracknetv4
+    ```
+
+-train517 (650c5fb7262aa2fa8a00c4303179d5364c18e20d)
+  - fix 影像疊重疊問題
+  - cache 不使用 docker 空間，使用 docker volume
+  - fix val image tensor 沒有正規劃的情形 （應該是導致 val loss 異常的主因）
+  - ```
+    docker run --gpus all --ipc=host \
+    -v /hdd/dataset/alex_tracknet:/usr/src/datasets/tracknet/train_data/profession_match_1 \
+    -v /hdd/dataset/sportxai_serve_machine:/usr/src/datasets/tracknet/train_data/profession_match_2 \
+    -v /hdd/dataset/AUX_nycu_new_court:/usr/src/datasets/tracknet/train_data/profession_match_3 \
+    -v /hdd/dataset/ces2025_all:/usr/src/datasets/tracknet/train_data/profession_match_4 \
+    -v /hdd/dataset/profession_match_1:/usr/src/datasets/tracknet/train_data/profession_match_5 \
+    -v /hdd/dataset/profession_match_2:/usr/src/datasets/tracknet/train_data/profession_match_6 \
+    -v /hdd/dataset/profession_match_3:/usr/src/datasets/tracknet/train_data/profession_match_7 \
+    -v /hdd/dataset/profession_match_4:/usr/src/datasets/tracknet/train_data/profession_match_8 \
+    -v /hdd/dataset/profession_match_5:/usr/src/datasets/tracknet/train_data/profession_match_9 \
+    -v /hdd/dataset/profession_match_6:/usr/src/datasets/tracknet/train_data/profession_match_10 \
+    -v /hdd/dataset/profession_match_7:/usr/src/datasets/tracknet/train_data/profession_match_11 \
+    -v /hdd/dataset/profession_match_8:/usr/src/datasets/tracknet/train_data/profession_match_12 \
+    -v /hdd/dataset/blion_tracknet_partial:/usr/src/datasets/tracknet/val_data/profession_match_20 \
+    -v /hdd/dataset/tracknetv4/runs:/usr/src/ultralytics/runs \
+    -v /hdd/dataset/tracknetv4/visualize_train_img:/usr/src/datasets/tracknet/visualize_train_img \
+    -v /hdd/dataset/tracknetv4/visualize_predict_img:/usr/src/datasets/tracknet/visualize_predict_img \
+    -v /hdd/dataset/tracknetv4/val_confusion_matrix:/usr/src/datasets/tracknet/val_confusion_matrix \
+    -v /hdd/dataset/tracknetv4/.cache:/usr/src/datasets/tracknet/train_data/.cache \
+    -it tracknetv4
+    ```
