@@ -1,4 +1,6 @@
 from datetime import datetime
+import os
+import cv2
 from matplotlib import pyplot as plt
 import numpy as np
 import torch
@@ -242,6 +244,229 @@ class TrackNetValidatorV3(BaseValidator):
         """Return a description for tqdm progress bar."""
         return "Validating TrackNet"
 
+# use original input image and output predict result as csv file
+class TrackNetValidatorV4(BaseValidator):
+    def __init__(self, dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
+        super().__init__(dataloader, save_dir, pbar, args, _callbacks)
+        self.args.task = 'detect'
+        self.is_coco = False
+        self.class_map = None
+        self.metrics = DetMetrics(save_dir=self.save_dir, on_plot=self.on_plot)
+        self.iouv = torch.linspace(0.5, 0.95, 10)  # iou vector for mAP@0.5:0.95
+        self.niou = self.iouv.numel()
+    
+    def get_dataloader(self, dataset_path, batch_size):
+        """For TrackNet, we can use the provided TrackNetDataset to get the dataloader."""
+        dataset = TrackNetValDataset(root_dir=dataset_path)
+        return build_dataloader(dataset, batch_size, self.args.workers, shuffle=False, rank=-1)
+    
+    def preprocess(self, batch):
+        batch['img'] = batch['img'].to(self.device, non_blocking=True)
+        batch['img'] = (batch['img'].half() if self.args.half else batch['img'].float()) / 255
+
+        # if self.args.half and self.device.type == "cuda":
+        #     batch['img'] = batch['img'].half() / 255.0  # `float16`
+        # else:
+        #     batch['img'] = batch['img'].float() / 255.0  # `float32`
+
+        for k in ['target']:
+            batch[k] = batch[k].to(self.device)
+
+        return batch
+    
+    def postprocess(self, preds):
+        """Postprocess the model predictions if needed."""
+        # For TrackNet, there might not be much postprocessing needed.
+        return preds
+    
+    def init_metrics(self, model):
+        """Initialize some metrics."""
+        # Placeholder for any metrics you might want to use.
+
+        # TODO val 時，stride 取得異常
+        if isinstance(model.stride, torch.Tensor):
+            self.stride = model.stride[0]
+        else:
+            self.stride = model.model.stride[0]
+        self.cell_num = int(640/self.stride)
+        self.num_groups = 10
+
+        self.total_loss = 0.0
+        self.num_samples = 0
+        self.conf_TP = 0
+        self.conf_TN = 0
+        self.conf_FP = 0
+        self.conf_FN = 0
+        self.conf_acc = 0
+        self.conf_precision = 0
+        self.pos_TP = 0
+        self.pos_TN = 0
+        self.pos_FP = 0
+        self.pos_FN = 0
+        self.pos_FP_dis = 0
+        self.fast_TP = 0
+        self.hit_TP = 0
+        self.hit_FP = 0
+        self.fast_FN = 0
+        self.hit_FN = 0
+        self.fast_hit_TP = 0
+        self.fast_hit_FN = 0
+        self.pos_acc = 0
+        self.pos_precision = 0
+        self.ball_count = 0
+        self.pred_ball_count = 0
+        device = device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.reg_max = 16
+        self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
+        self.feat_no = 8
+        self.nc = 1
+        self.no = 16*self.feat_no+self.nc
+
+        self.fast_count = 0
+        self.hit_count = 0
+        self.fast_hit_count = 0
+
+        self.target_hit_count = 0
+        self.hitV2_TP = 0  # True Positives
+        self.hitV2_FP = 0  # False Positives
+        self.hitV2_TN = 0  # True Negatives
+        self.hitV2_FN = 0  # False Negatives
+        self.hitV1_TP = 0  # True Positives
+        self.hitV1_FP = 0  # False Positives
+        self.hitV1_TN = 0  # True Negatives
+        self.hitV1_FN = 0  # False Negatives
+
+        # 一顆球半徑 = 2 pixel (640*640)
+        self.tolerance2 = 2.0 # 50% 距離容忍度
+        self.tolerance3 = 3.0
+        self.tolerance5 = 2.0
+        self.conf_thresholds = [i * 0.05 for i in range(1, 20)]  # [0.5, 0.55, ..., 0.95]
+        self.iou_dist_thresholds = [i * 1 for i in range(1, 6)]  # [1, 2, ..., 5]
+        
+        self.cumulative_TP = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
+        self.cumulative_FP = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
+        self.cumulative_FN = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
+        self.cumulative_TN = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
+        self.fitness = 0
+
+        self.frame_10_metrics = deque(maxlen=10)
+    
+    def update_metrics(self, preds, batch):
+        """Calculate and update metrics based on predictions and batch."""
+        # Placeholder for loss calculation, etc.
+        # preds = [[batch*50*20*20]]
+        # batch['target'] = [batch*10*6]
+        preds = preds[0] # only pick first (stride = 32)
+        batch_target = batch['target']
+        batch_img = batch['img']
+        batch_img_file = batch['img_files']
+        if preds.shape == (1290, self.cell_num, self.cell_num):
+            self.update_metrics_once(0, preds, batch_target[0], batch_img[0], batch_img_file)
+        else:
+            # for each batch
+            for idx, pred in enumerate(preds):
+                self.update_metrics_once(idx, pred, batch_target[idx], batch_img[idx], batch_img_file)
+        #print((self.TP, self.FP, self.FN))
+    def update_metrics_once(self, batch_idx, pred, batch_target, batch_img, batch_img_file):
+        self.save_pred_results(batch_img_file, pred, batch_target)
+        
+    def save_pred_results(self, img_path, pred, target):
+        # open img and get image shape
+        img = cv2.imread(img_path[0][0])
+        h, w = img.shape[:2] # y, x
+
+        assert w > h, "w must be greater than h"
+        x_n = w/640
+        y_offset = (w - h)/2
+            
+
+
+        feats = pred.clone()
+        pred_distri, pred_scores = feats.view(self.no, -1).split(
+            (self.reg_max * self.feat_no, self.nc), 0)
+        
+        pred_scores = pred_scores.permute(1, 0).contiguous()
+        pred_distri = pred_distri.permute(1, 0).contiguous()
+
+        pred_probs = torch.sigmoid(pred_scores)
+
+        a, c = pred_distri.shape
+
+        pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
+            self.proj.type(pred_distri.dtype))
+        
+        each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
+
+        for frame_idx in range(10):
+            p_cell_x = each_pos_x[frame_idx]
+            p_cell_y = each_pos_y[frame_idx]
+            p_cell_nx = each_pos_nx[frame_idx]
+            p_cell_ny = each_pos_ny[frame_idx]
+            center = self.stride/2
+            metrics = []
+            # 獲取當前圖片的 conf
+            p_conf = each_probs[frame_idx]
+
+            ############## MAX ##############
+            conf_threshold = 0.7
+            p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
+            max_position = torch.argmax(p_conf_masked)
+            # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
+            max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
+            max_conf = p_conf[max_y, max_x]
+            
+            ############# 多球 #############
+
+            ### 只拿最大值
+            preds = [(max_x, max_y, max_conf)]
+
+            ### 拿多顆球
+            # preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, dis_tolerance=30)
+
+            for (x, y, conf) in preds:
+                if len(metrics) > 5 :
+                    break
+                metric = {}
+                x_coordinate = x*self.stride
+                y_coordinate = y*self.stride
+                
+                x = x_coordinate + (center-p_cell_x[int(y)][int(x)][0]+p_cell_x[int(y)][int(x)][1]*self.stride)
+                y = y_coordinate + (center-p_cell_y[int(y)][int(x)][0]+p_cell_y[int(y)][int(x)][1]*self.stride)
+                nx = x_coordinate + (center-p_cell_nx[int(y)][int(x)][0]+p_cell_nx[int(y)][int(x)][1]*self.stride)
+                ny = y_coordinate + (center-p_cell_ny[int(y)][int(x)][0]+p_cell_ny[int(y)][int(x)][1]*self.stride)
+                
+                metric["x"] = x * x_n
+                metric["y"] = y + y_offset
+                metric["conf"] = conf
+
+                metric["nx"] = nx * x_n
+                metric["ny"] = ny + y_offset
+
+                metrics.append(metric)
+                self.frame_10_metrics.append(metric)
+            
+            # 畫出來
+            # for metric in metrics:
+            #     cv2.circle(img, (int(metric["x"]), int(metric["y"])), 5, (0, 0, 255), -1)
+            #     cv2.circle(img, (int(metric["nx"]), int(metric["ny"])), 5, (0, 255, 0), -1)
+
+            # cv2.imshow("img", img)
+            # cv2.waitKey(0)
+
+            # save to csv on self.save_dir, if csv not exist, create it
+            csv_path = self.save_dir / "val_output.csv"
+            if not csv_path.exists():
+                with open(csv_path, "w") as f:
+                    f.write("img_path,x,y,nx,ny,conf\n")
+
+            with open(csv_path, "a") as f:
+                f.write(f"{img_path[frame_idx][0]},
+                        {metrics[0]['x']}, {metrics[0]['y']},
+                        {metrics[0]['nx']},{metrics[0]['ny']},{metrics[0]['conf']}\n")
+
+
+# stable version
 class TrackNetValidator(BaseValidator):
     def __init__(self, dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
         super().__init__(dataloader, save_dir, pbar, args, _callbacks)
@@ -651,16 +876,16 @@ class TrackNetValidator(BaseValidator):
                 else:
                     target_xy = (batch_target[frame_idx][2], batch_target[frame_idx][3], batch_target[frame_idx][2], batch_target[frame_idx][3])
 
-                display_predict_image(
-                        batch_img[frame_idx],  
-                        metrics, 
-                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                        box_color=box_color,
-                        label=label,
-                        save_dir=self.metrics.save_dir,
-                        stride = self.stride,
-                        next=False
-                        ) 
+                # display_predict_image(
+                #         batch_img[frame_idx],  
+                #         metrics, 
+                #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                #         box_color=box_color,
+                #         label=label,
+                #         save_dir=self.metrics.save_dir,
+                #         stride = self.stride,
+                #         next=False
+                #         ) 
             
                 if box_color == 'blue':
                     display_predict_image(
@@ -689,18 +914,18 @@ class TrackNetValidator(BaseValidator):
                         next=False
                         ) 
 
-                # display_predict_image(
-                #             batch_img[frame_idx],  
-                #             list(self.frame_10_metrics), 
-                #             'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #             box_color=box_color,
-                #             label=label,
-                #             save_dir=self.metrics.save_dir,
-                #             stride = self.stride,
-                #             path='predict_val_10_frame_img',
-                #             next=False,
-                #             only_ball=True
-                #             )
+                display_predict_image(
+                            batch_img[frame_idx],  
+                            list(self.frame_10_metrics), 
+                            'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                            box_color=box_color,
+                            label=label,
+                            save_dir=self.metrics.save_dir,
+                            stride = self.stride,
+                            path='predict_val_10_frame_img',
+                            next=False,
+                            only_ball=True
+                            )
 
                 # display_predict_image(
                 #             batch_img[frame_idx],  

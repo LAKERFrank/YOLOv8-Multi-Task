@@ -189,7 +189,7 @@ class TrackNetValDataset(Dataset):
         count_ones = (target[:, 1] == 1).sum().item()
         self.total_ball+=count_ones
 
-        img_files = [f"{self.root_dir}/../{im}" for im in d['img_files']]
+        img_files = [f"{self.root_dir}/{d['match_name']}/frame/{d['video_name']}/{im}" for im in d['img_files']]
 
         return {"img": img, "target": target, "img_files": img_files}
 
