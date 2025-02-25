@@ -854,7 +854,7 @@ class FocalLossWithMask(nn.Module):
         """
         pos_mask = labels > 0
         num_pos = pos_mask.sum(dim=1, keepdim=True)
-        num_neg = 640
+        num_neg = negative_ratio * num_pos
 
         loss_for_sort = loss.clone()
         loss_for_sort[pos_mask] = float('-inf')
@@ -862,7 +862,8 @@ class FocalLossWithMask(nn.Module):
 
         neg_mask = torch.zeros_like(labels, dtype=torch.bool)
         for i in range(loss.size(0)):  
-            num_neg_samples = int(num_neg[i].item()) if int(num_neg[i].item()) != 0 else int(negative_ratio)
+            # num_neg_samples = int(num_neg[i].item()) if int(num_neg[i].item()) != 0 else int(negative_ratio)
+            num_neg_samples = 640
             # num_neg_samples = int(num_neg[i].item())
             neg_mask[i, indices[i, :num_neg_samples]] = True 
 
