@@ -854,7 +854,7 @@ class FocalLossWithMask(nn.Module):
         """
         pos_mask = labels > 0
         num_pos = pos_mask.sum(dim=1, keepdim=True)
-        num_neg = negative_ratio * num_pos
+        num_neg = 640
 
         loss_for_sort = loss.clone()
         loss_for_sort[pos_mask] = float('-inf')
@@ -906,7 +906,7 @@ class FocalLossWithMask(nn.Module):
         loss = loss * relevant_mask.float()
 
         loss[FN_mask] *= negative_ratio*10*w
-        loss[FP_mask & ~may_has_ball] *= negative_ratio*10*w
+        loss[FP_mask & ~may_has_ball] *= negative_ratio*20*w
         loss[TP_mask] *= negative_ratio*10
         loss[mask_hit_ball] *= negative_ratio*10*w*3
 
