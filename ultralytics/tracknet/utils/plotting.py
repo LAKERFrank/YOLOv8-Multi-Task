@@ -162,7 +162,8 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         conf = pred["conf"]
         nx = pred["nx"]
         ny = pred["ny"]
-        if abs(x-nx) <= 3 and abs(y-ny) <= 3:
+        distance = torch.sqrt((x*stride - nx*stride) ** 2 + (y*stride - ny*stride) ** 2)
+        if distance <= 3:
             continue
 
         x_coordinates *= stride
