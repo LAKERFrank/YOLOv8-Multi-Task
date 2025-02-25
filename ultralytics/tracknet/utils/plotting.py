@@ -162,6 +162,8 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         conf = pred["conf"]
         nx = pred["nx"]
         ny = pred["ny"]
+        if abs(x-nx) <= 5 and abs(y-ny) <= 5:
+            continue
 
         x_coordinates *= stride
         y_coordinates *= stride
