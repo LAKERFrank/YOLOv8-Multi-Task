@@ -777,6 +777,9 @@ class TrackNetValidator(BaseValidator):
             for (x, y, conf) in preds:
                 if len(metrics) > 5 :
                     break
+                if conf < 0.7:
+                    print("error conf < 0.7")
+                    continue
                 metric = {}
                 metric["grid_x"] = x
                 metric["grid_y"] = y
