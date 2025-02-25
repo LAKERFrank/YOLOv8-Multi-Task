@@ -777,8 +777,8 @@ class TrackNetValidator(BaseValidator):
             for (x, y, conf) in preds:
                 if len(metrics) > 5 :
                     break
-                if conf < 0.7:
-                    print("error conf < 0.7")
+                # 全部都小於 conf_threshold 還是會選最大的一筆
+                if conf < conf_threshold:
                     continue
                 metric = {}
                 metric["grid_x"] = x
