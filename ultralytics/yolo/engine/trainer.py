@@ -294,7 +294,7 @@ class BaseTrainer:
         losses = np.array(loss_list)
         top3_indices = np.argsort(losses)[-3:]
         top3_losses = losses[top3_indices]
-        LOGGER.info(f"Top 10 samples with highest losses: indices {top3_indices.tolist()}, losses {top3_losses.tolist()}")
+        LOGGER.info(f"Top 3 samples with highest losses: indices {top3_indices.tolist()}, losses {top3_losses.tolist()}")
         top3_info = [
             {
                 "index": i,
@@ -302,7 +302,7 @@ class BaseTrainer:
             }
             for i in top3_indices
         ]
-        LOGGER.info("Top 10 dataset information: %s", top3_info)
+        LOGGER.info("Top 3 dataset information: %s", top3_info)
 
         # 正規化 避免 overflow
         scaled_losses = (losses - losses.min()) / (losses.max() - losses.min())
