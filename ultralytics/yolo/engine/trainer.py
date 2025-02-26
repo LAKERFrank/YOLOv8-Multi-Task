@@ -269,6 +269,52 @@ class BaseTrainer:
         self.scheduler.last_epoch = self.start_epoch - 1  # do not move
         self.run_callbacks('on_pretrain_routine_end')
 
+    def update_sampler_weights(self):
+        LOGGER.info("Running per-sample forward pass (batch size=1) to update sampling weights...")
+        # 將模型設定為 eval 模式並關閉梯度
+        self.model.eval()
+        temp_loader = torch.utils.data.DataLoader(
+            self.train_loader.dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=self.train_loader.num_workers,
+            collate_fn=self.train_loader.collate_fn
+        )
+        loss_list = []
+        with torch.no_grad():
+            for batch in temp_loader:
+                batch = self.preprocess_batch(batch)
+                loss, _ = self.model(batch)
+                loss_list.append(loss.item())
+        self.model.train()
+        
+        # Assert：檢查 loss_list 長度是否與 dataset 一致
+        assert len(loss_list) == len(self.train_loader.dataset), f"Loss list length {len(loss_list)} does not match dataset size {len(self.train_loader.dataset)}"
+        
+        losses = np.array(loss_list)
+        # 正規化 避免 overflow
+        scaled_losses = (losses - losses.min()) / (losses.max() - losses.min())
+        # 依據每個樣本 loss 計算權重
+        lambda_factor = 3.0  # 可調參數 建議在 2-5
+        min_weight = 0.1     # 保證低 loss 樣本不被忽略
+        
+        weights = np.exp(lambda_factor * scaled_losses)
+
+        # Assert：檢查權重是否正常
+        assert np.all(np.isfinite(weights)), "Weights contain nan or inf values!"
+        assert weights.min() >= min_weight, f"Minimum weight {weights.min()} is lower than expected min_weight {min_weight}"
+
+        num_samples_to_sample = int(1.5 * len(self.train_loader.dataset))
+        new_sampler = torch.utils.data.WeightedRandomSampler(
+            weights, num_samples=num_samples_to_sample, replacement=True
+        )
+
+        # 重新建立 DataLoader，這裡調用 get_dataloader 並傳入 custom_sampler
+        self.train_loader = self.get_dataloader(self.trainset, batch_size=self.batch_size, rank=RANK, mode='train', custom_sampler=new_sampler)
+        LOGGER.info("DataLoader updated with new weighted sampler based on per-sample losses.")
+
+
+
     def _do_train(self, world_size=1):
         """Train completed, evaluate and plot if specified by arguments."""
         if world_size > 1:
@@ -294,6 +340,8 @@ class BaseTrainer:
         epoch = self.epochs  # predefine for resume fully trained model edge cases
         for epoch in range(self.start_epoch, self.epochs):
             self.epoch = epoch
+            if epoch > 0 :
+                self.update_sampler_weights()
             self.run_callbacks('on_train_epoch_start')
             self.model.train()
             if RANK != -1:
@@ -490,7 +538,7 @@ class BaseTrainer:
         """Returns a NotImplementedError when the get_validator function is called."""
         raise NotImplementedError('get_validator function not implemented in trainer')
 
-    def get_dataloader(self, dataset_path, batch_size=16, rank=0, mode='train'):
+    def get_dataloader(self, dataset_path, batch_size=16, rank=0, mode='train', custom_sampler = None):
         """
         Returns dataloader derived from torch.data.Dataloader.
         """
