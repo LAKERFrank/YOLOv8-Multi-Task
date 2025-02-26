@@ -282,7 +282,8 @@ class BaseTrainer:
         )
         loss_list = []
         with torch.no_grad():
-            for batch in temp_loader:
+            pbar = tqdm(enumerate(temp_loader), total=len(temp_loader), desc="Computing per-sample losses")
+            for i, batch in pbar:
                 batch = self.preprocess_batch(batch)
                 loss, _ = self.model(batch)
                 loss_list.append(loss.item())
