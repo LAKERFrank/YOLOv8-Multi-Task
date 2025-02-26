@@ -354,6 +354,7 @@ class BaseTrainer:
             self.epoch = epoch
             if epoch > 0 :
                 self.update_sampler_weights()
+                nb = len(self.train_loader)  # 重新計算 batch 數
             self.run_callbacks('on_train_epoch_start')
             self.model.train()
             if RANK != -1:
