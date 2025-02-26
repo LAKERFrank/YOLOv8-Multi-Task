@@ -90,12 +90,15 @@ def build_yolo_dataset(cfg, img_path, batch, data, mode='train', rect=False, str
         fraction=cfg.fraction if mode == 'train' else 1.0)
 
 
-def build_dataloader(dataset, batch, workers, shuffle=True, rank=-1):
+def build_dataloader(dataset, batch, workers, shuffle=True, rank=-1, custom_sampler=None):
     """Return an InfiniteDataLoader or DataLoader for training or validation set."""
     batch = min(batch, len(dataset))
     nd = torch.cuda.device_count()  # number of CUDA devices
     nw = min([os.cpu_count() // max(nd, 1), batch if batch > 1 else 0, workers])  # number of workers
-    sampler = None if rank == -1 else distributed.DistributedSampler(dataset, shuffle=shuffle)
+    if custom_sampler is not None:
+        sampler = custom_sampler
+    else:
+        sampler = None if rank == -1 else distributed.DistributedSampler(dataset, shuffle=shuffle)
     generator = torch.Generator()
     generator.manual_seed(6148914691236517205 + RANK)
     return InfiniteDataLoader(dataset=dataset,

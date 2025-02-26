@@ -286,12 +286,23 @@ class BaseTrainer:
                 batch = self.preprocess_batch(batch)
                 loss, _ = self.model(batch)
                 loss_list.append(loss.item())
-        self.model.train()
         
         # Assert：檢查 loss_list 長度是否與 dataset 一致
         assert len(loss_list) == len(self.train_loader.dataset), f"Loss list length {len(loss_list)} does not match dataset size {len(self.train_loader.dataset)}"
         
         losses = np.array(loss_list)
+        top3_indices = np.argsort(losses)[-3:]
+        top3_losses = losses[top3_indices]
+        LOGGER.info(f"Top 10 samples with highest losses: indices {top3_indices.tolist()}, losses {top3_losses.tolist()}")
+        top3_info = [
+            {
+                "index": i,
+                "img_files": self.train_loader.dataset[i]['img_files']
+            }
+            for i in top3_indices
+        ]
+        LOGGER.info("Top 10 dataset information: %s", top3_info)
+
         # 正規化 避免 overflow
         scaled_losses = (losses - losses.min()) / (losses.max() - losses.min())
         # 依據每個樣本 loss 計算權重
