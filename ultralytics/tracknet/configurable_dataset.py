@@ -24,7 +24,7 @@ class TrackNetConfigurableDataset(Dataset):
             "match_1" : 100, 
             "match_2" : 20, 
             "blion_tracknet_partial": 473,
-            "profession_match_1" : 5000, 
+            "profession_match_1" : 2000, 
             # "profession_match_2" : 3000, 
             # "profession_match_3" : 3000,
             # "profession_match_4" : 5000,
@@ -35,7 +35,7 @@ class TrackNetConfigurableDataset(Dataset):
             # "profession_match_9" : 1000,
             # "profession_match_10" : 1000,
             # "profession_match_11" : 1000,
-            "profession_match_12" : 1000
+            # "profession_match_12" : 1000
             }
 
         self.idx = set()
@@ -290,7 +290,7 @@ class TrackNetConfigurableDataset(Dataset):
         img = torch.from_numpy(img).float()
         target = torch.from_numpy(d['target'])
 
-        img_files = [f"{self.root_dir}/../{im}" for im in d['img_files']]
+        img_files = [f"{self.root_dir}/{d['match_name']}/frame/{d['video_name']}/{im}" for im in d['img_files']]
 
         return {"img": img, "target": target, "img_files": img_files}
 
