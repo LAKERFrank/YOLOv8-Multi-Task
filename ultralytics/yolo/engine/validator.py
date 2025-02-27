@@ -165,11 +165,9 @@ class BaseValidator:
 
             # Loss
             with dt[2], torch.no_grad():
-                tloss, loss = model.loss(batch, preds)
-                self.loss += tloss
-                # if self.training:
-                #     tloss, loss = model.loss(batch, preds)
-                #     self.loss += tloss
+                if self.training:
+                    tloss, loss = model.loss(batch, preds)
+                    self.loss += tloss
 
             # Postprocess
             with dt[3]:
