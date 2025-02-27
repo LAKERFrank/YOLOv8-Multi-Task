@@ -906,8 +906,8 @@ class FocalLossWithMask(nn.Module):
 
         loss = loss * relevant_mask.float()
 
-        loss[FN_mask] *= negative_ratio*10*w
-        loss[FP_mask & ~may_has_ball] *= negative_ratio*20*w
+        loss[FN_mask] *= negative_ratio*20*w
+        loss[FP_mask & ~may_has_ball] *= negative_ratio*15*w
         loss[TP_mask] *= negative_ratio*10
         loss[mask_hit_ball] *= negative_ratio*10*w*3
 
