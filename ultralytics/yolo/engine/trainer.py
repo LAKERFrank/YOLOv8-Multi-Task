@@ -292,17 +292,18 @@ class BaseTrainer:
         assert len(loss_list) == len(self.train_loader.dataset), f"Loss list length {len(loss_list)} does not match dataset size {len(self.train_loader.dataset)}"
         
         losses = np.array(loss_list)
-        top3_indices = np.argsort(losses)[-3:]
-        top3_losses = losses[top3_indices]
-        LOGGER.info(f"Top 3 samples with highest losses: indices {top3_indices.tolist()}, losses {top3_losses.tolist()}")
+        top10_indices = np.argsort(losses)[-10:]
+        top10_losses = losses[top10_indices]
+        LOGGER.info(f"Top 10 samples with highest losses: indices {top10_indices.tolist()}, losses {top10_losses.tolist()}")
         top3_info = [
             {
                 "index": i,
-                "img_files": self.train_loader.dataset[i]['img_files']
+                "img_files": self.train_loader.dataset[i]['img_files'][0]
             }
-            for i in top3_indices
+            for i in top10_indices
         ]
-        LOGGER.info("Top 3 dataset information: %s", top3_info)
+        top3_info_str = "\n".join(str(info) for info in top3_info)
+        LOGGER.info("Top 10 dataset information:\n%s", top3_info_str)
 
         # 正規化 避免 overflow
         scaled_losses = (losses - losses.min()) / (losses.max() - losses.min())
