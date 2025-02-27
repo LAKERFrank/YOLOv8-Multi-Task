@@ -154,6 +154,7 @@ class BaseValidator:
         for batch_i, batch in enumerate(bar):
             self.run_callbacks('on_val_batch_start')
             self.batch_i = batch_i
+            loss = None
             # Preprocess
             with dt[0]:
                 batch = self.preprocess(batch)
@@ -165,13 +166,14 @@ class BaseValidator:
             # Loss
             with dt[2], torch.no_grad():
                 if self.training:
-                    self.loss += model.loss(batch, preds)[1]
+                    tloss, loss = model.loss(batch, preds)
+                    self.loss += tloss
 
             # Postprocess
             with dt[3]:
                 preds = self.postprocess(preds)
 
-            self.update_metrics(preds, batch)
+            self.update_metrics(preds, batch, loss)
             if self.args.plots and batch_i < 3:
                 self.plot_val_samples(batch, batch_i)
                 self.plot_predictions(batch, preds, batch_i)
@@ -230,7 +232,7 @@ class BaseValidator:
         """Initialize performance metrics for the YOLO model."""
         pass
 
-    def update_metrics(self, preds, batch):
+    def update_metrics(self, preds, batch, loss):
         """Updates metrics based on predictions and batch."""
         pass
 
