@@ -571,7 +571,7 @@ class TrackNetValidator(BaseValidator):
 
         self.frame_10_metrics = deque(maxlen=10)
     
-    def update_metrics(self, preds, batch):
+    def update_metrics(self, preds, batch, loss):
         """Calculate and update metrics based on predictions and batch."""
         # Placeholder for loss calculation, etc.
         # preds = [[batch*50*20*20]]
@@ -581,13 +581,13 @@ class TrackNetValidator(BaseValidator):
         batch_img = batch['img']
         batch_img_file = batch['img_files']
         if preds.shape == (1290, self.cell_num, self.cell_num):
-            self.update_metrics_once(0, preds, batch_target[0], batch_img[0])
+            self.update_metrics_once(0, preds, batch_target[0], batch_img[0], loss)
         else:
             # for each batch
             for idx, pred in enumerate(preds):
-                self.update_metrics_once(idx, pred, batch_target[idx], batch_img[idx])
+                self.update_metrics_once(idx, pred, batch_target[idx], batch_img[idx], loss)
         #print((self.TP, self.FP, self.FN))
-    def update_metrics_once(self, batch_idx, pred, batch_target, batch_img):
+    def update_metrics_once(self, batch_idx, pred, batch_target, batch_img, loss):
         # pred = [330 * self.cell_num * self.cell_num]
         # batch_target = [10*7]
         feats = pred.clone()
@@ -885,7 +885,8 @@ class TrackNetValidator(BaseValidator):
                         label=label,
                         save_dir=self.metrics.save_dir,
                         stride = self.stride,
-                        next=False
+                        next=False,
+                        loss=loss
                         ) 
             
                 if box_color == 'blue':
@@ -899,7 +900,8 @@ class TrackNetValidator(BaseValidator):
                         stride = self.stride,
                         target=target_xy,
                         path='predict_val_FP_img',
-                        next=False
+                        next=False,
+                        loss=loss
                         ) 
                 if box_color == 'yellow':
                     display_predict_image(
@@ -912,7 +914,8 @@ class TrackNetValidator(BaseValidator):
                         stride = self.stride,
                         target=target_xy,
                         path='predict_val_FN_img',
-                        next=False
+                        next=False,
+                        loss=loss
                         ) 
 
                 display_predict_image(
@@ -925,7 +928,8 @@ class TrackNetValidator(BaseValidator):
                             stride = self.stride,
                             path='predict_val_10_frame_img',
                             next=False,
-                            only_ball=True
+                            only_ball=True,
+                            loss=loss
                             )
 
                 # display_predict_image(
