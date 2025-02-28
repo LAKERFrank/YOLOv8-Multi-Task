@@ -21,7 +21,7 @@ def preprocess_csv(csv_file):
         x_vals = ball_trajectory_df['X'].values
         y_vals = ball_trajectory_df['Y'].values
         
-        movement_threshold = 5.0  # 判定靜止的最大首尾位移（pixel）
+        movement_threshold = 3.0  # 判定靜止的最大首尾位移（pixel）
         
         # 找出所有 Visibility==1 的索引
         vis_indices = np.where(visibility == 1)[0]
