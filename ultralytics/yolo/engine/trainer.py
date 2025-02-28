@@ -353,7 +353,7 @@ class BaseTrainer:
         epoch = self.epochs  # predefine for resume fully trained model edge cases
         for epoch in range(self.start_epoch, self.epochs):
             self.epoch = epoch
-            if epoch > 0 :
+            if str(self.args.model).endswith('.yaml') or epoch > 0 :
                 self.update_sampler_weights()
                 nb = len(self.train_loader)  # 重新計算 batch 數
             self.run_callbacks('on_train_epoch_start')
