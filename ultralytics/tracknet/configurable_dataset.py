@@ -12,6 +12,8 @@ from tqdm import tqdm
 from functools import lru_cache
 from glob import glob
 
+from ultralytics.tracknet.utils.preprocess import preprocess_csv
+
 class TrackNetConfigurableDataset(Dataset):
     def __init__(self, root_dir, num_input=10, transform=None, prefix=''):
 
@@ -258,25 +260,7 @@ class TrackNetConfigurableDataset(Dataset):
             raise Exception("File corrupted: " + path)
 
     def __preprocess_csv(self, csv_file):
-        # Read the ball_trajectory csv file
-        ball_trajectory_df = pd.read_csv(csv_file)
-        ball_trajectory_df['dX'] = -1*ball_trajectory_df['X'].diff(-1).fillna(0)
-        ball_trajectory_df['dY'] = -1*ball_trajectory_df['Y'].diff(-1).fillna(0)
-
-        if 'Event' in ball_trajectory_df.columns:
-            ball_trajectory_df['hit'] = ((ball_trajectory_df['Event'] == 1) | (ball_trajectory_df['Event'] == 2)).astype(int)
-        else:
-            ball_trajectory_df['hit'] = 0
-
-        #ball_trajectory_df['prev_hit'] = ball_trajectory_df['hit'].shift(fill_value=0)
-        #ball_trajectory_df['next_hit'] = ball_trajectory_df['hit'].shift(-1, fill_value=0)
-        #ball_trajectory_df['hit'] = ball_trajectory_df[['hit', 'prev_hit', 'next_hit']].max(axis=1)
-
-        drop_columns = ['Fast', 'Event', 'Z', 'Shot', 'player_X', 'player_Y', 'prev_hit', 'next_hit', 'Timestamp']
-        
-        ball_trajectory_df = ball_trajectory_df.drop(drop_columns, axis=1, errors='ignore')
-
-        return ball_trajectory_df
+        return preprocess_csv(csv_file)
     
     def __len__(self):
         return len(self.samples)
