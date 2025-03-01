@@ -898,18 +898,18 @@ class FocalLossWithMask(nn.Module):
         FP_mask = (pred_prob >= 0.5) & (label == 0)  # False Positive
 
         # Combine the masks (we only care about TP, FN, FP)
-        relevant_mask = self.online_hard_example_mining(loss, label, negative_ratio)
+        # relevant_mask = self.online_hard_example_mining(loss, label, negative_ratio)
 
         pos_no = label.sum() if label.sum() != 0 else 1
 
         w = (alpha/(1-alpha))
 
-        loss = loss * relevant_mask.float()
+        # loss = loss * relevant_mask.float()
 
-        loss[FN_mask] *= negative_ratio*20*w
-        loss[FP_mask & ~may_has_ball] *= negative_ratio*15*w
-        loss[TP_mask] *= negative_ratio*10
-        loss[mask_hit_ball] *= negative_ratio*10*w*3
+        # loss[FN_mask] *= negative_ratio*20*w
+        # loss[FP_mask & ~may_has_ball] *= negative_ratio*15*w
+        # loss[TP_mask] *= negative_ratio*10
+        # loss[mask_hit_ball] *= negative_ratio*10*w*3
 
         # print(f'fast and hit count: {(mask_fast_ball|mask_hit_ball).sum()}')
         # print(f'fast and hit with relevant count: {(loss[mask_fast_ball|mask_hit_ball] > 0).sum()}')
@@ -917,7 +917,8 @@ class FocalLossWithMask(nn.Module):
 
         # Apply the mask to the loss
         loss_sum = (loss).sum()
-        loss = loss_sum / max(relevant_mask.float().sum(), 1) if loss_sum != 0 else 0
+        count = (pred_prob >= 0.5) | (label == 1)
+        loss = loss_sum / max(count.sum(), 1) if loss_sum != 0 else 0
 
         return loss
 
@@ -932,7 +933,7 @@ class XYLoss(nn.Module):
     def forward(self, pred_dist, pred_pos, target_pos_distri, target_scores, target_scores_sum, fg_mask, hit_weight):
         """IoU loss."""
         target_scores_clone = target_scores.clone()
-        target_scores_clone[hit_weight] *= 30
+        # target_scores_clone[hit_weight] *= 30
         weight = target_scores_clone.sum(-1)[fg_mask].unsqueeze(-1)
         # iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
         # loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
