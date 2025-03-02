@@ -306,9 +306,10 @@ class BaseTrainer:
         LOGGER.info("Top 10 dataset information:\n%s", top3_info_str)
 
         # 正規化 避免 overflow
-        scaled_losses = (losses - losses.min()) / (losses.max() - losses.min())
+        # scaled_losses = (losses - losses.min()) / (losses.max() - losses.min())
+        scaled_losses = np.log1p(losses) / np.log1p(losses.max())
         # 依據每個樣本 loss 計算權重
-        lambda_factor = 3.0  # 可調參數 建議在 2-5
+        lambda_factor = 2.5  # 可調參數 建議在 2-5
         min_weight = 0.1     # 保證低 loss 樣本不被忽略
         
         weights = np.exp(lambda_factor * scaled_losses)
