@@ -816,7 +816,7 @@ class TrackNetValidator(BaseValidator):
                     self.pos_TN += 1
             else:
                 if max_conf >= conf_threshold:
-                    if distance <= self.tolerance2:
+                    if distance <= self.tolerance3:
                         self.pos_TP += 1
 
                         if mask_hit_ball_v2[frame_idx] == 1:
