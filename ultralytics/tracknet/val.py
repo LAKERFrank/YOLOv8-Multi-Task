@@ -869,7 +869,7 @@ class TrackNetValidator(BaseValidator):
 
             display_interval = 1
             if self.args.mode == 'train':
-                display_interval = 20
+                display_interval = 10
 
             if frame_idx%display_interval==0:
                 if frame_idx != len(batch_target)-1:
