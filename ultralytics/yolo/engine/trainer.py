@@ -319,6 +319,24 @@ class BaseTrainer:
         assert np.all(np.isfinite(weights)), "Weights contain NaN or Inf values!"
         assert weights.min() >= min_weight, f"Minimum weight {weights.min()} is lower than expected min_weight {min_weight}"
         
+        # **記錄 Top 10 高 loss 樣本（原始 loss）**
+        top10_indices = np.argsort(combined_losses)[-10:]
+        top10_pos_losses = pos_losses[top10_indices]
+        top10_conf_losses = conf_losses[top10_indices]
+        LOGGER.info(f"Top 10 samples with highest losses: indices {top10_indices.tolist()}")
+        LOGGER.info(f"Top 10 original pos losses: {top10_pos_losses.tolist()}")
+        LOGGER.info(f"Top 10 original conf losses: {top10_conf_losses.tolist()}")
+        
+        top10_info = [
+            {
+                "index": i,
+                "img_files": self.train_loader.dataset[i]['img_files'][0]
+            }
+            for i in top10_indices
+        ]
+        top10_info_str = "\n".join(str(info) for info in top10_info)
+        LOGGER.info("Top 10 dataset information:\n%s", top10_info_str)
+        
         num_samples_to_sample = int(1.5 * len(self.train_loader.dataset))
         new_sampler = torch.utils.data.WeightedRandomSampler(
             weights, num_samples=num_samples_to_sample, replacement=True
@@ -329,9 +347,6 @@ class BaseTrainer:
             self.trainset, batch_size=self.batch_size, rank=RANK, mode='train', custom_sampler=new_sampler
         )
         LOGGER.info("DataLoader updated with new weighted sampler based on per-sample losses.")
-
-
-
 
     def _do_train(self, world_size=1):
         """Train completed, evaluate and plot if specified by arguments."""
