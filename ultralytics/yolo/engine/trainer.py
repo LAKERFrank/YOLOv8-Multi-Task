@@ -280,52 +280,56 @@ class BaseTrainer:
             num_workers=self.train_loader.num_workers,
             collate_fn=self.train_loader.collate_fn
         )
-        loss_list = []
+        
+        pos_loss_list = []
+        conf_loss_list = []
         with torch.no_grad():
             pbar = tqdm(enumerate(temp_loader), total=len(temp_loader), desc="Computing per-sample losses")
             for i, batch in pbar:
                 batch = self.preprocess_batch(batch)
-                loss, _ = self.model(batch)
-                loss_list.append(loss.item())
+                _, loss_items = self.model(batch)  # loss_items[0] -> pos loss, loss_items[1] -> conf loss
+                pos_loss_list.append(loss_items[0].item())
+                conf_loss_list.append(loss_items[1].item())
         
-        # Assert：檢查 loss_list 長度是否與 dataset 一致
-        assert len(loss_list) == len(self.train_loader.dataset), f"Loss list length {len(loss_list)} does not match dataset size {len(self.train_loader.dataset)}"
+        # 確保數據長度一致
+        assert len(pos_loss_list) == len(self.train_loader.dataset), "Loss list length does not match dataset size"
+        assert len(conf_loss_list) == len(self.train_loader.dataset), "Loss list length does not match dataset size"
         
-        losses = np.array(loss_list)
-        top10_indices = np.argsort(losses)[-10:]
-        top10_losses = losses[top10_indices]
-        LOGGER.info(f"Top 10 samples with highest losses: indices {top10_indices.tolist()}, losses {top10_losses.tolist()}")
-        top3_info = [
-            {
-                "index": i,
-                "img_files": self.train_loader.dataset[i]['img_files'][0]
-            }
-            for i in top10_indices
-        ]
-        top3_info_str = "\n".join(str(info) for info in top3_info)
-        LOGGER.info("Top 10 dataset information:\n%s", top3_info_str)
-
-        # 正規化 避免 overflow
-        # scaled_losses = (losses - losses.min()) / (losses.max() - losses.min())
-        scaled_losses = np.log1p(losses) / np.log1p(losses.max())
+        pos_losses = np.array(pos_loss_list)
+        conf_losses = np.array(conf_loss_list)
+        
+        # **標準化 loss 使不同類型 loss 的數值範圍相似**
+        pos_losses = (pos_losses - pos_losses.min()) / (pos_losses.max() - pos_losses.min() + 1e-8)
+        conf_losses = np.log1p(conf_losses) / np.log1p(conf_losses.max() + 1e-8)
+        
+        # **合併 loss**
+        alpha = 0.5  # 可調參數，平衡 pos loss 和 conf loss 的影響
+        combined_losses = alpha * pos_losses + (1 - alpha) * conf_losses
+        
+        # **直接標準化，不再使用 log1p**
+        scaled_losses = combined_losses / (combined_losses.max() + 1e-8)
+        
         # 依據每個樣本 loss 計算權重
         lambda_factor = 2.5  # 可調參數 建議在 2-5
         min_weight = 0.1     # 保證低 loss 樣本不被忽略
         
         weights = np.exp(lambda_factor * scaled_losses)
-
-        # Assert：檢查權重是否正常
-        assert np.all(np.isfinite(weights)), "Weights contain nan or inf values!"
+        
+        # 確保權重合理
+        assert np.all(np.isfinite(weights)), "Weights contain NaN or Inf values!"
         assert weights.min() >= min_weight, f"Minimum weight {weights.min()} is lower than expected min_weight {min_weight}"
-
+        
         num_samples_to_sample = int(1.5 * len(self.train_loader.dataset))
         new_sampler = torch.utils.data.WeightedRandomSampler(
             weights, num_samples=num_samples_to_sample, replacement=True
         )
-
-        # 重新建立 DataLoader，這裡調用 get_dataloader 並傳入 custom_sampler
-        self.train_loader = self.get_dataloader(self.trainset, batch_size=self.batch_size, rank=RANK, mode='train', custom_sampler=new_sampler)
+        
+        # 重新建立 DataLoader
+        self.train_loader = self.get_dataloader(
+            self.trainset, batch_size=self.batch_size, rank=RANK, mode='train', custom_sampler=new_sampler
+        )
         LOGGER.info("DataLoader updated with new weighted sampler based on per-sample losses.")
+
 
 
 
