@@ -559,7 +559,7 @@ class TrackNetValidator(BaseValidator):
         # 一顆球半徑 = 2 pixel (640*640)
         self.tolerance2 = 2.0 # 50% 距離容忍度
         self.tolerance3 = 3.0
-        self.tolerance5 = 2.0
+        self.tolerance4 = 4.0
         self.conf_thresholds = [i * 0.05 for i in range(1, 20)]  # [0.5, 0.55, ..., 0.95]
         self.iou_dist_thresholds = [i * 1 for i in range(1, 6)]  # [1, 2, ..., 5]
         
@@ -759,7 +759,7 @@ class TrackNetValidator(BaseValidator):
             p_conf = each_probs[frame_idx]
 
             ############## MAX ##############
-            conf_threshold = 0.5
+            conf_threshold = 0.6
             p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
             max_position = torch.argmax(p_conf_masked)
             # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
@@ -816,7 +816,7 @@ class TrackNetValidator(BaseValidator):
                     self.pos_TN += 1
             else:
                 if max_conf >= conf_threshold:
-                    if distance <= self.tolerance3:
+                    if distance <= self.tolerance4:
                         self.pos_TP += 1
 
                         if mask_hit_ball_v2[frame_idx] == 1:
