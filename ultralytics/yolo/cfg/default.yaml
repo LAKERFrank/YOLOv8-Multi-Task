@@ -114,6 +114,7 @@ weight_pos: 1
 weight_mov: 1
 weight_hit: 10000
 use_dxdy_loss: True
+use_resampler: True
 
 # Tracker settings ------------------------------------------------------------------------------------------------------
 tracker: botsort.yaml  # (str) tracker type, choices=[botsort.yaml, bytetrack.yaml]
