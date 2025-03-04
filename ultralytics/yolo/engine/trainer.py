@@ -373,7 +373,7 @@ class BaseTrainer:
         epoch = self.epochs  # predefine for resume fully trained model edge cases
         for epoch in range(self.start_epoch, self.epochs):
             self.epoch = epoch
-            if str(self.args.model).endswith('.pt') or epoch > 0 :
+            if self.args.use_resampler and (str(self.args.model).endswith('.pt') or epoch > 0) :
                 self.update_sampler_weights()
                 nb = len(self.train_loader)  # 重新計算 batch 數
             self.run_callbacks('on_train_epoch_start')
