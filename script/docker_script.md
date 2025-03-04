@@ -267,8 +267,9 @@ python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/run
 
 python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train475/weights/best.pt --source /usr/src/datasets/tracknet/val_data
 
-python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train502/weights/epoch50.pt --source /usr/src/datasets/tracknet/val_data
+python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train536/weights/last.pt --source /usr/src/datasets/tracknet/val_data
 
+python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/runs/detect/train525/weights/last.pt --epoch 200 &
 
 /hdd/dataset/alex_tracknet/frame/1_05_07/
 192

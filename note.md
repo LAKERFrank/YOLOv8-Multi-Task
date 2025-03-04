@@ -263,3 +263,31 @@ docker exec -it 0c3e1511776e /bin/bash
     -v /hdd/dataset/tracknetv4/.cache:/usr/src/datasets/tracknet/train_data/.cache \
     -it tracknetv4
     ```
+
+- train521 dd7bfef6bc55c3dd1095f4d7285da8524f376ec9
+  - 可以繼續 train，數據感覺可以在往上
+
+- train525 25b9a24817edd7727941104a49a21d65f7a97d2b
+  - 每個 epoch 會重新調整 data sample 權重
+
+
+- train527 ** => 87%
+  - 接續 train525 epoch 7 (last.pt) 訓練 6adc681282c05afa7f6e414d334734ebee1f9fb3
+  - 調整 conf weight
+  - training 時，顯示 val image loss
+
+- train534 69e3c4e19252f5fd04bd07264cd7ee49443b6d82
+  - continue with train527 last | train530 last
+  - process 處理發球羽球落地時，多餘的標記
+  - 移除 weight pattern => 效果不佳
+- train536 09c53e089e89365ef16b2dd86075052c6bde97d6
+  - continue with train534
+  - open OHEM
+  - movement_threshold = 5
+- train537 3218da330a5820875e29d18d3b29bbf2a2a3385c
+  - continue with train536 
+  - use log normalize on sampler
+- train539 716e43f2918ec2c00c7cc814dc4046bf55159041
+  - continue with train537
+  - 降低 conf threshold = 0.5
+  - sampler 分別 pos, conf loss 進行正規化
