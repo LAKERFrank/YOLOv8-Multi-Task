@@ -777,7 +777,7 @@ if __name__ == "__main__":
     parser.add_argument('--source', type=str, default=r'/Users/bartek/git/BartekTao/datasets/tracknet/train_data/match_1/frame/1_00_01/', help='source')
     parser.add_argument('--val', type=bool, default=True, help='run val')
     parser.add_argument('--use_dxdy_loss', type=bool, default=True, help='use dxdy loss or not')
-    parser.add_argument('--use_resampler', type=bool, default=False, help='use resampler on each epoch')
+    parser.add_argument('--use_resampler', type=bool, default=True, help='use resampler on each epoch')
     
     args = parser.parse_args()
     # args.epochs = 50
