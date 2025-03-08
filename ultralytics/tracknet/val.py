@@ -764,12 +764,12 @@ class TrackNetValidator(BaseValidator):
                 metric["grid_x"] = x
                 metric["grid_y"] = y
                 
-                metric["x"] = center*self.stride-p_cell_x[int(y)][int(x)][0]+p_cell_x[int(y)][int(x)][1]
-                metric["y"] = center*self.stride-p_cell_y[int(y)][int(x)][0]+p_cell_y[int(y)][int(x)][1]
+                metric["x"] = (center*self.stride-p_cell_x[int(y)][int(x)][0]+p_cell_x[int(y)][int(x)][1])/self.stride
+                metric["y"] = (center*self.stride-p_cell_y[int(y)][int(x)][0]+p_cell_y[int(y)][int(x)][1])/self.stride
                 metric["conf"] = conf
 
-                metric["nx"] = center*self.stride-p_cell_nx[int(y)][int(x)][0]+p_cell_nx[int(y)][int(x)][1]
-                metric["ny"] = center*self.stride-p_cell_ny[int(y)][int(x)][0]+p_cell_ny[int(y)][int(x)][1]
+                metric["nx"] = (center*self.stride-p_cell_nx[int(y)][int(x)][0]+p_cell_nx[int(y)][int(x)][1])/self.stride
+                metric["ny"] = (center*self.stride-p_cell_ny[int(y)][int(x)][0]+p_cell_ny[int(y)][int(x)][1])/self.stride
 
                 metrics.append(metric)
                 self.frame_10_metrics.append(metric)
