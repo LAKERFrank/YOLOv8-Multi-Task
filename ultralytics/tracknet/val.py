@@ -606,7 +606,6 @@ class TrackNetValidator(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
         
-        target_pos_distri = torch.zeros(self.num_groups, self.cell_num, self.cell_num, self.feat_no, device=self.device)
         mask_has_ball = torch.zeros(self.num_groups, self.cell_num, self.cell_num, device=self.device)
         cls_targets = torch.zeros(self.num_groups, self.cell_num, self.cell_num, 1, device=self.device)
         mask_fast_ball = torch.zeros(self.num_groups, 1, device=self.device)
@@ -663,30 +662,10 @@ class TrackNetValidator(BaseValidator):
             if target[1] == 1:
                 # xy
                 mask_has_ball[target_idx, grid_y, grid_x] = 1
-                
-                center = self.stride/2
-                def clamp(x, min_value, max_value):
-                        return max(min_value, min(x, max_value))
-                t_x = (grid_x*self.stride+center-target[2])/self.stride
-                t_y = (grid_y*self.stride+center-target[3])/self.stride
-                if t_x >= 0:
-                    target_pos_distri[target_idx, grid_y, grid_x, 0] = clamp(t_x, 0, self.reg_max-1 - 0.01)
-                    target_pos_distri[target_idx, grid_y, grid_x, 1] = 0
-                else:
-                    target_pos_distri[target_idx, grid_y, grid_x, 0] = 0
-                    target_pos_distri[target_idx, grid_y, grid_x, 1] = clamp(-t_x, 0, self.reg_max-1 - 0.01)
-
-                if t_y >= 0:
-                    target_pos_distri[target_idx, grid_y, grid_x, 2] = clamp(t_y, 0, self.reg_max-1 - 0.01)
-                    target_pos_distri[target_idx, grid_y, grid_x, 3] = 0
-                else:
-                    target_pos_distri[target_idx, grid_y, grid_x, 2] = 0
-                    target_pos_distri[target_idx, grid_y, grid_x, 3] = clamp(-t_y, 0, self.reg_max-1 - 0.01)
 
                 ## cls
                 cls_targets[target_idx, grid_y, grid_x, 0] = 1
         
-        target_pos_distri = target_pos_distri.view(self.num_groups*self.cell_num*self.cell_num, self.feat_no)
         cls_targets = cls_targets.view(self.num_groups*self.cell_num*self.cell_num, 1)
         mask_has_ball = mask_has_ball.view(self.num_groups*self.cell_num*self.cell_num).bool()
 
@@ -754,7 +733,7 @@ class TrackNetValidator(BaseValidator):
             p_cell_y = each_pos_y[frame_idx]
             p_cell_nx = each_pos_nx[frame_idx]
             p_cell_ny = each_pos_ny[frame_idx]
-            center = self.stride/2
+            center = 0.5
             metrics = []
             # 獲取當前圖片的 conf
             p_conf = each_probs[frame_idx]
@@ -785,20 +764,20 @@ class TrackNetValidator(BaseValidator):
                 metric["grid_x"] = x
                 metric["grid_y"] = y
                 
-                metric["x"] = center-p_cell_x[int(y)][int(x)][0]+p_cell_x[int(y)][int(x)][1]
-                metric["y"] = center-p_cell_y[int(y)][int(x)][0]+p_cell_y[int(y)][int(x)][1]
+                metric["x"] = center*self.stride-p_cell_x[int(y)][int(x)][0]+p_cell_x[int(y)][int(x)][1]
+                metric["y"] = center*self.stride-p_cell_y[int(y)][int(x)][0]+p_cell_y[int(y)][int(x)][1]
                 metric["conf"] = conf
 
-                metric["nx"] = center-p_cell_nx[int(y)][int(x)][0]+p_cell_nx[int(y)][int(x)][1]
-                metric["ny"] = center-p_cell_ny[int(y)][int(x)][0]+p_cell_ny[int(y)][int(x)][1]
+                metric["nx"] = center*self.stride-p_cell_nx[int(y)][int(x)][0]+p_cell_nx[int(y)][int(x)][1]
+                metric["ny"] = center*self.stride-p_cell_ny[int(y)][int(x)][0]+p_cell_ny[int(y)][int(x)][1]
 
                 metrics.append(metric)
                 self.frame_10_metrics.append(metric)
 
             # confusion metrics
             
-            pred_x = max_x*self.stride + (center-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1])*self.stride
-            pred_y = max_y*self.stride + (center-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])*self.stride
+            pred_x = max_x*self.stride + (center*self.stride-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1])
+            pred_y = max_y*self.stride + (center*self.stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
             target_x = batch_target[frame_idx][2]
             target_y = batch_target[frame_idx][3]
 

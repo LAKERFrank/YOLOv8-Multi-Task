@@ -320,11 +320,11 @@ class TrackNetLoss:
 
                 if target[1] == 1:
                     mask_has_ball[idx, target_idx, grid_y, grid_x] = 1
-                    center = stride/2
+                    center = 0.5
                     def clamp(x, min_value, max_value):
                         return max(min_value, min(x, max_value))
-                    t_x = (grid_x*stride+center*stride-target[2])/stride
-                    t_y = (grid_y*stride+center*stride-target[3])/stride
+                    t_x = (grid_x*stride+center*stride-target[2])
+                    t_y = (grid_y*stride+center*stride-target[3])
                     if t_x >= 0:
                         target_pos_distri[idx, target_idx, grid_y, grid_x, 0] = clamp(t_x, 0, self.reg_max-1 - 0.01)
                     else:
@@ -344,8 +344,8 @@ class TrackNetLoss:
                         next_gtx = batch_target[idx][target_idx+1][2]
                         next_gty = batch_target[idx][target_idx+1][3]
                         next_grid_x, next_grid_y, _, _ = target_grid(next_gtx, next_gty, stride)
-                        next_t_x = (grid_x*stride+center*stride-next_gtx)/stride
-                        next_t_y = (grid_y*stride+center*stride-next_gty)/stride
+                        next_t_x = (grid_x*stride+center*stride-next_gtx)
+                        next_t_y = (grid_y*stride+center*stride-next_gty)
                         if next_t_x >= 0:
                             target_pos_distri[idx, target_idx, grid_y, grid_x, 4] = clamp(next_t_x, 0, self.reg_max-1 - 0.01)
                         else:
