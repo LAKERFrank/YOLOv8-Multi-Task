@@ -338,11 +338,11 @@ class TrackNetLoss:
                     ## cls
                     cls_targets[idx, target_idx, grid_y, grid_x, 0] = 1
 
-                    if target_idx != len(batch_target[idx])-1 and batch_target[idx][target_idx+1][1] == 1:
+                    if target[4] is not 0 or target[5] is not 0:
                         mask_has_next_ball[idx, target_idx, grid_y, grid_x] = 1
 
-                        next_gtx = batch_target[idx][target_idx+1][2]
-                        next_gty = batch_target[idx][target_idx+1][3]
+                        next_gtx = target[4]
+                        next_gty = target[5]
                         next_grid_x, next_grid_y, _, _ = target_grid(next_gtx, next_gty, stride)
                         next_t_x = (grid_x*stride+center*stride-next_gtx)
                         next_t_y = (grid_y*stride+center*stride-next_gty)
@@ -355,6 +355,11 @@ class TrackNetLoss:
                             target_pos_distri[idx, target_idx, grid_y, grid_x, 6] = clamp(next_t_y, 0, self.reg_max-1 - 0.01)
                         else:
                             target_pos_distri[idx, target_idx, grid_y, grid_x, 7] = clamp(-next_t_y, 0, self.reg_max-1 - 0.01)
+                    else:
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 4] = pred_pos_distri[idx, target_idx*grid_y*grid_x, 4]
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 5] = pred_pos_distri[idx, target_idx*grid_y*grid_x, 5]
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 6] = pred_pos_distri[idx, target_idx*grid_y*grid_x, 6]
+                        target_pos_distri[idx, target_idx, grid_y, grid_x, 7] = pred_pos_distri[idx, target_idx*grid_y*grid_x, 7]
 
         mask_may_has_ball = F.max_pool2d(mask_has_ball, kernel_size=3, stride=1, padding=1)
         target_scores_sum = max(cls_targets.sum(), 1)
