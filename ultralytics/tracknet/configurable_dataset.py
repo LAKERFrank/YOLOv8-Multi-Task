@@ -218,8 +218,8 @@ class TrackNetConfigurableDataset(Dataset):
 
                 #         self.img_cache(match_name, video_name, frames, npy_path)
                 
-                # self.path_counts[match_name] = self.path_counts[match_name] - min_len
-                # pbar.update(min_len)
+                self.path_counts[match_name] = self.path_counts[match_name] - min_len
+                pbar.update(min_len)
 
     def img_cache_dir(self, match_name, video_name, img_files):
         s = '|'.join([match_name]+[video_name]+img_files)
