@@ -251,6 +251,7 @@ class TrackNetLoss:
         mask_has_next_ball = torch.zeros(b, self.num_groups, total_cells, device=self.device)
 
         offset = 0  # track index offset for different resolutions
+        exceed_count = 0
         for s_idx, stride in enumerate(self.stride):
             cell_num = cell_nums[s_idx]
 
@@ -292,7 +293,8 @@ class TrackNetLoss:
                             next_t_y = (grid_y * stride + center * stride - next_gty)
                             if next_t_x >= self.reg_max - 1 or next_t_y >= self.reg_max - 1:
                                 target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos[idx, target_idx * abs_idx, 4:]
-                                print(f"warning 超過可預測範圍: next_t_x: {next_t_x}, next_t_y: {next_t_y}")
+                                exceed_count += 1
+                                # print(f"warning 超過可預測範圍: next_t_x: {next_t_x}, next_t_y: {next_t_y}")
                                 continue
 
                             mask_has_next_ball[idx, target_idx, abs_idx] = 1
@@ -312,6 +314,7 @@ class TrackNetLoss:
 
             offset += cell_num * cell_num  # Move to next scale
 
+        print (f"exceed_count: {exceed_count}")
         # Flatten tensors for loss computation
         target_pos_distri = target_pos_distri.view(b, self.num_groups * total_cells, feature_dim)
         cls_targets = cls_targets.view(b, self.num_groups * total_cells, self.nc)
