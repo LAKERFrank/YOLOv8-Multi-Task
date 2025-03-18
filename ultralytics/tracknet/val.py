@@ -539,7 +539,7 @@ class TrackNetValidator(BaseValidator):
         self.reg_max = 16
         self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
         self.feat_no = 8
-        self.nc = 1
+        self.nc = 2
         self.no = 16*self.feat_no+self.nc
 
         self.fast_count = 0
@@ -674,7 +674,9 @@ class TrackNetValidator(BaseValidator):
         mask_fast_hit_ball = (mask_fast_ball.bool()|mask_hit_ball_v2.bool()).float()
         self.fast_hit_count += mask_fast_hit_ball.sum()
 
-        each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
+        each_probs, n_each_probs = pred_probs.view(10, self.cell_num, self.cell_num, self.nc).split([1, 1], dim=3)
+        each_probs = each_probs.view(10, self.cell_num, self.cell_num)
+        n_each_probs = n_each_probs.view(10, self.cell_num, self.cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
         # 計算 hit v2 效果
@@ -737,6 +739,7 @@ class TrackNetValidator(BaseValidator):
             metrics = []
             # 獲取當前圖片的 conf
             p_conf = each_probs[frame_idx]
+            n_p_conf = n_each_probs[frame_idx]
 
             ############## MAX ##############
             conf_threshold = 0.5
@@ -745,16 +748,17 @@ class TrackNetValidator(BaseValidator):
             # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
             max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
             max_conf = p_conf[max_y, max_x]
+            max_n_conf = n_p_conf[max_y, max_x]
             
             ############# 多球 #############
 
             ### 只拿最大值
-            preds = [(max_x, max_y, max_conf)]
+            preds = [(max_x, max_y, max_conf, max_n_conf)]
 
             ### 拿多顆球
             # preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, dis_tolerance=30)
 
-            for (x, y, conf) in preds:
+            for (x, y, conf, n_conf) in preds:
                 if len(metrics) > 5 :
                     break
                 # 全部都小於 conf_threshold 還是會選最大的一筆
@@ -770,6 +774,8 @@ class TrackNetValidator(BaseValidator):
 
                 metric["nx"] = (center*self.stride-p_cell_nx[int(y)][int(x)][0]+p_cell_nx[int(y)][int(x)][1])/self.stride
                 metric["ny"] = (center*self.stride-p_cell_ny[int(y)][int(x)][0]+p_cell_ny[int(y)][int(x)][1])/self.stride
+                metric["n_conf"] = n_conf
+
 
                 metrics.append(metric)
                 self.frame_10_metrics.append(metric)
@@ -778,6 +784,7 @@ class TrackNetValidator(BaseValidator):
             
             pred_x = max_x*self.stride + (center*self.stride-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1])
             pred_y = max_y*self.stride + (center*self.stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
+            
             target_x = batch_target[frame_idx][2]
             target_y = batch_target[frame_idx][3]
 
@@ -813,8 +820,19 @@ class TrackNetValidator(BaseValidator):
                     if mask_fast_hit_ball[frame_idx] == 1:
                         self.fast_hit_TP += 1
                 else:
-                    self.pos_FN += 1
-                    box_color = 'yellow'
+                    if frame_idx > 0 and max_n_conf >= conf_threshold and frame_idx < 9:
+                        distance = torch.sqrt((pred_n_x - target_x) ** 2 + (pred_n_y - target_y) ** 2)
+                        if distance <= self.tolerance3:
+                            self.pos_TP += 1
+                            print('next hit')
+                        else:
+                            self.pos_FP_dis += 1
+                            self.pos_FP += 1
+                            box_color = 'blue'
+                            print('next hit but miss')
+                    else:
+                        self.pos_FN += 1
+                        box_color = 'yellow'
                     if mask_fast_ball[frame_idx] == 1:
                         self.fast_FN += 1
                     if mask_hit_ball_v2[frame_idx] == 1:
@@ -822,6 +840,9 @@ class TrackNetValidator(BaseValidator):
                     if mask_fast_hit_ball[frame_idx] == 1:
                         self.fast_hit_FN += 1
             
+            pred_n_x = max_x*self.stride + (center*self.stride-p_cell_nx[max_y][max_x][0]+p_cell_nx[max_y][max_x][1])
+            pred_n_y = max_y*self.stride + (center*self.stride-p_cell_ny[max_y][max_x][0]+p_cell_ny[max_y][max_x][1])
+
             # threshold = 0.5 ~ 0.95
             # threshold_idx = 0 ~ 9
             # iou_dist = 1~5 (pixel 容忍距離)

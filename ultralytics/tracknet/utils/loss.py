@@ -247,7 +247,7 @@ class TrackNetLoss:
         # Initialize tensors with correct shape
         target_pos_distri = torch.zeros(b, self.num_groups, total_cells, feature_dim, device=self.device)
         mask_has_ball = torch.zeros(b, self.num_groups, total_cells, device=self.device)
-        cls_targets = torch.zeros(b, self.num_groups, total_cells, 1, device=self.device)
+        cls_targets = torch.zeros(b, self.num_groups, total_cells, self.nc, device=self.device)
         mask_has_next_ball = torch.zeros(b, self.num_groups, total_cells, device=self.device)
 
         offset = 0  # track index offset for different resolutions
@@ -285,14 +285,18 @@ class TrackNetLoss:
 
                         cls_targets[idx, target_idx, abs_idx, 0] = 1
 
-                        if target[4] != 0 or target[5] != 0:
-                            mask_has_next_ball[idx, target_idx, abs_idx] = 1
-
+                        if (target[4] != 0 or target[5] != 0) and target_idx < len(batch_target[idx]) - 1:
                             next_gtx, next_gty = target[4], target[5]
-                            next_grid_x, next_grid_y, _, _ = target_grid(next_gtx, next_gty, stride)
 
                             next_t_x = (grid_x * stride + center * stride - next_gtx)
                             next_t_y = (grid_y * stride + center * stride - next_gty)
+                            if next_t_x >= self.reg_max - 1 or next_t_y >= self.reg_max - 1:
+                                target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos[idx, target_idx * abs_idx, 4:]
+                                print(f"warning 超過可預測範圍: next_t_x: {next_t_x}, next_t_y: {next_t_y}")
+                                continue
+
+                            mask_has_next_ball[idx, target_idx, abs_idx] = 1
+                            cls_targets[idx, target_idx, abs_idx, 1] = 1
 
                             if next_t_x >= 0:
                                 target_pos_distri[idx, target_idx, abs_idx, 4] = clamp(next_t_x, 0, self.reg_max - 1 - 0.01)
@@ -304,13 +308,13 @@ class TrackNetLoss:
                             else:
                                 target_pos_distri[idx, target_idx, abs_idx, 7] = clamp(-next_t_y, 0, self.reg_max - 1 - 0.01)
                         else:
-                            target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos_distri[idx, target_idx * abs_idx, 4:]
+                            target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos[idx, target_idx * abs_idx, 4:]
 
             offset += cell_num * cell_num  # Move to next scale
 
         # Flatten tensors for loss computation
         target_pos_distri = target_pos_distri.view(b, self.num_groups * total_cells, feature_dim)
-        cls_targets = cls_targets.view(b, self.num_groups * total_cells, 1)
+        cls_targets = cls_targets.view(b, self.num_groups * total_cells, self.nc)
         mask_has_ball = mask_has_ball.view(b, self.num_groups * total_cells).bool()
         
         loss = torch.zeros(2, device=self.device)
@@ -320,7 +324,8 @@ class TrackNetLoss:
         cls_targets = cls_targets.to(pred_scores.dtype)
 
         self.confusion_class.confusion_matrix(pred_scores.sigmoid(), cls_targets)
-        loss[1] = self.FLM(pred_scores, cls_targets, 2, 0.75)
+        loss[1] = self.FLM(pred_scores[:,:,0], cls_targets[:,:,0], 2, 0.75)
+        loss[1] += self.FLM(pred_scores[:,:,1], cls_targets[:,:,1], 2, 0.75)
 
 
         loss[0] *= 1  # dfl gain
