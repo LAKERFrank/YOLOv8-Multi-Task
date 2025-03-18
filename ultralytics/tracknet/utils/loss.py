@@ -271,8 +271,10 @@ class TrackNetLoss:
                         def clamp(x, min_value, max_value):
                             return max(min_value, min(x, max_value))
 
-                        t_x = (grid_x * stride + center * stride - target[2])
-                        t_y = (grid_y * stride + center * stride - target[3])
+                        t_x = (grid_x * stride + center * stride - target[2])*8/stride
+                        t_y = (grid_y * stride + center * stride - target[3])*8/stride
+                        if t_x >= self.reg_max - 1 or t_y >= self.reg_max - 1:
+                            print(f"warning 超過可預測範圍: t_x: {t_x}, t_y: {t_y}")
 
                         if t_x >= 0:
                             target_pos_distri[idx, target_idx, abs_idx, 0] = clamp(t_x, 0, self.reg_max - 1 - 0.01)
@@ -289,8 +291,8 @@ class TrackNetLoss:
                         if (target[4] != 0 or target[5] != 0) and target_idx < len(batch_target[idx]) - 1:
                             next_gtx, next_gty = target[4], target[5]
 
-                            next_t_x = (grid_x * stride + center * stride - next_gtx)
-                            next_t_y = (grid_y * stride + center * stride - next_gty)
+                            next_t_x = (grid_x * stride + center * stride - next_gtx)*8/stride
+                            next_t_y = (grid_y * stride + center * stride - next_gty)*8/stride
                             if next_t_x >= self.reg_max - 1 or next_t_y >= self.reg_max - 1:
                                 target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos[idx, target_idx * abs_idx, 4:]
                                 exceed_count += 1
