@@ -230,169 +230,101 @@ class TrackNetLoss:
         
         pred_scores = pred_scores.permute(0, 2, 1).contiguous()
         pred_distri = pred_distri.permute(0, 2, 1).contiguous()
-        # pred_distri_dxdy = pred_dxdy.permute(0, 2, 1).contiguous()
 
         b, a, c = pred_distri.shape  # batch, anchors, channels
         pred_pos_distri = pred_distri
         pred_pos = pred_pos_distri.view(b, a, self.feat_no, c // self.feat_no).softmax(3).matmul(
             self.proj.type(pred_distri.dtype))
         
-        # pred_dxdy = pred_distri_dxdy.view(b, a, 2, c // 2).softmax(3).matmul(
-        #     self.dxdy_proj.type(pred_distri.dtype))
 
         batch_target = batch['target'].to(self.device)
 
-        cell_num = int(640/self.stride[0])
-        target_pos_distri = torch.zeros(b, self.num_groups, cell_num, cell_num, self.feat_no, device=self.device)
-        mask_has_ball = torch.zeros(b, self.num_groups, cell_num, cell_num, device=self.device)
-        cls_targets = torch.zeros(b, self.num_groups, cell_num, cell_num, 1, device=self.device)
-        mask_has_next_ball = torch.zeros(b, self.num_groups, cell_num, cell_num, device=self.device)
+        cell_nums = [int(640 / s) for s in self.stride]  # [80, 40, 20]
 
-        mask_fast_ball = torch.zeros(b, self.num_groups, cell_num, cell_num, device=self.device)
-        mask_hit_ball = torch.zeros(b, self.num_groups, cell_num, cell_num, device=self.device)
-        mask_hit_ball_v2 = torch.zeros(b, self.num_groups, cell_num, cell_num, device=self.device)
+        total_cells = sum([c * c for c in cell_nums])
+        feature_dim = self.feat_no
 
-        fast_ball_count = 0
-        hit_ball_count = 0
-        for idx, _ in enumerate(batch_target):
-            # pred = [330 * cell_num * cell_num]
-            stride = self.stride[0]
-            
-            for target_idx, target in enumerate(batch_target[idx]):
-                # target xy
-                grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
-                if grid_x >= 80 or grid_y >= 80:
-                    print(grid_x, grid_y, offset_x, offset_y)
-                # 找出快球 => 慢球, 慢球 => 快球
-                if target_idx > 1 and target_idx < len(batch_target[idx])-2 and \
-                    batch_target[idx][target_idx-2][1] == 1 and batch_target[idx][target_idx][1] == 1 and batch_target[idx][target_idx+2][1] == 1 and\
-                    batch_target[idx][target_idx-1][1] == 1 and batch_target[idx][target_idx+1][1] == 1:
-                    
-                    before_hit2 = [batch_target[idx][target_idx-2][2], batch_target[idx][target_idx-2][3]]
-                    hit = [batch_target[idx][target_idx][2], batch_target[idx][target_idx][3]]
-                    after_hit2 = [batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3]]
+        # Initialize tensors with correct shape
+        target_pos_distri = torch.zeros(b, self.num_groups, total_cells, feature_dim, device=self.device)
+        mask_has_ball = torch.zeros(b, self.num_groups, total_cells, device=self.device)
+        cls_targets = torch.zeros(b, self.num_groups, total_cells, 1, device=self.device)
+        mask_has_next_ball = torch.zeros(b, self.num_groups, total_cells, device=self.device)
 
-                    before_dist = calculate_dist(before_hit2, hit)
-                    after_dist = calculate_dist(hit, after_hit2)
-                    angle = calculate_angle(before_hit2, hit, after_hit2)
+        offset = 0  # track index offset for different resolutions
+        for s_idx, stride in enumerate(self.stride):
+            cell_num = cell_nums[s_idx]
 
-                    if (angle and angle > 30 and (before_dist > 10 or after_dist > 10)) or \
-                        ((before_dist > stride or after_dist > stride) and (before_dist > after_dist*2 or before_dist*2 < after_dist)):
+            for idx, _ in enumerate(batch_target):
+                for target_idx, target in enumerate(batch_target[idx]):
+                    grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
 
-                        grid_x_1, grid_y_1, _, _ = target_grid(batch_target[idx][target_idx-2][2], batch_target[idx][target_idx-2][3], stride)
-                        grid_x_2, grid_y_2, _, _ = target_grid(batch_target[idx][target_idx-1][2], batch_target[idx][target_idx-1][3], stride)
-                        grid_x_3, grid_y_3, _, _ = target_grid(batch_target[idx][target_idx][2], batch_target[idx][target_idx][3], stride)
-                        grid_x_4, grid_y_4, _, _ = target_grid(batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3], stride)
-                        grid_x_5, grid_y_5, _, _ = target_grid(batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3], stride)
-                        
-                        mask_hit_ball_v2[idx, target_idx-2, grid_y_1, grid_x_1] = 1
-                        mask_hit_ball_v2[idx, target_idx-1, grid_y_2, grid_x_2] = 1
-                        mask_hit_ball_v2[idx, target_idx, grid_y_3, grid_x_3] = 1
-                        mask_hit_ball_v2[idx, target_idx+1, grid_y_4, grid_x_4] = 1
-                        mask_hit_ball_v2[idx, target_idx+2, grid_y_5, grid_x_5] = 1
-                if target_idx < len(batch_target[idx])-1 and batch_target[idx][target_idx+1][1] == 1 and\
-                    batch_target[idx][target_idx][1] == 1 and target[4]**2 + target[5]**2 >= cell_num**2:
+                    if grid_x >= cell_num or grid_y >= cell_num:
+                        continue
 
-                    mask_fast_ball[idx, target_idx, grid_y, grid_x] = 1
+                    abs_idx = offset + grid_y * cell_num + grid_x  # Absolute position in combined tensor
 
-                    next_grid_x, next_grid_y, _, _ = target_grid(batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3], stride)
-                    mask_fast_ball[idx, target_idx+1, next_grid_y, next_grid_x] = 1
-                    
-                    fast_ball_count+=1
+                    if target[1] == 1:
+                        mask_has_ball[idx, target_idx, abs_idx] = 1
 
-                if target_idx < len(batch_target[idx])-2 \
-                    and batch_target[idx][target_idx][1] == 1 and batch_target[idx][target_idx+1][1] == 1 \
-                    and batch_target[idx][target_idx+2][1] == 1:
-                    
-                    first = [batch_target[idx][target_idx][2], batch_target[idx][target_idx][3]]
-                    second = [batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3]]
-                    third = [batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3]]
-                    angle = calculate_angle(first, second, third)
-                    dist1 = calculate_dist(first, second)
-                    dist2 = calculate_dist(second, third)
-                    if angle and angle > 30 and (dist1 > 10 or dist2 > 10):
-                        second_grid_x, second_grid_y, _, _ = target_grid(batch_target[idx][target_idx+1][2], batch_target[idx][target_idx+1][3], stride)
-                        third_grid_x, third_grid_y, _, _ = target_grid(batch_target[idx][target_idx+2][2], batch_target[idx][target_idx+2][3], stride)
-                        mask_hit_ball[idx, target_idx, grid_y, grid_x] = 1
-                        mask_hit_ball[idx, target_idx+1, second_grid_y, second_grid_x] = 1
-                        mask_hit_ball[idx, target_idx+2, third_grid_y, third_grid_x] = 1
-                        hit_ball_count+=1
+                        center = 0.5
+                        def clamp(x, min_value, max_value):
+                            return max(min_value, min(x, max_value))
 
-                if target[1] == 1:
-                    mask_has_ball[idx, target_idx, grid_y, grid_x] = 1
-                    center = 0.5
-                    def clamp(x, min_value, max_value):
-                        return max(min_value, min(x, max_value))
-                    t_x = (grid_x*stride+center*stride-target[2])
-                    t_y = (grid_y*stride+center*stride-target[3])
-                    if t_x >= 0:
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 0] = clamp(t_x, 0, self.reg_max-1 - 0.01)
-                    else:
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 1] = clamp(-t_x, 0, self.reg_max-1 - 0.01)
+                        t_x = (grid_x * stride + center * stride - target[2])
+                        t_y = (grid_y * stride + center * stride - target[3])
 
-                    if t_y >= 0:
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 2] = clamp(t_y, 0, self.reg_max-1 - 0.01)
-                    else:
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 3] = clamp(-t_y, 0, self.reg_max-1 - 0.01)
-
-                    ## cls
-                    cls_targets[idx, target_idx, grid_y, grid_x, 0] = 1
-
-                    if target[4] is not 0 or target[5] is not 0:
-                        mask_has_next_ball[idx, target_idx, grid_y, grid_x] = 1
-
-                        next_gtx = target[4]
-                        next_gty = target[5]
-                        next_grid_x, next_grid_y, _, _ = target_grid(next_gtx, next_gty, stride)
-                        next_t_x = (grid_x*stride+center*stride-next_gtx)
-                        next_t_y = (grid_y*stride+center*stride-next_gty)
-                        if next_t_x >= 0:
-                            target_pos_distri[idx, target_idx, grid_y, grid_x, 4] = clamp(next_t_x, 0, self.reg_max-1 - 0.01)
+                        if t_x >= 0:
+                            target_pos_distri[idx, target_idx, abs_idx, 0] = clamp(t_x, 0, self.reg_max - 1 - 0.01)
                         else:
-                            target_pos_distri[idx, target_idx, grid_y, grid_x, 5] = clamp(-next_t_x, 0, self.reg_max-1 - 0.01)
+                            target_pos_distri[idx, target_idx, abs_idx, 1] = clamp(-t_x, 0, self.reg_max - 1 - 0.01)
 
-                        if next_t_y >= 0:
-                            target_pos_distri[idx, target_idx, grid_y, grid_x, 6] = clamp(next_t_y, 0, self.reg_max-1 - 0.01)
+                        if t_y >= 0:
+                            target_pos_distri[idx, target_idx, abs_idx, 2] = clamp(t_y, 0, self.reg_max - 1 - 0.01)
                         else:
-                            target_pos_distri[idx, target_idx, grid_y, grid_x, 7] = clamp(-next_t_y, 0, self.reg_max-1 - 0.01)
-                    else:
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 4] = pred_pos_distri[idx, target_idx*grid_y*grid_x, 4]
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 5] = pred_pos_distri[idx, target_idx*grid_y*grid_x, 5]
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 6] = pred_pos_distri[idx, target_idx*grid_y*grid_x, 6]
-                        target_pos_distri[idx, target_idx, grid_y, grid_x, 7] = pred_pos_distri[idx, target_idx*grid_y*grid_x, 7]
+                            target_pos_distri[idx, target_idx, abs_idx, 3] = clamp(-t_y, 0, self.reg_max - 1 - 0.01)
 
-        mask_may_has_ball = F.max_pool2d(mask_has_ball, kernel_size=3, stride=1, padding=1)
-        target_scores_sum = max(cls_targets.sum(), 1)
+                        cls_targets[idx, target_idx, abs_idx, 0] = 1
 
-        target_pos_distri = target_pos_distri.view(b, self.num_groups*cell_num*cell_num, self.feat_no)
-        cls_targets = cls_targets.view(b, self.num_groups*cell_num*cell_num, 1)
-        mask_has_ball = mask_has_ball.view(b, self.num_groups*cell_num*cell_num).bool()
-        mask_may_has_ball = mask_may_has_ball.view(b, self.num_groups*cell_num*cell_num, 1).bool()
-        mask_fast_ball = mask_fast_ball.view(b, self.num_groups*cell_num*cell_num, 1).bool()
-        mask_hit_ball = mask_hit_ball.view(b, self.num_groups*cell_num*cell_num, 1).bool()
-        mask_hit_ball_v2 = mask_hit_ball_v2.view(b, self.num_groups*cell_num*cell_num, 1).bool()
+                        if target[4] != 0 or target[5] != 0:
+                            mask_has_next_ball[idx, target_idx, abs_idx] = 1
+
+                            next_gtx, next_gty = target[4], target[5]
+                            next_grid_x, next_grid_y, _, _ = target_grid(next_gtx, next_gty, stride)
+
+                            next_t_x = (grid_x * stride + center * stride - next_gtx)
+                            next_t_y = (grid_y * stride + center * stride - next_gty)
+
+                            if next_t_x >= 0:
+                                target_pos_distri[idx, target_idx, abs_idx, 4] = clamp(next_t_x, 0, self.reg_max - 1 - 0.01)
+                            else:
+                                target_pos_distri[idx, target_idx, abs_idx, 5] = clamp(-next_t_x, 0, self.reg_max - 1 - 0.01)
+
+                            if next_t_y >= 0:
+                                target_pos_distri[idx, target_idx, abs_idx, 6] = clamp(next_t_y, 0, self.reg_max - 1 - 0.01)
+                            else:
+                                target_pos_distri[idx, target_idx, abs_idx, 7] = clamp(-next_t_y, 0, self.reg_max - 1 - 0.01)
+                        else:
+                            target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos_distri[idx, target_idx * abs_idx, 4:]
+
+            offset += cell_num * cell_num  # Move to next scale
+
+        # Flatten tensors for loss computation
+        target_pos_distri = target_pos_distri.view(b, self.num_groups * total_cells, feature_dim)
+        cls_targets = cls_targets.view(b, self.num_groups * total_cells, 1)
+        mask_has_ball = mask_has_ball.view(b, self.num_groups * total_cells).bool()
         
         loss = torch.zeros(2, device=self.device)
-        _, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball, mask_hit_ball_v2)
+        target_scores_sum = max(cls_targets.sum(), 1)
+        _, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball)
         
         cls_targets = cls_targets.to(pred_scores.dtype)
 
-        # fp_additional_penalty = 4000
-        # fn_additional_penalty = 400
-        # cls_weight = torch.where(cls_targets == 1, w_pos + false_negative*fn_additional_penalty, 
-        #                          w_neg + false_positive * fp_additional_penalty)
-        # bce = nn.BCEWithLogitsLoss(reduction='none', weight=cls_weight)
-
         self.confusion_class.confusion_matrix(pred_scores.sigmoid(), cls_targets)
-        loss[1] = self.FLM(pred_scores, cls_targets, mask_may_has_ball, mask_fast_ball, mask_hit_ball_v2, 2, 0.75)
+        loss[1] = self.FLM(pred_scores, cls_targets, 2, 0.75)
 
-        # print(f'conf loss: {fp_loss_weighted, fn_loss_weighted, tp_loss_weighted}\n')
-        # print(f'fast ball count: {fast_ball_count}, total ball: {target_scores_sum}\n')
-        # print(f'hit_ball_count: {hit_ball_count}, total ball: {target_scores_sum}\n')
 
         loss[0] *= 1  # dfl gain
         loss[1] *= 20  # cls gain
-        # loss[2] *= 1  # iou gain
 
         tlose = loss.sum() * b
         tlose_item = loss.detach()
@@ -874,7 +806,7 @@ class FocalLossWithMask(nn.Module):
 
         return pos_mask | neg_mask
 
-    def forward(self, pred, label, may_has_ball, mask_fast_ball, mask_hit_ball, gamma=2, alpha=0.75, negative_ratio=3.0):
+    def forward(self, pred, label, gamma=2, alpha=0.75, negative_ratio=3.0):
         """Calculates and updates confusion matrix for object detection/classification tasks."""
         assert torch.all((label == 0) | (label == 1)), f"`label` contains invalid values: {label.unique()}"
         loss = F.binary_cross_entropy_with_logits(pred, label, reduction='none')
@@ -936,7 +868,7 @@ class XYLoss(nn.Module):
         self.reg_max = reg_max
         self.use_dfl = use_dfl
 
-    def forward(self, pred_dist, pred_pos, target_pos_distri, target_scores, target_scores_sum, fg_mask, hit_weight):
+    def forward(self, pred_dist, pred_pos, target_pos_distri, target_scores, target_scores_sum, fg_mask):
         """IoU loss."""
         target_scores_clone = target_scores.clone()
         # target_scores_clone[hit_weight] *= 30
