@@ -296,7 +296,7 @@ class TrackNetLoss:
                             if next_t_x >= self.reg_max - 1 or next_t_y >= self.reg_max - 1:
                                 target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos[idx, target_idx * abs_idx, 4:]
                                 exceed_count += 1
-                                print(f"warning 超過可預測範圍: next_t_x: {next_t_x}, next_t_y: {next_t_y}")
+                                print(f"warning 超過可預測範圍: stride: {stride} next_t_x: {next_t_x}, next_t_y: {next_t_y}")
                                 continue
 
                             mask_has_next_ball[idx, target_idx, abs_idx] = 1
