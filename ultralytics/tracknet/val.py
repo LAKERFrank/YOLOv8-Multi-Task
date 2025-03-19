@@ -820,12 +820,12 @@ class TrackNetValidator(BaseValidator):
                         distance = torch.sqrt((pred_n_x - target_x) ** 2 + (pred_n_y - target_y) ** 2)
                         if distance <= self.tolerance3:
                             self.pos_TP += 1
-                            print('next hit')
+                            # print('next hit')
                         else:
                             self.pos_FP_dis += 1
                             self.pos_FP += 1
                             box_color = 'blue'
-                            print('next hit but miss')
+                            # print('next hit but miss')
                     else:
                         self.pos_FN += 1
                         box_color = 'yellow'
