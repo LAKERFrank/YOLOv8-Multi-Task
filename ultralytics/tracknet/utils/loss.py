@@ -230,7 +230,7 @@ class TrackNetLoss:
         
         pred_scores = pred_scores.permute(0, 2, 1).contiguous()
         pred_distri = pred_distri.permute(0, 2, 1).contiguous()
-
+        pred_scores, n_pred_scores = pred_scores.split([1, 1], dim=2)
         b, a, c = pred_distri.shape  # batch, anchors, channels
 
         pred_pos_distri, n_pred_pos_distri = pred_distri.split([64, 64], dim=2)
@@ -335,8 +335,8 @@ class TrackNetLoss:
         cls_targets = cls_targets.to(pred_scores.dtype)
 
         self.confusion_class.confusion_matrix(pred_scores.sigmoid(), cls_targets)
-        loss[1] = self.FLM(pred_scores[:,:,0], cls_targets[:,:,0], 2, 0.75)
-        loss[1] += self.FLM(pred_scores[:,:,1], cls_targets[:,:,1], 2, 0.75)
+        loss[1] = self.FLM(pred_scores, cls_targets, 2, 0.75)
+        loss[1] += self.FLM(n_pred_scores, n_cls_targets, 2, 0.75)
 
 
         loss[0] *= 1  # dfl gain
