@@ -232,23 +232,27 @@ class TrackNetLoss:
         pred_distri = pred_distri.permute(0, 2, 1).contiguous()
 
         b, a, c = pred_distri.shape  # batch, anchors, channels
-        pred_pos_distri = pred_distri
-        pred_pos = pred_pos_distri.view(b, a, self.feat_no, c // self.feat_no).softmax(3).matmul(
-            self.proj.type(pred_distri.dtype))
-        
+
+        pred_pos_distri, n_pred_pos_distri = pred_distri.split([64, 64], dim=2)
+
+        pred_pos = pred_pos_distri.view(b, a, 4, -1).softmax(3).matmul(self.proj.type(pred_distri.dtype))
+        n_pred_pos = n_pred_pos_distri.view(b, a, 4, -1).softmax(3).matmul(self.proj.type(pred_distri.dtype))
 
         batch_target = batch['target'].to(self.device)
 
         cell_nums = [int(640 / s) for s in self.stride]  # [80, 40, 20]
 
         total_cells = sum([c * c for c in cell_nums])
-        feature_dim = self.feat_no
+        feature_dim = self.feat_no//2
 
         # Initialize tensors with correct shape
         target_pos_distri = torch.zeros(b, self.num_groups, total_cells, feature_dim, device=self.device)
         mask_has_ball = torch.zeros(b, self.num_groups, total_cells, device=self.device)
-        cls_targets = torch.zeros(b, self.num_groups, total_cells, self.nc, device=self.device)
+        cls_targets = torch.zeros(b, self.num_groups, total_cells, device=self.device)
+
+        n_target_pos_distri = torch.zeros(b, self.num_groups, total_cells, feature_dim, device=self.device)
         mask_has_next_ball = torch.zeros(b, self.num_groups, total_cells, device=self.device)
+        n_cls_targets = torch.zeros(b, self.num_groups, total_cells, device=self.device)
 
         offset = 0  # track index offset for different resolutions
         exceed_count = 0
@@ -263,7 +267,6 @@ class TrackNetLoss:
                         continue
 
                     abs_idx = offset + grid_y * cell_num + grid_x  # Absolute position in combined tensor
-                    anchor_idx = target_idx * total_cells + abs_idx
                     if target[1] == 1:
                         mask_has_ball[idx, target_idx, abs_idx] = 1
 
@@ -286,7 +289,7 @@ class TrackNetLoss:
                         else:
                             target_pos_distri[idx, target_idx, abs_idx, 3] = clamp(-t_y, 0, self.reg_max - 1 - 0.01)
 
-                        cls_targets[idx, target_idx, abs_idx, 0] = 1
+                        cls_targets[idx, target_idx, abs_idx] = 1
                         
                         if (target[4] != 0 or target[5] != 0) and target_idx < len(batch_target[idx]) - 1:
                             next_gtx, next_gty = target[4], target[5]
@@ -294,37 +297,40 @@ class TrackNetLoss:
                             next_t_x = (grid_x * stride + center * stride - next_gtx)*8/stride
                             next_t_y = (grid_y * stride + center * stride - next_gty)*8/stride
                             if abs(next_t_x) >= self.reg_max - 1 or abs(next_t_y) >= self.reg_max - 1:
-                                target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos[idx, anchor_idx, 4:]
                                 exceed_count += 1
                                 # print(f"warning 超過可預測範圍: stride: {stride} next_t_x: {next_t_x}, next_t_y: {next_t_y}")
                                 continue
 
                             mask_has_next_ball[idx, target_idx, abs_idx] = 1
-                            cls_targets[idx, target_idx, abs_idx, 1] = 1
+                            n_cls_targets[idx, target_idx, abs_idx] = 1
 
                             if next_t_x >= 0:
-                                target_pos_distri[idx, target_idx, abs_idx, 4] = clamp(next_t_x, 0, self.reg_max - 1 - 0.01)
+                                n_target_pos_distri[idx, target_idx, abs_idx, 0] = clamp(next_t_x, 0, self.reg_max - 1 - 0.01)
                             else:
-                                target_pos_distri[idx, target_idx, abs_idx, 5] = clamp(-next_t_x, 0, self.reg_max - 1 - 0.01)
+                                n_target_pos_distri[idx, target_idx, abs_idx, 1] = clamp(-next_t_x, 0, self.reg_max - 1 - 0.01)
 
                             if next_t_y >= 0:
-                                target_pos_distri[idx, target_idx, abs_idx, 6] = clamp(next_t_y, 0, self.reg_max - 1 - 0.01)
+                                n_target_pos_distri[idx, target_idx, abs_idx, 2] = clamp(next_t_y, 0, self.reg_max - 1 - 0.01)
                             else:
-                                target_pos_distri[idx, target_idx, abs_idx, 7] = clamp(-next_t_y, 0, self.reg_max - 1 - 0.01)
-                        else:
-                            target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos[idx, anchor_idx, 4:]
+                                n_target_pos_distri[idx, target_idx, abs_idx, 3] = clamp(-next_t_y, 0, self.reg_max - 1 - 0.01)
 
             offset += cell_num * cell_num  # Move to next scale
 
         # print (f"exceed_count: {exceed_count}")
         # Flatten tensors for loss computation
         target_pos_distri = target_pos_distri.view(b, self.num_groups * total_cells, feature_dim)
-        cls_targets = cls_targets.view(b, self.num_groups * total_cells, self.nc)
+        cls_targets = cls_targets.view(b, self.num_groups * total_cells, 1)
+        mask_has_ball = mask_has_ball.view(b, self.num_groups * total_cells).bool()
+
+        n_target_pos_distri = n_target_pos_distri.view(b, self.num_groups * total_cells, feature_dim)
+        n_cls_targets = n_cls_targets.view(b, self.num_groups * total_cells, 1)
         mask_has_ball = mask_has_ball.view(b, self.num_groups * total_cells).bool()
         
         loss = torch.zeros(2, device=self.device)
         target_scores_sum = max(cls_targets.sum(), 1)
-        _, loss[0] = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball)
+        n_target_scores_sum = max(n_cls_targets.sum(), 1)
+        _, xy_loss = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball)
+        _, nxny_loss = self.xy_loss(pred_pos_distri, n_pred_pos, n_target_pos_distri, n_cls_targets, n_target_scores_sum, mask_has_next_ball)
         
         cls_targets = cls_targets.to(pred_scores.dtype)
 
