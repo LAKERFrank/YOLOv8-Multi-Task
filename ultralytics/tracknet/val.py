@@ -581,7 +581,7 @@ class TrackNetValidator(BaseValidator):
         batch_target = batch['target']
         batch_img = batch['img']
         batch_img_file = batch['img_files']
-        if preds.shape == (1290, self.cell_num, self.cell_num):
+        if len(preds) == 3:
             self.update_metrics_once(0, preds, batch_target[0], batch_img[0], loss)
         else:
             # for each batch
