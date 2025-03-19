@@ -27,25 +27,25 @@ class TrackNetConfigurableDataset(Dataset):
             "match_2" : 20, 
             "blion_tracknet_partial": 473,
             "profession_match_1" : 5000, 
-            "profession_match_2" : 0, 
-            "profession_match_3" : 0,
-            "profession_match_4" : 0,
-            "profession_match_5" : 0,
-            "profession_match_6" : 0,
-            "profession_match_7" : 0,
-            "profession_match_8" : 0,
-            "profession_match_9" : 0,
-            "profession_match_10" : 0,
-            "profession_match_11" : 0,
-            "profession_match_12" : 0,
-            "profession_match_13" : 0,
-            "profession_match_14" : 0,
-            "profession_match_15" : 0,
-            "profession_match_16" : 0,
-            "profession_match_17" : 0,
-            "profession_match_18" : 0,
-            "profession_match_19" : 0,
-            "profession_match_20" : 0,
+            "profession_match_2" : 4000, 
+            "profession_match_3" : 4000,
+            "profession_match_4" : 5000,
+            "profession_match_5" : 1000,
+            "profession_match_6" : 1000,
+            "profession_match_7" : 1000,
+            "profession_match_8" : 1000,
+            "profession_match_9" : 1000,
+            "profession_match_10" : 1000,
+            "profession_match_11" : 1000,
+            "profession_match_12" : 1000,
+            "profession_match_13" : 1000,
+            "profession_match_14" : 1000,
+            "profession_match_15" : 1000,
+            "profession_match_16" : 1000,
+            "profession_match_17" : 1000,
+            "profession_match_18" : 1000,
+            "profession_match_19" : 1000,
+            "profession_match_20" : 1000,
             }
 
         self.idx = set()
@@ -315,7 +315,7 @@ class TrackNetConfigurableDataset(Dataset):
             data_transformed[indices_to_transform, 5] += pad1
         else:
             data_transformed[indices_to_transform, 2] += pad1  # if height is greater, adjust X
-            data_transformed[indices_to_transform, 4] += pad1
+            data_transformed[indices_to_transform, 4] += pad1  # if height is greater, adjust X
 
         # Adjust for scaling
         scale_factor = target_size / max_dim
