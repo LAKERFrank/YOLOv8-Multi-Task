@@ -263,7 +263,7 @@ class TrackNetLoss:
                         continue
 
                     abs_idx = offset + grid_y * cell_num + grid_x  # Absolute position in combined tensor
-
+                    anchor_idx = target_idx * total_cells + abs_idx
                     if target[1] == 1:
                         mask_has_ball[idx, target_idx, abs_idx] = 1
 
@@ -287,14 +287,14 @@ class TrackNetLoss:
                             target_pos_distri[idx, target_idx, abs_idx, 3] = clamp(-t_y, 0, self.reg_max - 1 - 0.01)
 
                         cls_targets[idx, target_idx, abs_idx, 0] = 1
-
+                        
                         if (target[4] != 0 or target[5] != 0) and target_idx < len(batch_target[idx]) - 1:
                             next_gtx, next_gty = target[4], target[5]
 
                             next_t_x = (grid_x * stride + center * stride - next_gtx)*8/stride
                             next_t_y = (grid_y * stride + center * stride - next_gty)*8/stride
                             if abs(next_t_x) >= self.reg_max - 1 or abs(next_t_y) >= self.reg_max - 1:
-                                target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos[idx, target_idx * abs_idx, 4:]
+                                target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos[idx, anchor_idx, 4:]
                                 exceed_count += 1
                                 # print(f"warning 超過可預測範圍: stride: {stride} next_t_x: {next_t_x}, next_t_y: {next_t_y}")
                                 continue
@@ -312,7 +312,7 @@ class TrackNetLoss:
                             else:
                                 target_pos_distri[idx, target_idx, abs_idx, 7] = clamp(-next_t_y, 0, self.reg_max - 1 - 0.01)
                         else:
-                            target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos[idx, target_idx * abs_idx, 4:]
+                            target_pos_distri[idx, target_idx, abs_idx, 4:] = pred_pos[idx, anchor_idx, 4:]
 
             offset += cell_num * cell_num  # Move to next scale
 
