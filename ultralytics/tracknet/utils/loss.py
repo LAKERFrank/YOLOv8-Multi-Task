@@ -320,11 +320,11 @@ class TrackNetLoss:
         # Flatten tensors for loss computation
         target_pos_distri = target_pos_distri.view(b, self.num_groups * total_cells, feature_dim)
         cls_targets = cls_targets.view(b, self.num_groups * total_cells, 1)
-        mask_has_ball = mask_has_ball.view(b, self.num_groups * total_cells, 1).bool()
+        mask_has_ball = mask_has_ball.view(b, self.num_groups * total_cells).bool()
 
         n_target_pos_distri = n_target_pos_distri.view(b, self.num_groups * total_cells, feature_dim)
         n_cls_targets = n_cls_targets.view(b, self.num_groups * total_cells, 1)
-        mask_has_next_ball = mask_has_next_ball.view(b, self.num_groups * total_cells, 1).bool()
+        mask_has_next_ball = mask_has_next_ball.view(b, self.num_groups * total_cells).bool()
         
         loss = torch.zeros(2, device=self.device)
         target_scores_sum = max(cls_targets.sum(), 1)
