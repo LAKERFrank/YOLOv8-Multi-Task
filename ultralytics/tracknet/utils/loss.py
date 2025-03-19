@@ -320,18 +320,18 @@ class TrackNetLoss:
         # Flatten tensors for loss computation
         target_pos_distri = target_pos_distri.view(b, self.num_groups * total_cells, feature_dim)
         cls_targets = cls_targets.view(b, self.num_groups * total_cells, 1)
-        mask_has_ball = mask_has_ball.view(b, self.num_groups * total_cells).bool()
+        mask_has_ball = mask_has_ball.view(b, self.num_groups * total_cells, 1).bool()
 
         n_target_pos_distri = n_target_pos_distri.view(b, self.num_groups * total_cells, feature_dim)
         n_cls_targets = n_cls_targets.view(b, self.num_groups * total_cells, 1)
-        mask_has_ball = mask_has_ball.view(b, self.num_groups * total_cells).bool()
+        mask_has_next_ball = mask_has_next_ball.view(b, self.num_groups * total_cells, 1).bool()
         
         loss = torch.zeros(2, device=self.device)
         target_scores_sum = max(cls_targets.sum(), 1)
         n_target_scores_sum = max(n_cls_targets.sum(), 1)
         _, xy_loss = self.xy_loss(pred_pos_distri, pred_pos, target_pos_distri, cls_targets, target_scores_sum, mask_has_ball)
         _, nxny_loss = self.xy_loss(pred_pos_distri, n_pred_pos, n_target_pos_distri, n_cls_targets, n_target_scores_sum, mask_has_next_ball)
-        
+        loss[0] = xy_loss + nxny_loss
         cls_targets = cls_targets.to(pred_scores.dtype)
 
         self.confusion_class.confusion_matrix(pred_scores.sigmoid(), cls_targets)
