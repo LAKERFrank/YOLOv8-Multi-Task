@@ -886,7 +886,7 @@ class TrackNetValidator(BaseValidator):
                         label=label,
                         save_dir=self.metrics.save_dir,
                         stride = self.stride,
-                        next=False,
+                        next=True,
                         loss=loss
                         ) 
             
@@ -948,30 +948,30 @@ class TrackNetValidator(BaseValidator):
                 #             )
 
         # 計算 conf 的 confusion matrix
-        pred_binary = (pred_probs >= conf_threshold)
-        self.pred_ball_count += pred_binary.int().sum()
+        # pred_binary = (pred_probs >= conf_threshold)
+        # self.pred_ball_count += pred_binary.int().sum()
 
-        unique_classes = torch.unique(cls_targets.bool())
-        if len(unique_classes) == 1:
-            if unique_classes.item() == 1:
-                # All targets are 1 (positive class)
-                self.conf_TP += (pred_binary == 1).sum().item()  # Count of true positives
-                self.conf_FN += (pred_binary == 0).sum().item()  # Count of false negatives
-                self.conf_TN += 0  # No true negatives
-                self.conf_FP += 0  # No false positives
-            else:
-                # All targets are 0 (negative class)
-                self.conf_TN += (pred_binary == 0).sum().item()  # Count of true negatives
-                self.conf_FP += (pred_binary == 1).sum().item()  # Count of false positives
-                self.conf_TP += 0  # No true positives
-                self.conf_FN += 0  # No false negatives
-        else:
-            # Compute confusion matrix normally
-            conf_matrix = confusion_matrix(cls_targets.bool().cpu().numpy(), pred_binary.cpu().numpy())
-            self.conf_TN += conf_matrix[0][0]
-            self.conf_FP += conf_matrix[0][1]
-            self.conf_FN += conf_matrix[1][0]
-            self.conf_TP += conf_matrix[1][1]
+        # unique_classes = torch.unique(cls_targets.bool())
+        # if len(unique_classes) == 1:
+        #     if unique_classes.item() == 1:
+        #         # All targets are 1 (positive class)
+        #         self.conf_TP += (pred_binary == 1).sum().item()  # Count of true positives
+        #         self.conf_FN += (pred_binary == 0).sum().item()  # Count of false negatives
+        #         self.conf_TN += 0  # No true negatives
+        #         self.conf_FP += 0  # No false positives
+        #     else:
+        #         # All targets are 0 (negative class)
+        #         self.conf_TN += (pred_binary == 0).sum().item()  # Count of true negatives
+        #         self.conf_FP += (pred_binary == 1).sum().item()  # Count of false positives
+        #         self.conf_TP += 0  # No true positives
+        #         self.conf_FN += 0  # No false negatives
+        # else:
+        #     # Compute confusion matrix normally
+        #     conf_matrix = confusion_matrix(cls_targets.bool().cpu().numpy(), pred_binary.cpu().numpy())
+        #     self.conf_TN += conf_matrix[0][0]
+        #     self.conf_FP += conf_matrix[0][1]
+        #     self.conf_FN += conf_matrix[1][0]
+        #     self.conf_TP += conf_matrix[1][1]
         
     def finalize_metrics(self):
         """Calculate final metrics for this validation run."""
