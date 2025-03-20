@@ -799,26 +799,60 @@ class FocalLossWithMask(nn.Module):
         super().__init__()
 
     # OHEM
-    def online_hard_example_mining(self, loss, labels, negative_ratio=3.0):
+    def online_hard_example_mining(self, loss, labels, negative_ratio=3.0, strides=[8, 16, 32], num_groups=10):
         """
-        Hard Negative Mining: Selects the hardest negative examples based on the loss.
+        Hard Negative Mining: Selects the hardest negative examples for each feature map (P3, P4, P5).
         """
-        pos_mask = labels > 0
-        num_pos = pos_mask.sum(dim=1, keepdim=True)
-        num_neg = negative_ratio * num_pos
+        # 處理 loss 和 labels 的維度
+        loss = loss.squeeze(-1)  # 變成 [16, 84000]
+        labels = labels.squeeze(-1)  # 變成 [16, 84000]
 
-        loss_for_sort = loss.clone()
-        loss_for_sort[pos_mask] = float('-inf')
-        _, indices = loss_for_sort.sort(dim=1, descending=True)
+        # 計算正樣本 mask
+        pos_mask = labels > 0  # 形狀 [16, 84000]
+        num_pos = pos_mask.sum(dim=1, keepdim=True)  # 每個 batch 的正樣本數量，形狀 [16, 1]
 
+        # 初始化負樣本 mask
         neg_mask = torch.zeros_like(labels, dtype=torch.bool)
-        for i in range(loss.size(0)):  
-            num_neg_samples = int(num_neg[i].item()) if int(num_neg[i].item()) != 0 else int(negative_ratio)
-            # num_neg_samples = 640
-            # num_neg_samples = int(num_neg[i].item())
-            neg_mask[i, indices[i, :num_neg_samples]] = True 
 
-        return pos_mask | neg_mask
+        # 針對每個尺度 (P3, P4, P5) 進行獨立排序
+        start_idx = 0
+        for stride in strides:
+            cell_num = 640 // stride  # P3=80, P4=40, P5=20
+            num_cells = cell_num * cell_num  # 該尺度下的總 cell 數
+            total_anchors_per_scale = num_cells * num_groups  # 需要考慮 num_groups
+
+            # 確保不超過 loss.shape[1]，避免索引錯誤
+            end_idx = min(start_idx + total_anchors_per_scale, loss.shape[1])
+
+            # 針對該尺度取對應 loss, labels
+            loss_part = loss[:, start_idx:end_idx]  # [16, total_anchors_per_scale]
+            labels_part = labels[:, start_idx:end_idx]  # [16, total_anchors_per_scale]
+            pos_mask_part = pos_mask[:, start_idx:end_idx]  # [16, total_anchors_per_scale]
+
+            # 針對該尺度計算 num_pos_per_scale
+            num_pos_per_scale = pos_mask_part.sum(dim=1, keepdim=True)  # [16, 1]
+            num_neg_per_scale = negative_ratio * num_pos_per_scale  # 計算負樣本數量
+
+            # 處理邊界情況，確保 num_neg_per_scale 不為 0 或超出範圍
+            num_neg_per_scale = torch.clamp(num_neg_per_scale, min=negative_ratio, max=total_anchors_per_scale).long()
+
+            # 對當前尺度的 loss 進行排序
+            loss_for_sort = loss_part.clone()
+            loss_for_sort[labels_part > 0] = float('-inf')  # 忽略正樣本
+            _, indices = loss_for_sort.sort(dim=1, descending=True)  # [16, total_anchors_per_scale]
+
+            # 選擇 hardest negatives
+            for i in range(loss.shape[0]):  # batch 維度
+                num_neg_samples = num_neg_per_scale[i].item()  # 取出該 batch 內的負樣本數量
+                neg_mask[i, start_idx:end_idx][indices[i, :num_neg_samples]] = True  # 設定 hardest negatives
+
+            # 更新起始索引
+            start_idx = end_idx  
+
+        # 恢復原始形狀 [16, 84000, 1]
+        return (pos_mask | neg_mask).unsqueeze(-1)
+
+
 
     def forward(self, pred, label, gamma=2, alpha=0.75, negative_ratio=3.0):
         """Calculates and updates confusion matrix for object detection/classification tasks."""
@@ -849,15 +883,15 @@ class FocalLossWithMask(nn.Module):
         FP_mask = (pred_prob >= 0.5) & (label == 0)  # False Positive
 
         # Combine the masks (we only care about TP, FN, FP)
-        # relevant_mask = self.online_hard_example_mining(loss, label, negative_ratio)
+        relevant_mask = self.online_hard_example_mining(loss, label, negative_ratio)
 
         pos_no = label.sum() if label.sum() != 0 else 1
 
         w = (alpha/(1-alpha))
 
-        # loss = loss * relevant_mask.float()
+        loss = loss * relevant_mask.float()
 
-        loss[FN_mask] *= 10
+        # loss[FN_mask] *= 10
         # loss[FP_mask & ~may_has_ball] *= negative_ratio*15*w
         # loss[TP_mask] *= negative_ratio*10
         # loss[mask_hit_ball] *= negative_ratio*10*w*3
@@ -870,7 +904,7 @@ class FocalLossWithMask(nn.Module):
         loss_sum = (loss).sum()
         num_pos = label.sum()  # 計算正樣本數
         num_all = label.numel()  # 計算總樣本數
-        loss = loss_sum / max(num_pos + 0.1 * num_all, 1)
+        loss = loss_sum / max(relevant_mask.float().sum(), 1)
         # count = (pred_prob >= 0.5) | (label == 1)
         # loss = loss_sum / max(count.sum(), 1) if loss_sum != 0 else 0
 
