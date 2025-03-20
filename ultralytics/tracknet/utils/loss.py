@@ -857,7 +857,7 @@ class FocalLossWithMask(nn.Module):
 
         # loss = loss * relevant_mask.float()
 
-        loss[FN_mask] *= 200
+        loss[FN_mask] *= 10
         # loss[FP_mask & ~may_has_ball] *= negative_ratio*15*w
         # loss[TP_mask] *= negative_ratio*10
         # loss[mask_hit_ball] *= negative_ratio*10*w*3
@@ -868,7 +868,9 @@ class FocalLossWithMask(nn.Module):
 
         # Apply the mask to the loss
         loss_sum = (loss).sum()
-        loss = loss_sum / max(label.sum(), 1) if loss_sum != 0 else 0
+        num_pos = label.sum()  # 計算正樣本數
+        num_all = label.numel()  # 計算總樣本數
+        loss = loss_sum / max(num_pos + 0.1 * num_all, 1)
         # count = (pred_prob >= 0.5) | (label == 1)
         # loss = loss_sum / max(count.sum(), 1) if loss_sum != 0 else 0
 
