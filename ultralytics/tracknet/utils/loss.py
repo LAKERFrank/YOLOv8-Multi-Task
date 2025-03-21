@@ -288,8 +288,11 @@ class TrackNetLoss:
                             next_t_x = (grid_x*stride+center*stride-next_gtx)*8/stride
                             next_t_y = (grid_y*stride+center*stride-next_gty)*8/stride
                             if abs(next_t_x) >= self.reg_max - 1 or abs(next_t_y) >= self.reg_max - 1:
-                                exceed_count += 1
                                 print(f"warning 超過可預測範圍: stride: {stride} next_t_x: {next_t_x}, next_t_y: {next_t_y}")
+                                target_pos_distri[idx, target_idx, grid_y, grid_x, 4] = pred_pos_distri[idx, target_idx*grid_y*grid_x, 4]
+                                target_pos_distri[idx, target_idx, grid_y, grid_x, 5] = pred_pos_distri[idx, target_idx*grid_y*grid_x, 5]
+                                target_pos_distri[idx, target_idx, grid_y, grid_x, 6] = pred_pos_distri[idx, target_idx*grid_y*grid_x, 6]
+                                target_pos_distri[idx, target_idx, grid_y, grid_x, 7] = pred_pos_distri[idx, target_idx*grid_y*grid_x, 7]
                                 continue
                             if next_t_x >= 0:
                                 target_pos_distri[idx, target_idx, grid_y, grid_x, 4] = clamp(next_t_x, 0, self.reg_max-1 - 0.01)
