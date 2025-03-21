@@ -292,7 +292,7 @@ class TrackNetLoss:
                             next_t_y = (grid_y*stride+center*stride-next_gty)*8/stride
 
                             if abs(next_t_x) >= self.reg_max - 1 or abs(next_t_y) >= self.reg_max - 1:
-                                print(f"warning 超過可預測範圍: stride: {stride} next_t_x: {next_t_x}, next_t_y: {next_t_y}")
+                                # print(f"warning 超過可預測範圍: stride: {stride} next_t_x: {next_t_x}, next_t_y: {next_t_y}")
                                 continue
 
                             mask_has_next_ball[idx, target_idx, grid_y, grid_x] = 1
