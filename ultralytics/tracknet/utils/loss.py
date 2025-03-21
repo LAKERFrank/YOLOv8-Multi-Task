@@ -260,70 +260,59 @@ class TrackNetLoss:
 
             for idx, _ in enumerate(batch_target):
                 for target_idx, target in enumerate(batch_target[idx]):
+                    if target[1] != 1:
+                        continue
+
                     grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
 
                     if grid_x >= cell_num or grid_y >= cell_num:
                         continue
-
                     abs_idx = offset + grid_y * cell_num + grid_x  # Absolute position in combined tensor
-                    if target[1] == 1:
-                        mask_has_ball[idx, target_idx, abs_idx] = 1
 
-                        center = 0.5
-                        def clamp(x, min_value, max_value):
-                            return max(min_value, min(x, max_value))
+                    def clamp(x):
+                        return max(0, min(x, self.reg_max - 1 - 0.01))
 
-                        t_x = (grid_x * stride + center * stride - target[2])*8/stride
-                        t_y = (grid_y * stride + center * stride - target[3])*8/stride
-                        if abs(t_x) >= self.reg_max - 1 or abs(t_y) >= self.reg_max - 1:
-                            print(f"warning 超過可預測範圍: t_x: {t_x}, t_y: {t_y}")
+                    center = 0.5
 
-                        if t_x >= 0:
-                            target_pos_distri[idx, target_idx, abs_idx, 0] = clamp(t_x, 0, self.reg_max - 1 - 0.01)
-                        else:
-                            target_pos_distri[idx, target_idx, abs_idx, 1] = clamp(-t_x, 0, self.reg_max - 1 - 0.01)
+                    # 計算 current target
+                    mask_has_ball[idx, target_idx, abs_idx] = 1
+                    cls_targets[idx, target_idx, abs_idx] = 1
+                    t_x = (grid_x * stride + center * stride - target[2])*8/stride
+                    t_y = (grid_y * stride + center * stride - target[3])*8/stride
+                    if abs(t_x) >= self.reg_max - 1 or abs(t_y) >= self.reg_max - 1:
+                        print(f"warning 超過可預測範圍: t_x: {t_x}, t_y: {t_y}")
 
-                        if t_y >= 0:
-                            target_pos_distri[idx, target_idx, abs_idx, 2] = clamp(t_y, 0, self.reg_max - 1 - 0.01)
-                        else:
-                            target_pos_distri[idx, target_idx, abs_idx, 3] = clamp(-t_y, 0, self.reg_max - 1 - 0.01)
+                    target_pos_distri[idx, target_idx, abs_idx, 0 if t_x >= 0 else 1] = clamp(abs(t_x))
+                    target_pos_distri[idx, target_idx, abs_idx, 2 if t_y >= 0 else 3] = clamp(abs(t_y))
+                    
+                    # 計算 current next target，最後一顆球不計算，因為看不到下一球
+                    if (target[4] != 0 or target[5] != 0) and target_idx < len(batch_target[idx]) - 1:
+                        next_gtx, next_gty = target[4], target[5]
 
-                        cls_targets[idx, target_idx, abs_idx] = 1
-                        
-                        if (target[4] != 0 or target[5] != 0) and target_idx < len(batch_target[idx]) - 1:
-                            next_gtx, next_gty = target[4], target[5]
+                        next_t_x = (grid_x * stride + center * stride - next_gtx)*8/stride
+                        next_t_y = (grid_y * stride + center * stride - next_gty)*8/stride
+                        if abs(next_t_x) >= self.reg_max - 1 or abs(next_t_y) >= self.reg_max - 1:
+                            exceed_count += 1
+                            # print(f"warning 超過可預測範圍: stride: {stride} next_t_x: {next_t_x}, next_t_y: {next_t_y}")
+                            continue
 
-                            next_t_x = (grid_x * stride + center * stride - next_gtx)*8/stride
-                            next_t_y = (grid_y * stride + center * stride - next_gty)*8/stride
-                            if abs(next_t_x) >= self.reg_max - 1 or abs(next_t_y) >= self.reg_max - 1:
-                                exceed_count += 1
-                                # print(f"warning 超過可預測範圍: stride: {stride} next_t_x: {next_t_x}, next_t_y: {next_t_y}")
-                                continue
-
-                            mask_has_next_ball[idx, target_idx, abs_idx] = 1
-                            n_cls_targets[idx, target_idx, abs_idx] = 1
-
-                            if next_t_x >= 0:
-                                n_target_pos_distri[idx, target_idx, abs_idx, 0] = clamp(next_t_x, 0, self.reg_max - 1 - 0.01)
-                            else:
-                                n_target_pos_distri[idx, target_idx, abs_idx, 1] = clamp(-next_t_x, 0, self.reg_max - 1 - 0.01)
-
-                            if next_t_y >= 0:
-                                n_target_pos_distri[idx, target_idx, abs_idx, 2] = clamp(next_t_y, 0, self.reg_max - 1 - 0.01)
-                            else:
-                                n_target_pos_distri[idx, target_idx, abs_idx, 3] = clamp(-next_t_y, 0, self.reg_max - 1 - 0.01)
+                        mask_has_next_ball[idx, target_idx, abs_idx] = 1
+                        n_cls_targets[idx, target_idx, abs_idx] = 1
+                        n_target_pos_distri[idx, target_idx, abs_idx, 0 if next_t_x >= 0 else 1] = clamp(abs(next_t_x))
+                        n_target_pos_distri[idx, target_idx, abs_idx, 2 if next_t_y >= 0 else 3] = clamp(abs(next_t_y))
 
             offset += cell_num * cell_num  # Move to next scale
-
+        
         # print (f"exceed_count: {exceed_count}")
-        # Flatten tensors for loss computation
-        target_pos_distri = target_pos_distri.view(b, self.num_groups * total_cells, feature_dim)
-        cls_targets = cls_targets.view(b, self.num_groups * total_cells, 1)
-        mask_has_ball = mask_has_ball.view(b, self.num_groups * total_cells).bool()
 
-        n_target_pos_distri = n_target_pos_distri.view(b, self.num_groups * total_cells, feature_dim)
-        n_cls_targets = n_cls_targets.view(b, self.num_groups * total_cells, 1)
-        mask_has_next_ball = mask_has_next_ball.view(b, self.num_groups * total_cells).bool()
+        # Flatten tensors for loss computation
+        target_pos_distri = target_pos_distri.permute(0, 2, 1, 3).contiguous().view(b, self.num_groups * total_cells, feature_dim)
+        cls_targets = cls_targets.permute(0, 2, 1).contiguous().view(b, self.num_groups * total_cells, 1)
+        mask_has_ball = mask_has_ball.permute(0, 2, 1).contiguous().view(b, self.num_groups * total_cells).bool()
+        
+        n_target_pos_distri = n_target_pos_distri.permute(0, 2, 1, 3).contiguous().view(b, self.num_groups * total_cells, feature_dim)
+        n_cls_targets = n_cls_targets.permute(0, 2, 1).contiguous().view(b, self.num_groups * total_cells, 1)
+        mask_has_next_ball = mask_has_next_ball.permute(0, 2, 1).contiguous().view(b, self.num_groups * total_cells).bool()
         
         loss = torch.zeros(2, device=self.device)
         target_scores_sum = max(cls_targets.sum(), 1)
