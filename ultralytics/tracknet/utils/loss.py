@@ -790,7 +790,7 @@ class FocalLossWithMask(nn.Module):
         super().__init__()
 
     # OHEM
-    def online_hard_example_mining(self, loss, labels, negative_ratio=3.0):
+    def top_k_sampling(self, loss, labels, negative_ratio=3.0):
         """
         Hard Negative Mining: Selects the hardest negative examples based on the loss.
         """
@@ -840,7 +840,7 @@ class FocalLossWithMask(nn.Module):
         FP_mask = (pred_prob >= 0.5) & (label == 0)  # False Positive
 
         # Combine the masks (we only care about TP, FN, FP)
-        relevant_mask = self.online_hard_example_mining(loss, label, negative_ratio)
+        relevant_mask = self.top_k_sampling(loss, label, negative_ratio)
 
         pos_no = label.sum() if label.sum() != 0 else 1
 
