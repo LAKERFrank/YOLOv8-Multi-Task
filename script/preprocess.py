@@ -61,30 +61,28 @@ def compute_speed(df):
         speeds.append(spd)
     return speeds
 
-def filter_static_segments(df, speed_threshold=5.0, min_static_frames=5, smoothing_window=5):
+def filter_static_segments(df, speed_threshold=5.0, min_static_frames=5, smoothing_window=5, static_radius=5):
     """
-    1. 只保留 Visibility>0 的 frame
-    2. 平滑
-    3. 計算速度
-    4. 從前後端偵測長段靜止並移除
+    1. 先只保留 Visibility > 0 的 frame
+    2. 平滑處理與計算速度，標記速度小的 frame 為 is_static
+    3. 依照原邏輯抓出候選靜止區段（連續 is_static）
+       接著以候選區段的 pivot (前端取最後一筆、後端取第一筆) 為基準，
+       檢查候選區段內連續 frame 與 pivot 的歐式距離是否均在 static_radius 內，
+       若達到 min_static_frames 才視為真正靜止並移除該區段。
     回傳: (filtered_df, original_df)
     """
-    # 先篩除不可見
+    # 先篩除 Visibility 為 0 的 frame
     df = df[df['Visibility'] > 0].copy()
     df.reset_index(drop=True, inplace=True)
-
-    # 若整段都不可見或太短, 直接回傳空
     if len(df) == 0:
         return df, df
 
-    # 平滑
+    # 平滑與計算速度
     df = smooth_positions(df, smoothing_window)
-
-    # 速度
     df['speed'] = compute_speed(df)
     df['is_static'] = df['speed'] < speed_threshold
 
-    # 前端靜止
+    # 前端候選區段
     front_static_count = 0
     for is_static in df['is_static']:
         if is_static:
@@ -92,7 +90,23 @@ def filter_static_segments(df, speed_threshold=5.0, min_static_frames=5, smoothi
         else:
             break
 
-    # 後端靜止
+    new_front_count = 0
+    if front_static_count > 0:
+        # 選擇前端候選區段最後一筆作為 pivot
+        pivot_front = df.iloc[0]
+        once = True
+        for i in range(front_static_count):
+            dist = math.sqrt((df.loc[i, 'X'] - pivot_front['X'])**2 + (df.loc[i, 'Y'] - pivot_front['Y'])**2)
+            if dist <= static_radius:
+                new_front_count += 1
+            else:
+                if once and i < front_static_count/2:
+                    pivot_front = df.iloc[i]
+                    once = False
+                else:
+                    break
+
+    # 後端候選區段
     back_static_count = 0
     for is_static in reversed(df['is_static'].tolist()):
         if is_static:
@@ -100,8 +114,25 @@ def filter_static_segments(df, speed_threshold=5.0, min_static_frames=5, smoothi
         else:
             break
 
-    start_idx = front_static_count if front_static_count >= min_static_frames else 0
-    end_idx = len(df) - back_static_count if back_static_count >= min_static_frames else len(df)
+    new_back_count = 0
+    if back_static_count > 0:
+        # 選擇後端候選區段第一筆作為 pivot
+        pivot_back = df.iloc[len(df) - 1]
+        once = True
+        for i in reversed(range(len(df) - back_static_count, len(df))):
+            dist = math.sqrt((df.loc[i, 'X'] - pivot_back['X'])**2 + (df.loc[i, 'Y'] - pivot_back['Y'])**2)
+            if dist <= static_radius:
+                new_back_count += 1
+            else:
+                if once and i > back_static_count/2:
+                    pivot_back = df.iloc[i]
+                    once = False
+                else:
+                    break
+
+    # 判斷是否滿足 min_static_frames 的要求，否則不移除
+    start_idx = new_front_count if front_static_count >= min_static_frames else 0
+    end_idx = len(df) - new_back_count if back_static_count >= min_static_frames else len(df)
 
     filtered_df = df.iloc[start_idx:end_idx].copy()
     filtered_df.reset_index(drop=True, inplace=True)
@@ -110,10 +141,11 @@ def filter_static_segments(df, speed_threshold=5.0, min_static_frames=5, smoothi
 
 def main():
     input_folder = r'/Users/bartek/git/BartekTao/datasets/test_static_ball'
-    speed_threshold = 5.0
-    min_static_frames = 20
+    speed_threshold = 10.0
+    min_static_frames = 5
     smoothing_window = 1
-    max_missing_frames = 80
+    max_missing_frames = 20
+    static_radius = 10.0
 
     csv_files = glob.glob(os.path.join(input_folder, "*_ball.csv"))
     for csv_file in csv_files:
@@ -135,7 +167,8 @@ def main():
                 seg_df,
                 speed_threshold=speed_threshold,
                 min_static_frames=min_static_frames,
-                smoothing_window=smoothing_window
+                smoothing_window=smoothing_window,
+                static_radius=static_radius
             )
             # 在這裡也可以幫 filtered_df 加上 segment_id
             filtered_df['segment_id'] = seg_id
