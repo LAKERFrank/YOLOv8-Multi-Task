@@ -22,31 +22,7 @@ class TrackNetConfigurableDataset(Dataset):
         self.num_input = num_input
         self.samples = []
         self.prefix = prefix
-        self.path_counts = { 
-            "match_1" : 100, 
-            "match_2" : 20, 
-            "blion_tracknet_partial": 473,
-            "profession_match_1" : 5000, 
-            "profession_match_2" : 4000, 
-            "profession_match_3" : 4000,
-            "profession_match_4" : 5000,
-            "profession_match_5" : 1000,
-            "profession_match_6" : 1000,
-            "profession_match_7" : 1000,
-            "profession_match_8" : 1000,
-            "profession_match_9" : 1000,
-            "profession_match_10" : 1000,
-            "profession_match_11" : 1000,
-            "profession_match_12" : 1000,
-            "profession_match_13" : 1000,
-            "profession_match_14" : 1000,
-            "profession_match_15" : 1000,
-            "profession_match_16" : 1000,
-            "profession_match_17" : 1000,
-            "profession_match_18" : 1000,
-            "profession_match_19" : 1000,
-            "profession_match_20" : 1000,
-            }
+        self.path_counts = {f"profession_match_{i}": 5000 for i in range(1, 30)}
 
         self.idx = set()
 
@@ -164,59 +140,59 @@ class TrackNetConfigurableDataset(Dataset):
                                     "img_files": frames,
                                     "target": target
                                 })
-                # 降低 FPS 120 => 40
-                for i in range(min_len - (self.num_input*3-1)):
+                # # 降低 FPS 120 => 40
+                # for i in range(min_len - (self.num_input*3-1)):
 
-                    frames = img_files[i: i + self.num_input*3: 3]
+                #     frames = img_files[i: i + self.num_input*3: 3]
 
-                    target = ball_trajectory_df.iloc[i: i + self.num_input*3: 3].values
-                    target = self.transform_coordinates(target, width, height)
+                #     target = ball_trajectory_df.iloc[i: i + self.num_input*3: 3].values
+                #     target = self.transform_coordinates(target, width, height)
 
-                    # Avoid invalid data
-                    if len(frames) == self.num_input and len(target) == self.num_input:
-                        npy_path = self.img_cache_dir(match_name, video_name, frames)
+                #     # Avoid invalid data
+                #     if len(frames) == self.num_input and len(target) == self.num_input:
+                #         npy_path = self.img_cache_dir(match_name, video_name, frames)
 
-                        self.samples.append({
-                            "match_name": match_name,
-                            "video_name": video_name,
-                            "cache_npy": npy_path,
-                            "img_files": frames,
-                            "target": target
-                        })
+                #         self.samples.append({
+                #             "match_name": match_name,
+                #             "video_name": video_name,
+                #             "cache_npy": npy_path,
+                #             "img_files": frames,
+                #             "target": target
+                #         })
 
-                        self.img_cache(match_name, video_name, frames, npy_path)
+                #         self.img_cache(match_name, video_name, frames, npy_path)
 
-                        hit_exists = np.any(target[:, 6] == 1)
-                        if hit_exists:
-                            for i in range(5):
-                                self.samples.append({
-                                    "match_name": match_name,
-                                    "video_name": video_name,
-                                    "cache_npy": npy_path,
-                                    "img_files": frames,
-                                    "target": target
-                                })
-                # 降低 FPS 120 => 30
-                for i in range(min_len - (self.num_input*4-1)):
+                #         hit_exists = np.any(target[:, 6] == 1)
+                #         if hit_exists:
+                #             for i in range(5):
+                #                 self.samples.append({
+                #                     "match_name": match_name,
+                #                     "video_name": video_name,
+                #                     "cache_npy": npy_path,
+                #                     "img_files": frames,
+                #                     "target": target
+                #                 })
+                # # 降低 FPS 120 => 30
+                # for i in range(min_len - (self.num_input*4-1)):
 
-                    frames = img_files[i: i + self.num_input*4: 4]
+                #     frames = img_files[i: i + self.num_input*4: 4]
 
-                    target = ball_trajectory_df.iloc[i: i + self.num_input*4: 4].values
-                    target = self.transform_coordinates(target, width, height)
+                #     target = ball_trajectory_df.iloc[i: i + self.num_input*4: 4].values
+                #     target = self.transform_coordinates(target, width, height)
 
-                    # Avoid invalid data
-                    if len(frames) == self.num_input and len(target) == self.num_input:
-                        npy_path = self.img_cache_dir(match_name, video_name, frames)
+                #     # Avoid invalid data
+                #     if len(frames) == self.num_input and len(target) == self.num_input:
+                #         npy_path = self.img_cache_dir(match_name, video_name, frames)
 
-                        self.samples.append({
-                            "match_name": match_name,
-                            "video_name": video_name,
-                            "cache_npy": npy_path,
-                            "img_files": frames,
-                            "target": target
-                        })
+                #         self.samples.append({
+                #             "match_name": match_name,
+                #             "video_name": video_name,
+                #             "cache_npy": npy_path,
+                #             "img_files": frames,
+                #             "target": target
+                #         })
 
-                        self.img_cache(match_name, video_name, frames, npy_path)
+                #         self.img_cache(match_name, video_name, frames, npy_path)
                 
                 self.path_counts[match_name] = self.path_counts[match_name] - min_len
                 pbar.update(min_len)
