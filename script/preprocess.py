@@ -145,7 +145,7 @@ def main():
     min_static_frames = 5
     smoothing_window = 1
     max_missing_frames = 20
-    static_radius = 10.0
+    static_radius = 6.0
 
     csv_files = glob.glob(os.path.join(input_folder, "*_ball.csv"))
     for csv_file in csv_files:
