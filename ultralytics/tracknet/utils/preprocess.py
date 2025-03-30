@@ -135,7 +135,7 @@ def split_into_segments(df, max_missing_frames=30):
 
     return segments
 
-def preprocess_csvV2(csv_path, speed_threshold=10.0, min_static_frames=5, max_missing_frames=20, static_radius=6.0):
+def preprocess_csvV2(csv_path, speed_threshold=10.0, min_static_frames=5, max_missing_frames=20, static_radius=8.0):
     df_all = pd.read_csv(csv_path)
 
     if 'Visibility' not in df_all.columns:
