@@ -200,6 +200,7 @@ def plot_static_removal_comparison(df, save_path=None):
 
     for idx, seg_id in enumerate(segment_ids):
         seg = df[df['segment_id'] == seg_id]
+        seg = seg[~((seg['X'] == 0) & (seg['Y'] == 0))]
         seg_kept = seg[~seg['is_removed']]
         seg_removed = seg[seg['is_removed']]
 
