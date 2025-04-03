@@ -11,7 +11,7 @@ import torch.nn.functional as F
 from tqdm import tqdm
 from functools import lru_cache
 from glob import glob
-from ultralytics.tracknet.utils.preprocess import preprocess_csvV3
+from ultralytics.tracknet.utils.preprocess import preprocess_csvV4
 
 class TrackNetValDataset(Dataset):
     def __init__(self, root_dir, num_input=10, transform=None, prefix=''):
@@ -156,7 +156,7 @@ class TrackNetValDataset(Dataset):
             raise Exception("File corrupted: " + path)
 
     def __preprocess_csv(self, csv_file):
-        return preprocess_csvV3(csv_file)
+        return preprocess_csvV4(csv_file)
     
     def __len__(self):
         return len(self.samples)

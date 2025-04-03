@@ -135,6 +135,94 @@ def split_into_segments(df, max_missing_frames=30):
 
     return segments
 
+def compute_motion_score(xy_seq):
+    xy = np.array(xy_seq)
+    if np.any(np.isnan(xy)):
+        return 0.0
+    max_disp = np.max(np.linalg.norm(xy - xy[0], axis=1))
+    speeds = np.linalg.norm(xy[1:] - xy[:-1], axis=1)
+    mean_speed = np.mean(speeds)
+    coord_variance = np.var(xy[:, 0]) + np.var(xy[:, 1])
+    path_length = np.sum(speeds)
+    motion_score = (
+        0.8 * max_disp +
+        1.0 * mean_speed +
+        0.01 * coord_variance +    # 強縮放，避免爆炸
+        0.8 * path_length
+    )
+    return motion_score
+
+def sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+def preprocess_csv_per_frame_motion_filter_with_padding_v2(
+    csv_path,
+    window_size=10,
+    motion_score_threshold=40.0,
+    min_visible_in_window=7
+):
+    """
+    幀級靜止球過濾版本（最終版）：對每一幀根據其周圍 window_size 幀計算 motion score，
+    若低於 threshold 則將該幀 Visibility 改為 0。
+    使用 padding 補齊邊界不足的幀。
+    """
+    df = pd.read_csv(csv_path)
+
+    if 'Visibility' not in df.columns or 'X' not in df.columns or 'Y' not in df.columns:
+        raise ValueError("CSV 欄位缺少必要資訊")
+    df['nX'] = df['X'].shift(-1).fillna(df['X'])
+    df['nY'] = df['Y'].shift(-1).fillna(df['Y'])
+
+    if 'Event' in df.columns:
+        df['hit'] = ((df['Event'] == 1) | (df['Event'] == 2)).astype(int)
+    else:
+        df['hit'] = 0
+
+    half_w = window_size // 2
+    motion_scores = np.zeros(len(df))
+    removed_mask = np.zeros(len(df), dtype=bool)
+
+    for i in range(len(df)):
+        start = max(i - half_w, 0)
+        end = min(i + half_w + 1, len(df))
+        segment = df.iloc[start:end].copy()
+
+        # 邊界補值（使用邊界幀複製填滿）
+        if len(segment) < window_size:
+            pad_len = window_size - len(segment)
+            if i < half_w:
+                pad_rows = pd.concat([segment.iloc[[0]]] * pad_len, ignore_index=True)
+                segment = pd.concat([pad_rows, segment], ignore_index=True)
+            else:
+                pad_rows = pd.concat([segment.iloc[[-1]]] * pad_len, ignore_index=True)
+                segment = pd.concat([segment, pad_rows], ignore_index=True)
+
+        if segment['Visibility'].sum() < min_visible_in_window:
+            continue
+
+        xy_seq = list(zip(segment['X'], segment['Y']))
+        motion_scores[i] = compute_motion_score(xy_seq)
+        if motion_scores[i] < motion_score_threshold and df.loc[i, 'Visibility'] == 1:
+            removed_mask[i] = True
+
+    df['motion_score'] = motion_scores
+    df['static_ball'] = removed_mask
+
+    return df
+
+def preprocess_csvV4(csv_path):
+    df_filtered = preprocess_csv_per_frame_motion_filter_with_padding_v2(csv_path, motion_score_threshold=25.0)
+    plot_visibility_removed_points_2d(df_filtered, save_path=convert_to_static_removal_path(csv_path))
+    
+    df_filtered.loc[df_filtered['static_ball'], 'Visibility'] = 0  # 執行靜止點過濾
+    df_filtered.loc[df_filtered['static_ball'], 'hit'] = 0  # 執行靜止點過濾
+
+    df_filtered = df_filtered.drop(columns=['static_ball', 'motion_score',
+                                            'Fast', 'Event', 'Z', 'Shot', 'player_X', 
+                                            'player_Y', 'prev_hit', 'next_hit', 
+                                            'Timestamp'], errors='ignore')
+    return df_filtered
+
 def is_static_shuttlecock(
     xy_seq,
     max_disp_threshold=25.0,
@@ -371,4 +459,4 @@ if __name__ == "__main__":
     csv_files = [os.path.join(csv_file, f) for f in os.listdir(csv_file) if f.endswith('.csv')]
     for csv_file in csv_files:
         print(f"Processing {csv_file}...")
-        df = preprocess_csvV3(csv_file)
+        df = preprocess_csvV4(csv_file)
