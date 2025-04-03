@@ -135,6 +135,143 @@ def split_into_segments(df, max_missing_frames=30):
 
     return segments
 
+def is_static_shuttlecock(
+    xy_seq,
+    max_disp_threshold=25.0,
+    mean_speed_threshold=3.0,
+    variance_threshold=50.0,
+    path_length_threshold=30.0
+):
+    """
+    判斷一段 shuttlecock 是否為靜止狀態。
+
+    Parameters:
+    - xy_seq: List of (x, y), 長度固定為 10
+    - *_threshold: 靜止判定門檻，單位為像素
+
+    Returns:
+    - True 表示判定為靜止球（可將 Visibility=1 改為 0）
+    """
+    xy = np.array(xy_seq)  # shape (10, 2)
+    if np.any(np.isnan(xy)):
+        return False
+
+    max_disp = np.max(np.linalg.norm(xy - xy[0], axis=1))
+    speeds = np.linalg.norm(xy[1:] - xy[:-1], axis=1)
+    mean_speed = np.mean(speeds)
+    coord_variance = np.var(xy[:, 0]) + np.var(xy[:, 1])
+    path_length = np.sum(speeds)
+
+    return (
+        max_disp < max_disp_threshold and
+        mean_speed < mean_speed_threshold and
+        coord_variance < variance_threshold and
+        path_length < path_length_threshold
+    )
+
+def preprocess_csv_static_filter_voting(
+    csv_path,
+    max_disp_threshold=25.0,
+    mean_speed_threshold=3.0,
+    variance_threshold=50.0,
+    path_length_threshold=30.0,
+    static_ratio_threshold=0.8,
+    min_visible_frames=7,
+    min_vote_support=3
+):
+    """
+    處理整份 shuttlecock label CSV，根據移動特徵標記靜止段落為 static_ball=True。
+
+    回傳處理後的 DataFrame（含 static_score、static_ball）。
+    """
+    df = pd.read_csv(csv_path)
+
+    if 'Visibility' not in df.columns or 'X' not in df.columns or 'Y' not in df.columns:
+        raise ValueError(f"{csv_path} 缺少必要欄位")
+    df['nX'] = df['X'].shift(-1).fillna(df['X'])
+    df['nY'] = df['Y'].shift(-1).fillna(df['Y'])
+
+    if 'Event' in df.columns:
+        df['hit'] = ((df['Event'] == 1) | (df['Event'] == 2)).astype(int)
+    else:
+        df['hit'] = 0
+
+    vote_static = np.zeros(len(df), dtype=int)
+    vote_total = np.zeros(len(df), dtype=int)
+
+    for i in range(len(df) - 9):
+        segment = df.iloc[i:i+10]
+        if segment['Visibility'].sum() < min_visible_frames:
+            continue
+
+        xy_seq = list(zip(segment['X'], segment['Y']))
+        if np.isnan(xy_seq).any():
+            continue
+
+        is_static = is_static_shuttlecock(
+            xy_seq,
+            max_disp_threshold=max_disp_threshold,
+            mean_speed_threshold=mean_speed_threshold,
+            variance_threshold=variance_threshold,
+            path_length_threshold=path_length_threshold
+        )
+
+        for j in range(10):
+            if i + j < len(df):
+                vote_total[i + j] += 1
+                if is_static:
+                    vote_static[i + j] += 1
+
+    vote_ratio = vote_static / (vote_total + 1e-5)
+    static_flags = (vote_total >= min_vote_support) & (vote_ratio > static_ratio_threshold)
+
+    df['static_score'] = vote_ratio
+    df['static_ball'] = static_flags
+
+    return df
+
+def plot_visibility_removed_points_2d(df, save_path=None):
+    original_visibility_mask = df['Visibility'] == 1
+    removed_mask = original_visibility_mask & df['static_ball']
+
+    plt.figure(figsize=(8, 8))
+    ax = plt.gca()
+    ax.invert_yaxis()
+
+    plt.plot(df.loc[original_visibility_mask, 'X'], 
+             df.loc[original_visibility_mask, 'Y'], 
+             label='Trajectory (Visibility=1)', color='blue', alpha=0.6)
+
+    plt.scatter(df.loc[removed_mask, 'X'], 
+                df.loc[removed_mask, 'Y'], 
+                color='red', marker='x', label='Removed (V=1→0)', zorder=5)
+
+    plt.title("Shuttlecock (X, Y) Trajectory - Static Points Removed")
+    plt.xlabel("X Position (px)")
+    plt.ylabel("Y Position (px)")
+    plt.legend()
+    plt.grid(True)
+
+    if save_path:
+        plt.savefig(save_path, bbox_inches='tight')
+    else:
+        plt.show()
+
+
+
+def preprocess_csvV3(csv_path):
+    df_filtered = preprocess_csv_static_filter_voting(
+        csv_path=csv_path)
+    
+    plot_visibility_removed_points_2d(df_filtered, save_path=convert_to_static_removal_path(csv_path))
+
+    df_filtered.loc[df_filtered['static_ball'], 'hit'] = 0  # 執行靜止點過濾
+    df_filtered.loc[df_filtered['static_ball'], 'Visibility'] = 0  # 執行靜止點過濾
+    drop_columns = ['static_ball', 'static_score']
+    df_filtered = df_filtered.drop(columns=drop_columns, errors='ignore')
+    return df_filtered
+
+
 def preprocess_csvV2(csv_path, speed_threshold=10.0, min_static_frames=5, max_missing_frames=20, static_radius=6.0):
     df_all = pd.read_csv(csv_path)
 
@@ -226,3 +363,12 @@ def plot_static_removal_comparison(df, save_path=None):
     else:
         plt.show()
     plt.close()
+
+if __name__ == "__main__":
+    # Example usage
+    csv_file = '/Users/bartek/git/BartekTao/datasets/blion_tracknet_partial/csv/'
+    # foreach read all csv files in the directory
+    csv_files = [os.path.join(csv_file, f) for f in os.listdir(csv_file) if f.endswith('.csv')]
+    for csv_file in csv_files:
+        print(f"Processing {csv_file}...")
+        df = preprocess_csvV3(csv_file)
