@@ -256,7 +256,7 @@ def plot_visibility_removed_points_2d(df, save_path=None):
         plt.savefig(save_path, bbox_inches='tight')
     else:
         plt.show()
-
+    plt.close()
 
 
 def preprocess_csvV3(csv_path):
