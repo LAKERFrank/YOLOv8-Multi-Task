@@ -303,14 +303,14 @@ class BaseTrainer:
         conf_losses = np.log1p(conf_losses) / np.log1p(conf_losses.max() + 1e-8)
         
         # **合併 loss**
-        alpha = 0.5  # 可調參數，平衡 pos loss 和 conf loss 的影響
+        alpha = 0.3  # 可調參數，平衡 pos loss 和 conf loss 的影響
         combined_losses = alpha * pos_losses + (1 - alpha) * conf_losses
         
         # **直接標準化，不再使用 log1p**
         scaled_losses = combined_losses / (combined_losses.max() + 1e-8)
         
         # 依據每個樣本 loss 計算權重
-        lambda_factor = 2.5  # 可調參數 建議在 2-5
+        lambda_factor = 3.5  # 可調參數 建議在 2-5
         min_weight = 0.1     # 保證低 loss 樣本不被忽略
         
         weights = np.exp(lambda_factor * scaled_losses)
