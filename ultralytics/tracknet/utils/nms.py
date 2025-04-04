@@ -3,7 +3,7 @@
 import torch
 
 
-def non_max_suppression(pred_conf, pred_x, pred_y, conf_threshold=0.7, dis_tolerance=12, stride=8):
+def non_max_suppression(pred_conf, pred_x, pred_y, conf_threshold=0.5, dis_tolerance=10, stride=8):
         """
         Apply non-maximum suppression (NMS) to filter out overlapping balls based on distance.
         
@@ -17,8 +17,8 @@ def non_max_suppression(pred_conf, pred_x, pred_y, conf_threshold=0.7, dis_toler
         Returns:
         - keep (list): List of (x, y, confidence) tuples for retained detections.
         """
-        # 1. 篩選置信度 > 0.6 的 cell
-        mask = pred_conf > conf_threshold
+        # 1. 篩選置信度 >= conf_threshold 的 cell
+        mask = pred_conf >= conf_threshold
         conf_values = pred_conf[mask]
         indices = torch.nonzero(mask)
 
@@ -35,14 +35,14 @@ def non_max_suppression(pred_conf, pred_x, pred_y, conf_threshold=0.7, dis_toler
         for i in range(len(sorted_conf_values)):
 
             y_coordinates, x_coordinates = sorted_positions[i].tolist()
-            x1 = center - pred_x[y_coordinates][x_coordinates][0]+pred_x[y_coordinates][x_coordinates][1]
-            y1 = center - pred_y[y_coordinates][x_coordinates][0]+pred_y[y_coordinates][x_coordinates][1]
+            x1 = center*stride - pred_x[y_coordinates][x_coordinates][0]+pred_x[y_coordinates][x_coordinates][1]
+            y1 = center*stride - pred_y[y_coordinates][x_coordinates][0]+pred_y[y_coordinates][x_coordinates][1]
             conf = sorted_conf_values[i].item()
 
             x_coordinates *= stride
             y_coordinates *= stride
-            current_x = x_coordinates+x1*stride
-            current_y = y_coordinates+y1*stride
+            current_x = x_coordinates+x1
+            current_y = y_coordinates+y1
 
             # 只保留與所有已保留框距離大於 dis_tolerance 的框
             is_far_enough = True
@@ -53,7 +53,7 @@ def non_max_suppression(pred_conf, pred_x, pred_y, conf_threshold=0.7, dis_toler
                     break
 
             if is_far_enough:
-                keep.append((x1.item(), y1.item(), conf))
+                keep.append((current_x, current_y, conf))
                 result.append((x_coordinates/stride, y_coordinates/stride, conf))
 
         return result

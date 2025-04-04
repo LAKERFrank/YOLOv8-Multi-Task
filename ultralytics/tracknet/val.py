@@ -513,24 +513,12 @@ class TrackNetValidator(BaseValidator):
 
         self.total_loss = 0.0
         self.num_samples = 0
-        self.conf_TP = 0
-        self.conf_TN = 0
-        self.conf_FP = 0
-        self.conf_FN = 0
-        self.conf_acc = 0
         self.conf_precision = 0
         self.pos_TP = 0
         self.pos_TN = 0
         self.pos_FP = 0
         self.pos_FN = 0
         self.pos_FP_dis = 0
-        self.fast_TP = 0
-        self.hit_TP = 0
-        self.hit_FP = 0
-        self.fast_FN = 0
-        self.hit_FN = 0
-        self.fast_hit_TP = 0
-        self.fast_hit_FN = 0
         self.pos_acc = 0
         self.pos_precision = 0
         self.ball_count = 0
@@ -541,20 +529,6 @@ class TrackNetValidator(BaseValidator):
         self.feat_no = 8
         self.nc = 1
         self.no = 16*self.feat_no+self.nc
-
-        self.fast_count = 0
-        self.hit_count = 0
-        self.fast_hit_count = 0
-
-        self.target_hit_count = 0
-        self.hitV2_TP = 0  # True Positives
-        self.hitV2_FP = 0  # False Positives
-        self.hitV2_TN = 0  # True Negatives
-        self.hitV2_FN = 0  # False Negatives
-        self.hitV1_TP = 0  # True Positives
-        self.hitV1_FP = 0  # False Positives
-        self.hitV1_TN = 0  # True Negatives
-        self.hitV1_FN = 0  # False Negatives
 
         # 一顆球半徑 = 2 pixel (640*640)
         self.tolerance2 = 2.0 # 50% 距離容忍度
@@ -609,10 +583,7 @@ class TrackNetValidator(BaseValidator):
         
         mask_has_ball = torch.zeros(self.num_groups, self.cell_num, self.cell_num, device=self.device)
         cls_targets = torch.zeros(self.num_groups, self.cell_num, self.cell_num, 1, device=self.device)
-        mask_fast_ball = torch.zeros(self.num_groups, 1, device=self.device)
-        mask_hit_ball = torch.zeros(self.num_groups, 1, device=self.device)
-        mask_hit_ball_v2 = torch.zeros(self.num_groups, 1, device=self.device)
-
+        
         for target_idx, target in enumerate(batch_target):
             grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], self.stride)
             if grid_x >= 80:
@@ -622,44 +593,6 @@ class TrackNetValidator(BaseValidator):
                 print(grid_x, grid_y, offset_x, offset_y)
                 grid_y = 79
 
-            # 找出快球 => 慢球, 慢球 => 快球
-            if target_idx > 1 and target_idx < len(batch_target)-2 and \
-                batch_target[target_idx-2][1] == 1 and batch_target[target_idx][1] == 1 and batch_target[target_idx+2][1] == 1:
-                before_hit2 = [batch_target[target_idx-2][2], batch_target[target_idx-2][3]]
-                hit = [batch_target[target_idx][2], batch_target[target_idx][3]]
-                after_hit2 = [batch_target[target_idx+2][2], batch_target[target_idx+2][3]]
-
-                before_dist = calculate_dist(before_hit2, hit)
-                after_dist = calculate_dist(hit, after_hit2)
-                angle = calculate_angle(before_hit2, hit, after_hit2)
-
-                if (angle and angle > 30 and (before_dist > 10 or after_dist > 10)) or \
-                    ((before_dist > self.stride or after_dist > self.stride) and (before_dist > after_dist*2 or before_dist*2 < after_dist)):
-                    mask_hit_ball_v2[target_idx-2] = 1
-                    mask_hit_ball_v2[target_idx-1] = 1
-                    mask_hit_ball_v2[target_idx] = 1
-                    mask_hit_ball_v2[target_idx+1] = 1
-                    mask_hit_ball_v2[target_idx+2] = 1
-
-            if target_idx < len(batch_target)-1 and batch_target[target_idx+1][1] == 1 and \
-                batch_target[target_idx][1] == 1 and target[4]**2 + target[5]**2 >= self.cell_num**2:
-                mask_fast_ball[target_idx] = 1
-                mask_fast_ball[target_idx+1] = 1
-
-            if target_idx < len(batch_target)-2 \
-                and batch_target[target_idx][1] == 1 and batch_target[target_idx+1][1] == 1 \
-                and batch_target[target_idx+2][1] == 1:
-                
-                first = [batch_target[target_idx][2], batch_target[target_idx][3]]
-                second = [batch_target[target_idx+1][2], batch_target[target_idx+1][3]]
-                third = [batch_target[target_idx+2][2], batch_target[target_idx+2][3]]
-                angle = calculate_angle(first, second, third)
-                dist1 = calculate_dist(first, second)
-                dist2 = calculate_dist(second, third)
-                if angle and angle > 30 and (dist1 > 10 or dist2 > 10):
-                    mask_hit_ball[target_idx] = 1
-                    mask_hit_ball[target_idx+1] = 1
-                    mask_hit_ball[target_idx+2] = 1
             if target[1] == 1:
                 # xy
                 mask_has_ball[target_idx, grid_y, grid_x] = 1
@@ -669,11 +602,6 @@ class TrackNetValidator(BaseValidator):
         
         cls_targets = cls_targets.view(self.num_groups*self.cell_num*self.cell_num, 1)
         mask_has_ball = mask_has_ball.view(self.num_groups*self.cell_num*self.cell_num).bool()
-
-        self.fast_count += mask_fast_ball.sum()
-        self.hit_count += mask_hit_ball_v2.sum()
-        mask_fast_hit_ball = (mask_fast_ball.bool()|mask_hit_ball_v2.bool()).float()
-        self.fast_hit_count += mask_fast_hit_ball.sum()
 
         each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
@@ -700,36 +628,7 @@ class TrackNetValidator(BaseValidator):
         
         for frame_idx in range(10):
             label = ''
-            if mask_fast_ball[frame_idx] == 1:
-                label += '_fast_'
-            if mask_hit_ball[frame_idx] == 1:
-                label += '_hit_'
-            if mask_hit_ball_v2[frame_idx] == 1:
-                label += '_hitV2_'
-            if batch_target[frame_idx][6] == 1:
-                label += '_targetHit_'
-                self.target_hit_count+=1
-
-            if batch_target[frame_idx][6] == 1 and mask_hit_ball_v2[frame_idx] == 1:
-                self.hitV2_TP += 1
-            elif batch_target[frame_idx][6] == 0 and mask_hit_ball_v2[frame_idx] == 1:
-                self.hitV2_FP += 1
-            elif batch_target[frame_idx][6] == 0 and mask_hit_ball_v2[frame_idx] == 0:
-                self.hitV2_TN += 1
-            elif batch_target[frame_idx][6] == 1 and mask_hit_ball_v2[frame_idx] == 0:
-                self.hitV2_FN += 1
-
-            if batch_target[frame_idx][6] == 1 and mask_hit_ball[frame_idx] == 1:
-                self.hitV1_TP += 1
-            elif batch_target[frame_idx][6] == 0 and mask_hit_ball[frame_idx] == 1:
-                self.hitV1_FP += 1
-            elif batch_target[frame_idx][6] == 0 and mask_hit_ball[frame_idx] == 0:
-                self.hitV1_TN += 1
-            elif batch_target[frame_idx][6] == 1 and mask_hit_ball[frame_idx] == 0:
-                self.hitV1_FN += 1
             
-             
-
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
             p_cell_nx = each_pos_nx[frame_idx]
@@ -749,11 +648,13 @@ class TrackNetValidator(BaseValidator):
             
             ############# 多球 #############
 
-            ### 只拿最大值
-            preds = [(max_x, max_y, max_conf)]
+            ### max_conf 版本 ###
+            # preds = [(max_x, max_y, max_conf)]
+            ### max_conf 版本 ###
 
-            ### 拿多顆球
-            # preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, dis_tolerance=30)
+            ### nms 版本 ###
+            preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=10)
+            ### nms 版本 ###
 
             for (x, y, conf) in preds:
                 if len(metrics) > 5 :
@@ -792,6 +693,8 @@ class TrackNetValidator(BaseValidator):
             distance = torch.sqrt((pred_x - target_x) ** 2 + (pred_y - target_y) ** 2)
             
             box_color = 'red'
+
+            ### max_conf 版本 ###
             if batch_target[frame_idx][1] == 0:
                 if max_conf >= conf_threshold:
                     self.pos_FP += 1
@@ -802,33 +705,45 @@ class TrackNetValidator(BaseValidator):
                 if max_conf >= conf_threshold:
                     if distance <= self.tolerance5:
                         self.pos_TP += 1
-
-                        if mask_hit_ball_v2[frame_idx] == 1:
-                            self.hit_TP += 1
                     else:
                         self.pos_FP_dis += 1
                         self.pos_FP += 1
                         box_color = 'blue'
-
-                        if mask_hit_ball_v2[frame_idx] == 1:
-                            self.hit_FP += 1
-                    if mask_fast_ball[frame_idx] == 1:
-                        self.fast_TP += 1
-                    if mask_fast_hit_ball[frame_idx] == 1:
-                        self.fast_hit_TP += 1
                 else:
                     self.pos_FN += 1
                     box_color = 'yellow'
-                    if mask_fast_ball[frame_idx] == 1:
-                        self.fast_FN += 1
-                    if mask_hit_ball_v2[frame_idx] == 1:
-                        self.hit_FN += 1
-                    if mask_fast_hit_ball[frame_idx] == 1:
-                        self.fast_hit_FN += 1
-            
-            pred_n_x = max_x*self.stride + (center*self.stride-p_cell_nx[max_y][max_x][0]+p_cell_nx[max_y][max_x][1])
-            pred_n_y = max_y*self.stride + (center*self.stride-p_cell_ny[max_y][max_x][0]+p_cell_ny[max_y][max_x][1])
-            lconf = conf
+            ### max_conf 版本 ###
+
+            ### nms 版本 ###
+            gt_has_ball = batch_target[frame_idx][1] == 1
+            if len(preds) > 0:
+                # 找出距離 ground truth 最近的一顆預測
+                distances = [torch.sqrt((px - target_x)**2 + (py - target_y)**2) for _, px, py in preds]
+                min_dist = min(distances)
+                min_idx = distances.index(min_dist)
+
+                if gt_has_ball:
+                    if min_dist <= self.tolerance5:
+                        self.pos_TP += 1
+                    else:
+                        self.pos_FN += 1
+                    # 其餘預測視為 FP
+                    self.pos_FP += len(preds) - 1
+                    self.pos_FP_dis += sum([1 for i, d in enumerate(distances) if i != min_idx])
+                    box_color = 'blue'
+                else:
+                    # 沒有球，全部預測都是 false positive
+                    self.pos_FP += len(preds)
+                    box_color = 'blue'
+
+            else:
+                if gt_has_ball:
+                    self.pos_FN += 1
+                    box_color = 'yellow'
+                else:
+                    self.pos_TN += 1
+            ### nms 版本 ###
+
             # threshold = 0.5 ~ 0.95
             # threshold_idx = 0 ~ 9
             # iou_dist = 1~5 (pixel 容忍距離)
@@ -932,32 +847,6 @@ class TrackNetValidator(BaseValidator):
                 #             only_ball=True,
                 #             only_next=True
                 #             )
-
-        # 計算 conf 的 confusion matrix
-        # pred_binary = (pred_probs >= conf_threshold)
-        # self.pred_ball_count += pred_binary.int().sum()
-
-        # unique_classes = torch.unique(cls_targets.bool())
-        # if len(unique_classes) == 1:
-        #     if unique_classes.item() == 1:
-        #         # All targets are 1 (positive class)
-        #         self.conf_TP += (pred_binary == 1).sum().item()  # Count of true positives
-        #         self.conf_FN += (pred_binary == 0).sum().item()  # Count of false negatives
-        #         self.conf_TN += 0  # No true negatives
-        #         self.conf_FP += 0  # No false positives
-        #     else:
-        #         # All targets are 0 (negative class)
-        #         self.conf_TN += (pred_binary == 0).sum().item()  # Count of true negatives
-        #         self.conf_FP += (pred_binary == 1).sum().item()  # Count of false positives
-        #         self.conf_TP += 0  # No true positives
-        #         self.conf_FN += 0  # No false negatives
-        # else:
-        #     # Compute confusion matrix normally
-        #     conf_matrix = confusion_matrix(cls_targets.bool().cpu().numpy(), pred_binary.cpu().numpy())
-        #     self.conf_TN += conf_matrix[0][0]
-        #     self.conf_FP += conf_matrix[0][1]
-        #     self.conf_FN += conf_matrix[1][0]
-        #     self.conf_TP += conf_matrix[1][1]
         
     def finalize_metrics(self):
         """Calculate final metrics for this validation run."""
@@ -965,11 +854,6 @@ class TrackNetValidator(BaseValidator):
             self.pos_acc = (self.pos_TN + self.pos_TP) / (self.pos_FN+self.pos_FP+self.pos_TN + self.pos_TP)
         if (self.pos_TP+self.pos_FP) != 0:
             self.pos_precision = self.pos_TP/(self.pos_TP+self.pos_FP)
-
-        if (self.conf_FN+self.conf_FP+self.conf_TN + self.conf_TP) != 0:
-            self.conf_acc = (self.conf_TN + self.conf_TP) / (self.conf_FN+self.conf_FP+self.conf_TN + self.conf_TP)
-        if (self.conf_TP+self.conf_FP) != 0:
-            self.conf_precision = self.conf_TP/(self.conf_TP+self.conf_FP)
 
         self.calculate_precision_recall(True)
 
@@ -1104,32 +988,11 @@ class TrackNetValidator(BaseValidator):
         """Return the stats."""
         return {'self.avg_ap': self.avg_ap, 'fitness': self.fitness, 'pos_FN': self.pos_FN, 'pos_FP_dis': self.pos_FP_dis, 'pos_FP': self.pos_FP, 'pos_TN': self.pos_TN, 
                 'pos_TP': self.pos_TP, 'pos_acc': self.pos_acc, 'pos_precision': self.pos_precision,
-                "fast_TP": self.fast_TP, "fast_FN": self.fast_FN, 
-                "hit_TP": self.hit_TP, "hit_FP": self.hit_FP, "hit_FN": self.hit_FN, 
-                "fast_hit_TP": self.fast_hit_TP, "fast_hit_FN": self.fast_hit_FN, 
-                'conf_FN': self.conf_FN, 'conf_FP': self.conf_FP, 'conf_TN': self.conf_TN, 
-                'conf_TP': self.conf_TP, 'conf_acc': self.conf_acc, 'conf_precision': self.conf_precision,
                 'threshold>0.8 rate':self.pred_ball_count/self.ball_count}
     
     def print_results(self):
         """Print the results."""
-        print(f'fast count: {self.fast_count}, hit count: {self.hit_count}')
-        print(f'fast acc: {self.fast_TP/self.fast_count}, hit acc: {self.hit_TP/self.hit_count}')
-        print(f'fast or hit count: {self.fast_hit_count}, fast or hit acc: {self.fast_hit_TP/self.fast_hit_count}')
-        
-        # print(f'target hit count: {self.target_hit_count}')
-        # print(f"hitV2- TP: {self.hitV2_TP}, FP: {self.hitV2_FP}, TN: {self.hitV2_TN}, FN: {self.hitV2_FN}")
-        # print(f"hitV1- TP: {self.hitV1_TP}, FP: {self.hitV1_FP}, TN: {self.hitV1_TN}, FN: {self.hitV1_FN}")
-
         print(self.get_stats())
-        # precision = 0
-        # recall = 0
-        # f1 = 0
-        # if self.TP > 0:
-        #     precision = self.TP/(self.TP+self.FP)
-        #     recall = self.TP/(self.TP+self.FN)
-        #     f1 = (2*precision*recall)/(precision+recall)
-        # print(f"Validation Accuracy: {self.acc:.4f}, Validation Precision: {precision:.4f}, Validation Recall: {recall:.4f}, , Validation F1-Score: {f1:.4f}")
 
     def get_desc(self):
         """Return a description for tqdm progress bar."""
