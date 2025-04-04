@@ -177,7 +177,7 @@ def preprocess_csv_per_frame_motion_filter_with_padding_v2(
 
     for i in range(len(df)):
         start = max(i - half_w, 0)
-        end = min(i + half_w + 1, len(df))
+        end = min(i + half_w, len(df))
         segment = df.iloc[start:end].copy()
 
         # 邊界補值（使用邊界幀複製填滿）
