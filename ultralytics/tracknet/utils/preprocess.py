@@ -152,9 +152,6 @@ def compute_motion_score(xy_seq):
     )
     return motion_score
 
-def sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
 def preprocess_csv_per_frame_motion_filter_with_padding_v2(
     csv_path,
     window_size=10,
@@ -190,10 +187,10 @@ def preprocess_csv_per_frame_motion_filter_with_padding_v2(
                 pad_rows = pd.concat([segment.iloc[[-1]]] * pad_len, ignore_index=True)
                 segment = pd.concat([segment, pad_rows], ignore_index=True)
 
-        if segment['Visibility'].sum() < min_visible_in_window:
+        visible_segment = segment[segment['Visibility'] == 1]
+        if len(visible_segment) < min_visible_in_window:
             continue
-
-        xy_seq = list(zip(segment['X'], segment['Y']))
+        xy_seq = list(zip(visible_segment['X'], visible_segment['Y']))
         motion_scores[i] = compute_motion_score(xy_seq)
         if motion_scores[i] < motion_score_threshold and df.loc[i, 'Visibility'] == 1:
             removed_mask[i] = True
