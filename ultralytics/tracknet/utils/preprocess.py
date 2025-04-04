@@ -206,6 +206,7 @@ def preprocess_csv_per_frame_motion_filter_with_padding_v2(
 def preprocess_csvV4(csv_path):
     df_filtered = preprocess_csv_per_frame_motion_filter_with_padding_v2(csv_path, motion_score_threshold=25.0)
     plot_visibility_removed_points_2d(df_filtered, save_path=convert_to_static_removal_path(csv_path))
+    df_filtered.to_csv(convert_to_static_removal_csv_path(csv_path, 'static_removal_before_csv'), index=False)
     
     df_filtered.loc[df_filtered['static_ball'], 'Visibility'] = 0  # 執行靜止點過濾
     df_filtered.loc[df_filtered['static_ball'], 'X'] = 0  # 執行靜止點過濾
@@ -224,6 +225,8 @@ def preprocess_csvV4(csv_path):
                                             'Fast', 'Event', 'Z', 'Shot', 'player_X', 
                                             'player_Y', 'prev_hit', 'next_hit', 
                                             'Timestamp'], errors='ignore')
+    df_filtered.to_csv(convert_to_static_removal_csv_path(csv_path, 'static_removal_after_csv'), index=False)
+    
     return df_filtered
 
 def is_static_shuttlecock(
@@ -409,6 +412,14 @@ def convert_to_static_removal_path(csv_path):
 
     base_name = os.path.splitext(os.path.basename(csv_path))[0]  # filename
     return os.path.join(static_dir, f"{base_name}.png")
+
+def convert_to_static_removal_csv_path(csv_path, filename):
+    parent_dir = os.path.dirname(csv_path)                # /path/to/dir
+    static_dir = os.path.join(os.path.dirname(parent_dir), filename)
+    os.makedirs(static_dir, exist_ok=True)                # 自動建立目錄（若不存在）
+
+    base_name = os.path.splitext(os.path.basename(csv_path))[0]  # filename
+    return os.path.join(static_dir, f"{base_name}.csv")
 
 def plot_static_removal_comparison(df, save_path=None):
     """
