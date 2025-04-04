@@ -649,11 +649,11 @@ class TrackNetValidator(BaseValidator):
             ############# 多球 #############
 
             ### max_conf 版本 ###
-            # preds = [(max_x, max_y, max_conf)]
+            preds = [(max_x, max_y, max_conf)]
             ### max_conf 版本 ###
 
             ### nms 版本 ###
-            preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=12)
+            # preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=12)
             ### nms 版本 ###
 
             for (x, y, conf) in preds:
@@ -695,53 +695,53 @@ class TrackNetValidator(BaseValidator):
             box_color = 'red'
 
             ### max_conf 版本 ###
-            # if batch_target[frame_idx][1] == 0:
-            #     if max_conf >= conf_threshold:
-            #         self.pos_FP += 1
-            #         box_color = 'blue'
-            #     else:
-            #         self.pos_TN += 1
-            # else:
-            #     if max_conf >= conf_threshold:
-            #         if distance <= self.tolerance5:
-            #             self.pos_TP += 1
-            #         else:
-            #             self.pos_FP_dis += 1
-            #             self.pos_FP += 1
-            #             box_color = 'blue'
-            #     else:
-            #         self.pos_FN += 1
-            #         box_color = 'yellow'
+            if batch_target[frame_idx][1] == 0:
+                if max_conf >= conf_threshold:
+                    self.pos_FP += 1
+                    box_color = 'blue'
+                else:
+                    self.pos_TN += 1
+            else:
+                if max_conf >= conf_threshold:
+                    if distance <= self.tolerance5:
+                        self.pos_TP += 1
+                    else:
+                        self.pos_FP_dis += 1
+                        self.pos_FP += 1
+                        box_color = 'blue'
+                else:
+                    self.pos_FN += 1
+                    box_color = 'yellow'
             ### max_conf 版本 ###
 
             ### nms 版本 ###
-            gt_has_ball = batch_target[frame_idx][1] == 1
-            if len(preds) > 0:
-                # 找出距離 ground truth 最近的一顆預測
-                distances = [torch.sqrt((px - target_x)**2 + (py - target_y)**2) for _, px, py in preds]
-                min_dist = min(distances)
-                min_idx = distances.index(min_dist)
+            # gt_has_ball = batch_target[frame_idx][1] == 1
+            # if len(preds) > 0:
+            #     # 找出距離 ground truth 最近的一顆預測
+            #     distances = [torch.sqrt((px - target_x)**2 + (py - target_y)**2) for _, px, py in preds]
+            #     min_dist = min(distances)
+            #     min_idx = distances.index(min_dist)
 
-                if gt_has_ball:
-                    if min_dist <= self.tolerance5:
-                        self.pos_TP += 1
-                    else:
-                        self.pos_FN += 1
-                    # 其餘預測視為 FP
-                    self.pos_FP += len(preds) - 1
-                    self.pos_FP_dis += sum([1 for i, d in enumerate(distances) if i != min_idx])
-                    box_color = 'blue'
-                else:
-                    # 沒有球，全部預測都是 false positive
-                    self.pos_FP += len(preds)
-                    box_color = 'blue'
+            #     if gt_has_ball:
+            #         if min_dist <= self.tolerance5:
+            #             self.pos_TP += 1
+            #         else:
+            #             self.pos_FN += 1
+            #         # 其餘預測視為 FP
+            #         self.pos_FP += len(preds) - 1
+            #         self.pos_FP_dis += sum([1 for i, d in enumerate(distances) if i != min_idx])
+            #         box_color = 'blue'
+            #     else:
+            #         # 沒有球，全部預測都是 false positive
+            #         self.pos_FP += len(preds)
+            #         box_color = 'blue'
 
-            else:
-                if gt_has_ball:
-                    self.pos_FN += 1
-                    box_color = 'yellow'
-                else:
-                    self.pos_TN += 1
+            # else:
+            #     if gt_has_ball:
+            #         self.pos_FN += 1
+            #         box_color = 'yellow'
+            #     else:
+            #         self.pos_TN += 1
             ### nms 版本 ###
 
             # threshold = 0.5 ~ 0.95
@@ -779,60 +779,60 @@ class TrackNetValidator(BaseValidator):
                 else:
                     target_xy = (batch_target[frame_idx][2], batch_target[frame_idx][3], batch_target[frame_idx][2], batch_target[frame_idx][3])
 
-                # display_predict_image(
-                #         batch_img[frame_idx],  
-                #         metrics, 
-                #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #         box_color=box_color,
-                #         label=label,
-                #         save_dir=self.metrics.save_dir,
-                #         stride = self.stride,
-                #         next=True,
-                #         loss=loss
-                #         ) 
+                display_predict_image(
+                        batch_img[frame_idx],  
+                        metrics, 
+                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                        box_color=box_color,
+                        label=label,
+                        save_dir=self.metrics.save_dir,
+                        stride = self.stride,
+                        next=True,
+                        loss=loss
+                        ) 
             
-                # if box_color == 'blue':
-                #     display_predict_image(
-                #         batch_img[frame_idx],  
-                #         metrics, 
-                #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #         box_color=box_color,
-                #         label=label,
-                #         save_dir=self.metrics.save_dir,
-                #         stride = self.stride,
-                #         target=target_xy,
-                #         path='predict_val_FP_img',
-                #         next=False,
-                #         loss=loss
-                #         ) 
-                # if box_color == 'yellow':
-                #     display_predict_image(
-                #         batch_img[frame_idx],  
-                #         metrics, 
-                #         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #         box_color=box_color,
-                #         label=label,
-                #         save_dir=self.metrics.save_dir,
-                #         stride = self.stride,
-                #         target=target_xy,
-                #         path='predict_val_FN_img',
-                #         next=False,
-                #         loss=loss
-                #         ) 
+                if box_color == 'blue':
+                    display_predict_image(
+                        batch_img[frame_idx],  
+                        metrics, 
+                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                        box_color=box_color,
+                        label=label,
+                        save_dir=self.metrics.save_dir,
+                        stride = self.stride,
+                        target=target_xy,
+                        path='predict_val_FP_img',
+                        next=False,
+                        loss=loss
+                        ) 
+                if box_color == 'yellow':
+                    display_predict_image(
+                        batch_img[frame_idx],  
+                        metrics, 
+                        'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                        box_color=box_color,
+                        label=label,
+                        save_dir=self.metrics.save_dir,
+                        stride = self.stride,
+                        target=target_xy,
+                        path='predict_val_FN_img',
+                        next=False,
+                        loss=loss
+                        ) 
 
-                # display_predict_image(
-                #             batch_img[frame_idx],  
-                #             list(self.frame_10_metrics), 
-                #             'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
-                #             box_color=box_color,
-                #             label=label,
-                #             save_dir=self.metrics.save_dir,
-                #             stride = self.stride,
-                #             path='predict_val_10_frame_img',
-                #             next=False,
-                #             only_ball=True,
-                #             loss=loss
-                #             )
+                display_predict_image(
+                            batch_img[frame_idx],  
+                            list(self.frame_10_metrics), 
+                            'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
+                            box_color=box_color,
+                            label=label,
+                            save_dir=self.metrics.save_dir,
+                            stride = self.stride,
+                            path='predict_val_10_frame_img',
+                            next=False,
+                            only_ball=True,
+                            loss=loss
+                            )
 
                 # display_predict_image(
                 #             batch_img[frame_idx],  
