@@ -170,13 +170,6 @@ def preprocess_csv_per_frame_motion_filter_with_padding_v2(
 
     if 'Visibility' not in df.columns or 'X' not in df.columns or 'Y' not in df.columns:
         raise ValueError("CSV 欄位缺少必要資訊")
-    df['nX'] = df['X'].shift(-1).fillna(df['X'])
-    df['nY'] = df['Y'].shift(-1).fillna(df['Y'])
-
-    if 'Event' in df.columns:
-        df['hit'] = ((df['Event'] == 1) | (df['Event'] == 2)).astype(int)
-    else:
-        df['hit'] = 0
 
     half_w = window_size // 2
     motion_scores = np.zeros(len(df))
@@ -215,6 +208,16 @@ def preprocess_csvV4(csv_path):
     plot_visibility_removed_points_2d(df_filtered, save_path=convert_to_static_removal_path(csv_path))
     
     df_filtered.loc[df_filtered['static_ball'], 'Visibility'] = 0  # 執行靜止點過濾
+    df_filtered.loc[df_filtered['static_ball'], 'X'] = 0  # 執行靜止點過濾
+    df_filtered.loc[df_filtered['static_ball'], 'Y'] = 0  # 執行靜止點過濾
+
+    df_filtered['nX'] = df_filtered['X'].shift(-1).fillna(df_filtered['X'])
+    df_filtered['nY'] = df_filtered['Y'].shift(-1).fillna(df_filtered['Y'])
+
+    if 'Event' in df_filtered.columns:
+        df_filtered['hit'] = ((df_filtered['Event'] == 1) | (df_filtered['Event'] == 2)).astype(int)
+    else:
+        df_filtered['hit'] = 0
     df_filtered.loc[df_filtered['static_ball'], 'hit'] = 0  # 執行靜止點過濾
 
     df_filtered = df_filtered.drop(columns=['static_ball', 'motion_score',
