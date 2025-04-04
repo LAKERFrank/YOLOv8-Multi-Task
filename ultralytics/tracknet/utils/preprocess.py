@@ -156,7 +156,7 @@ def preprocess_csv_per_frame_motion_filter_with_padding_v2(
     csv_path,
     window_size=10,
     motion_score_threshold=40.0,
-    min_visible_in_window=7
+    min_visible_in_window=5
 ):
     """
     幀級靜止球過濾版本（最終版）：對每一幀根據其周圍 window_size 幀計算 motion score，
