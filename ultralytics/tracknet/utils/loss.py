@@ -285,6 +285,7 @@ class TrackNetLoss:
                         ## cls
                         cls_targets[idx, target_idx, grid_y, grid_x, 0] = 1
 
+                        # 當前有球 & 下一個 target 也有球 & 下一個 target 是具有值的，才會計算下一個球的 loss
                         if (target[4] != 0 or target[5] != 0) and target_idx < len(batch_target[idx]) - 1 and batch_target[idx][target_idx + 1][1] == 1:
                             next_gtx = target[4]
                             next_gty = target[5]
