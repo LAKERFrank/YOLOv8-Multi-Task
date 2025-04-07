@@ -213,7 +213,7 @@ class TrackNetConfigurableDataset(Dataset):
         f = os.path.join(d, f"{filename}.npy")
         return f
 
-    def img_cache(self, match_name, video_name, img_files, npy_path):
+    def img_cache(self, match_name, video_name, img_files, npy_path, mix=True):
 
         if os.path.isfile(npy_path):
             return
@@ -223,11 +223,19 @@ class TrackNetConfigurableDataset(Dataset):
                 for fp in img_files]
         frames = np.array(frames)  # 轉換為 NumPy 陣列
 
-        # 計算中位數影像，確保 dtype 為 float32
-        median_frame = np.median(frames, axis=0).astype(np.float32)
+        if mix:
+            background_remove = np.random.choice([True, False])
+        else:
+            background_remove = True
 
-        # # 影像減去中位數影像，確保計算不發生溢出
-        processed_frames = np.clip(frames - median_frame, 0, 255).astype(np.float32)
+        if background_remove:
+            # 計算中位數影像，確保 dtype 為 float32
+            median_frame = np.median(frames, axis=0).astype(np.float32)
+
+            # # 影像減去中位數影像，確保計算不發生溢出
+            processed_frames = np.clip(frames - median_frame, 0, 255).astype(np.float32)
+        else:
+            processed_frames = frames
         images = []
         for i, processed_frame in enumerate(processed_frames):
             img = self.pad_to_square(processed_frame)
