@@ -748,6 +748,10 @@ def main(arg):
     elif arg.mode == 'train_v2':
         model = TrackNet(overrides)
         model.train()
+    elif arg.mode == 'train_v3':
+        model = TrackNet(overrides)
+        model.freeze(8)
+        model.train()
     elif arg.mode == 'val_v2':
         model = TrackNet(overrides)
         model.val()
