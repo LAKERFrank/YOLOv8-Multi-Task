@@ -337,7 +337,7 @@ class TrackNet:
         args.task = self.task
         return Exporter(overrides=args, _callbacks=self.callbacks)(model=self.model)
 
-    def train(self, **kwargs):
+    def train(self, freeze_layers = 0, **kwargs):
         """
         Trains the model on a given dataset.
 
@@ -365,6 +365,7 @@ class TrackNet:
         if not overrides.get('resume'):  # manually set model only if not resuming
             self.trainer.model = self.trainer.get_model(weights=self.model if self.ckpt else None, cfg=self.model.yaml)
             self.model = self.trainer.model
+        self.freeze_layers(n=freeze_layers)  # freeze layers
         self.trainer.hub_session = self.session  # attach optional HUB session
         self.trainer.train()
         # Update model and cfg after training
@@ -372,6 +373,11 @@ class TrackNet:
             self.model, _ = attempt_load_one_weight(str(self.trainer.best))
             self.overrides = self.model.args
             self.metrics = getattr(self.trainer.validator, 'metrics', None)  # TODO: no metrics returned by DDP
+    
+    def freeze_layers(self, n=8):
+        for i, layer in enumerate(self.model.model[:n]):
+            for param in layer.parameters():
+                param.requires_grad = False
 
     def to(self, device):
         """

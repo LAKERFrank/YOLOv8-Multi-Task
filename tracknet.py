@@ -750,8 +750,7 @@ def main(arg):
         model.train()
     elif arg.mode == 'train_v3':
         model = TrackNet(overrides)
-        model.model.freeze(8)
-        model.train()
+        model.train(freeze_layers=8)
     elif arg.mode == 'val_v2':
         model = TrackNet(overrides)
         model.val()
