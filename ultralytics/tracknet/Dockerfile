@@ -30,8 +30,6 @@ RUN git checkout feat/add_hit_label
 RUN git pull
 
 # Install pip packages
-RUN python3 -m pip install --upgrade pip wheel
-RUN pip install --no-cache -e . albumentations comet thop pycocotools onnx onnx-simplifier onnxruntime-gpu
 
 RUN pip install --no-cache-dir --upgrade pip wheel \
  && pip install --no-cache-dir albumentations comet thop pycocotools onnx onnx-simplifier onnxruntime-gpu \
