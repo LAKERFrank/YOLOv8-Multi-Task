@@ -80,3 +80,38 @@ def decode_pred_conf(pred_confs, threshold=0.8):
 
 def inverse_transform(pred_x, pred_y, target_weight, target_hight):
     return
+
+
+def revert_coordinates(data, w=1280, h=480, target_size=640):
+    """
+    Reverts coordinates from resized-padded image (e.g., 640x640)
+    back to original image coordinates (e.g., 1280x480).
+    
+    Parameters:
+    - data: (N, 6) tensor with (frame, visibility, x, y, dx, dy)
+    - w, h: original image size
+    - target_size: size after preprocessing
+    
+    Returns:
+    - reverted (N, 6) tensor in original image coordinates
+    """
+    data_reverted = data.clone()
+
+    max_dim = max(w, h)
+    scale_factor = target_size / max_dim
+    pad_diff = max_dim - min(w, h)
+    pad1 = pad_diff // 2  # = (1280 - 480) / 2 = 400 → /2 = 200
+
+    indices = (data[:, 2] != 0) | (data[:, 3] != 0)
+
+    # Remove padding
+    if h < w:
+        data_reverted[indices, 1] -= pad1
+    else:
+        data_reverted[indices, 0] -= pad1
+
+    # Revert scaling
+    data_reverted[:, 0] /= scale_factor
+    data_reverted[:, 1] /= scale_factor
+
+    return data_reverted
