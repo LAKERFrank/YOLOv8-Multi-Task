@@ -1,4 +1,6 @@
 
+import os
+from matplotlib import pyplot as plt
 import torch
 import numpy as np
 from ultralytics.tracknet.utils.transform import revert_coordinates
@@ -57,7 +59,32 @@ class TrackNetPredictor(BasePredictor):
         img = img.half() if self.model.fp16 else img.float()  # uint8 to fp16/32
         # if not_tensor:
         #     img /= 255  # 0 - 255 to 0.0 - 1.0
+        # 儲存轉換前的第一張圖片（轉成 numpy，供顯示用）
+        img_before = img[0].detach().cpu().numpy()
+
+        # 中位數去除背景
+        if img.ndim == 3 and img.shape[0] == 10:
+            median = img.median(dim=0).values
+            img = img - median
+
         img = img.view(1, 10, 640, 640)
+
+        # 顯示第一張圖片：轉換前 vs. 轉換後
+        # img_after = img[0, 0].detach().cpu().numpy()
+
+        # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        # axs[0].imshow(img_before, cmap='gray')
+        # axs[0].set_title("Before Median Subtraction")
+        # axs[0].axis('off')
+
+        # axs[1].imshow(img_after, cmap='gray')
+        # axs[1].set_title("After Median Subtraction")
+        # axs[1].axis('off')
+
+        # plt.tight_layout()
+        # plt.show()
+        # plt.close(fig)
+
         return img
     def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
@@ -87,6 +114,10 @@ class TrackNetPredictor(BasePredictor):
         each_probs = pred_probs.view(10, cell_num, cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, cell_num, cell_num, feat_no).split([2, 2, 2, 2], dim=3)
 
+        orig_images_clone = orig_imgs.transpose(2, 0, 1)
+
+        save_path = os.path.join(self.save_dir, "predict")
+        os.makedirs(save_path, exist_ok=True)
         result = []
         for frame_idx in range(10):
             p_cell_x = each_pos_x[frame_idx]
@@ -122,6 +153,24 @@ class TrackNetPredictor(BasePredictor):
                 pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
                 speed={'preprocess': None, 'inference': None, 'postprocess': None }
             ))
+            
+            
+            # 取出第 frame_idx 張圖片
+            img_np = orig_images_clone[frame_idx, :, :]
+            img_np = img_np.astype(np.uint8)
+            img_np = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
+            img_np = np.ascontiguousarray(img_np.copy())
+
+            if max_conf >= conf_threshold:
+                cv2.circle(img_np, (int(pred_x.item()), int(pred_y.item())), radius=3, color=(0, 0, 255), thickness=-1)
+                conf_text = f"{max_conf.item():.2f}"
+                cv2.putText(img_np, conf_text, (int(pred_x.item()) + 5, int(pred_y.item()) - 5),
+                            cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=1)
+                # cv2.imshow(f"frame_{frame_idx}", img_np)
+                # cv2.waitKey(1)
+
+            # 儲存圖片
+            cv2.imwrite(f"{save_path}/frame_{frame_idx:02d}.jpg", img_np)
         
         # TODO: 這裡需要將結果轉換為原始圖片的座標系統
         # result = revert_coordinates(result, orig_imgs[0].shape[2], orig_imgs[0].shape[3], img[0].shape[2])
