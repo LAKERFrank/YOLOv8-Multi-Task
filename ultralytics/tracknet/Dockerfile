@@ -25,11 +25,12 @@ WORKDIR /usr/src/ultralytics
 
 # Copy contents
 ARG ULTRALYTICS_BRANCH=main
+ARG CACHE_BUSTER=now
 RUN git clone --depth 1 --branch ${ULTRALYTICS_BRANCH} https://github.com/BartekTao/ultralytics.git .
 
 # Install pip packages
 RUN python3 -m pip install --upgrade pip wheel
-RUN pip install --no-cache -e . albumentations==1.3.1 comet thop pycocotools onnx onnx-simplifier onnxruntime-gpu
+RUN pip install --no-cache -e . numpy==1.26.4 albumentations==1.3.1 comet thop pycocotools onnx onnx-simplifier onnxruntime-gpu
 
 # Set environment variables
 ENV OMP_NUM_THREADS=1

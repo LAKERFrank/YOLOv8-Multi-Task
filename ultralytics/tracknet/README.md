@@ -6,9 +6,14 @@
 - /hdd/dataset/blion_tracknet
 
 ## how to build
-分支可調整
+ULTRALYTICS_BRANCH: 指定使用分之
+CACHE_BUSTER: 確保每次都能拉取最新的分支
 ```
-docker build -f ultralytics/tracknet/Dockerfile --build-arg ULTRALYTICS_BRANCH=feat/p3p4p5-test2 -t tracknet1000:latest .
+docker build \
+    -f ultralytics/tracknet/Dockerfile \
+    --build-arg ULTRALYTICS_BRANCH=feat/p3p4p5-test2 \
+    --build-arg CACHE_BUSTER=$(date +%s) \
+    -t tracknet1000:latest .
 ```
 
 ## how to run
