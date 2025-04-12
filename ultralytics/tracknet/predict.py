@@ -1,5 +1,7 @@
 
 import torch
+import numpy as np
+from ultralytics.tracknet.utils.transform import revert_coordinates
 from ultralytics.yolo.data.build import load_inference_source
 from ultralytics.yolo.engine.predictor import STREAM_WARNING, BasePredictor
 from ultralytics.yolo.engine.results import Results
@@ -7,14 +9,28 @@ from ultralytics.yolo.engine.results import Results
 from ultralytics.yolo.utils import LOGGER, ops
 from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.torch_utils import select_device
+import platform
+from pathlib import Path
+import cv2
+from dataclasses import dataclass
+from typing import Optional
 
+@dataclass
+class Prediction:
+    x: float
+    y: float
+    conf: float
+
+@dataclass
+class ResultItem:
+    pred: Prediction
+    speed: dict[str, float | None]
 
 class TrackNetPredictor(BasePredictor):
     def setup_source(self, source):
         """Sets up source and inference mode."""
         self.imgsz = check_imgsz(self.args.imgsz, stride=self.model.stride, min_dim=2)  # check image size
-        self.transforms = getattr(self.model.model, 'transforms', classify_transforms(
-            self.imgsz[0])) if self.args.task == 'classify' else None
+        self.transforms = None
         images = load_inference_source(source=source, imgsz=self.imgsz, vid_stride=self.args.vid_stride)
         self.dataset = load_inference_source(source=source, imgsz=self.imgsz, vid_stride=self.args.vid_stride)
         self.source_type = self.dataset.source_type
@@ -30,21 +46,111 @@ class TrackNetPredictor(BasePredictor):
     #     self.args.half = True  # update half
     #     # self.args.half = self.args.half  # update half
     #     self.model.eval()
+    def preprocess(self, im):
+        not_tensor = not isinstance(im, torch.Tensor)
+        if not_tensor:
+            im = im.transpose((2, 0, 1))  # BGR to RGB, BHWC to BCHW, (n, 3, h, w)
+            im = np.ascontiguousarray(im)  # contiguous
+            im = torch.from_numpy(im)
+
+        img = im.to(self.device)
+        img = img.half() if self.model.fp16 else img.float()  # uint8 to fp16/32
+        # if not_tensor:
+        #     img /= 255  # 0 - 255 to 0.0 - 1.0
+        img = img.view(1, 10, 640, 640)
+        return img
     def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
-        preds = ops.non_max_suppression(preds,
-                                        self.args.conf,
-                                        self.args.iou,
-                                        agnostic=self.args.agnostic_nms,
-                                        max_det=self.args.max_det,
-                                        classes=self.args.classes)
+        nc = 1
+        reg_max = 16
+        feat_no = 8
+        no = nc + reg_max * feat_no
+        cell_num = 80
+        stride = 8
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        proj = torch.arange(reg_max, dtype=torch.float, device=device)
 
-        results = []
-        for i, pred in enumerate(preds):
-            orig_img = orig_imgs[i] if isinstance(orig_imgs, list) else orig_imgs
-            if not isinstance(orig_imgs, torch.Tensor):
-                pred[:, :4] = ops.scale_boxes(img.shape[2:], pred[:, :4], orig_img.shape)
-            path = self.batch[0]
-            img_path = path[i] if isinstance(path, list) else path
-            results.append(Results(orig_img=orig_img, path=img_path, names=self.model.names, boxes=pred))
-        return results
+        feats = preds[0].clone()
+        pred_distri, pred_scores = feats.view(no, -1).split(
+            (reg_max * feat_no, nc), 0)
+        
+        pred_scores = pred_scores.permute(1, 0).contiguous()
+        pred_distri = pred_distri.permute(1, 0).contiguous()
+
+        pred_probs = torch.sigmoid(pred_scores)
+        # pred_probs = [10*self.cell_num*self.cell_num]
+        
+        a, c = pred_distri.shape
+
+        pred_pos = pred_distri.view(a, feat_no, c // feat_no).softmax(2).matmul(
+            proj.type(pred_distri.dtype))
+        each_probs = pred_probs.view(10, cell_num, cell_num)
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, cell_num, cell_num, feat_no).split([2, 2, 2, 2], dim=3)
+
+        result = []
+        for frame_idx in range(10):
+            p_cell_x = each_pos_x[frame_idx]
+            p_cell_y = each_pos_y[frame_idx]
+            p_cell_nx = each_pos_nx[frame_idx]
+            p_cell_ny = each_pos_ny[frame_idx]
+            center = 0.5
+
+            # 獲取當前圖片的 conf
+            p_conf = each_probs[frame_idx]
+
+            ############## MAX ##############
+            conf_threshold = 0.5
+            p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
+            max_position = torch.argmax(p_conf_masked)
+            # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
+            max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
+            max_conf = p_conf[max_y, max_x]
+            
+            ############# 多球 #############
+
+            ### max_conf 版本 ###
+            preds = [(max_x, max_y, max_conf)]
+            ### max_conf 版本 ###
+
+            ### nms 版本 ###
+            # preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=12)
+            ### nms 版本 ###
+
+            pred_x = max_x*stride + (center*stride-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1])
+            pred_y = max_y*stride + (center*stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
+            result.append(ResultItem(
+                pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
+                speed={'preprocess': None, 'inference': None, 'postprocess': None }
+            ))
+        
+        # TODO: 這裡需要將結果轉換為原始圖片的座標系統
+        # result = revert_coordinates(result, orig_imgs[0].shape[2], orig_imgs[0].shape[3], img[0].shape[2])
+        return result
+    def write_results(self, idx, results, batch):
+        return "todo"
+    def show(self, p):
+        """Display an image in a window using OpenCV imshow()."""
+        return "todo"
+
+    def save_preds(self, vid_cap, idx, save_path):
+        """Save video predictions as mp4 at specified path."""
+        im0 = self.plotted_img
+        # Save imgs
+        if self.dataset.mode == 'image':
+            cv2.imwrite(save_path, im0)
+        else:  # 'video' or 'stream'
+            if self.vid_path[idx] != save_path:  # new video
+                self.vid_path[idx] = save_path
+                if isinstance(self.vid_writer[idx], cv2.VideoWriter):
+                    self.vid_writer[idx].release()  # release previous video writer
+                if vid_cap:  # video
+                    fps = int(vid_cap.get(cv2.CAP_PROP_FPS))  # integer required, floats produce error in MP4 codec
+                    w = int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                    h = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                else:  # stream
+                    fps, w, h = 30, im0.shape[1], im0.shape[0]
+                suffix = '.mp4'
+                fourcc = 'avc1'
+                save_path = str(Path(save_path).with_suffix(suffix))
+                self.vid_writer[idx] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*fourcc), fps, (w, h))
+            self.vid_writer[idx].write(im0)

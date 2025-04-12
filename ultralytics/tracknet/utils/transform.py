@@ -77,3 +77,6 @@ def decode_pred_conf(pred_confs, threshold=0.8):
         results.append(frame_results)
 
     return results
+
+def inverse_transform(pred_x, pred_y, target_weight, target_hight):
+    return

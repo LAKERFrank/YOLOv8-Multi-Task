@@ -4,6 +4,7 @@ import glob
 import math
 import os
 import time
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Thread
@@ -15,6 +16,7 @@ import requests
 import torch
 from PIL import Image
 
+from ultralytics.tracknet.utils.resize import resize_and_pad
 from ultralytics.yolo.data.utils import IMG_FORMATS, VID_FORMATS
 from ultralytics.yolo.utils import LOGGER, ROOT, is_colab, is_kaggle, ops
 from ultralytics.yolo.utils.checks import check_requirements
@@ -162,13 +164,13 @@ class LoadScreenshots:
 class LoadImages:
     """YOLOv8 image/video dataloader, i.e. `yolo predict source=image.jpg/vid.mp4`."""
 
-    def __init__(self, path, imgsz=640, vid_stride=1):
+    def __init__(self, path, imgsz=640, vid_stride=1, batch_size=10):
         """Initialize the Dataloader and raise FileNotFoundError if file not found."""
         if isinstance(path, str) and Path(path).suffix == '.txt':  # *.txt file with img/vid/dir on each line
             path = Path(path).read_text().rsplit()
         files = []
         for p in sorted(path) if isinstance(path, (list, tuple)) else [path]:
-            p = str(Path(p).absolute())  # do not use .resolve() https://github.com/ultralytics/ultralytics/issues/2912
+            p = str(Path(p).absolute())
             if '*' in p:
                 files.extend(sorted(glob.glob(p, recursive=True)))  # glob
             elif os.path.isdir(p):
@@ -178,8 +180,11 @@ class LoadImages:
             else:
                 raise FileNotFoundError(f'{p} does not exist')
 
-        images = [x for x in files if x.split('.')[-1].lower() in IMG_FORMATS]
-        videos = [x for x in files if x.split('.')[-1].lower() in VID_FORMATS]
+        def natural_sort_key(s):
+            return [int(t) if t.isdigit() else t for t in re.split(r'(\d+)', s)]
+
+        images = sorted([x for x in files if x.split('.')[-1].lower() in IMG_FORMATS], key=natural_sort_key)
+        videos = sorted([x for x in files if x.split('.')[-1].lower() in VID_FORMATS], key=natural_sort_key)
         ni, nv = len(images), len(videos)
 
         self.imgsz = imgsz
@@ -187,7 +192,8 @@ class LoadImages:
         self.nf = ni + nv  # number of files
         self.video_flag = [False] * ni + [True] * nv
         self.mode = 'image'
-        self.vid_stride = vid_stride  # video frame-rate stride
+        self.vid_stride = vid_stride
+        self.batch_size = batch_size  # Process 10 frames at a time
         self.bs = 1
         if any(videos):
             self.orientation = None  # rotation degrees
@@ -204,7 +210,7 @@ class LoadImages:
         return self
 
     def __next__(self):
-        """Return next image, path and metadata from dataset."""
+        """Return next 10 frames, path and metadata from dataset."""
         if self.count == self.nf:
             raise StopIteration
         path = self.files[self.count]
@@ -212,41 +218,64 @@ class LoadImages:
         if self.video_flag[self.count]:
             # Read video
             self.mode = 'video'
-            for _ in range(self.vid_stride):
-                self.cap.grab()
-            success, im0 = self.cap.retrieve()
-            while not success:
+            frames = [10]
+            frame_paths = []  # Store paths for each frame
+            for i in range(self.batch_size):
+                for _ in range(self.vid_stride):
+                    self.cap.grab()
+                success, im0 = self.cap.retrieve()
+                if not success:
+                    break
+                frames[i] = im0
+                frame_paths.append(path)  # Append path for each frame
+            
+            if len(frames) < self.batch_size:
                 self.count += 1
                 self.cap.release()
-                if self.count == self.nf:  # last video
+                if self.count == self.nf:
                     raise StopIteration
                 path = self.files[self.count]
                 self._new_video(path)
-                success, im0 = self.cap.read()
+                return self.__next__()
 
-            self.frame += 1
-            # im0 = self._cv2_rotate(im0)  # for use if cv2 autorotation is False
+            self.frame += self.batch_size
             s = f'video {self.count + 1}/{self.nf} ({self.frame}/{self.frames}) {path}: '
 
         else:
             # Read image
-            self.count += 1
-            im0 = cv2.imread(path)  # BGR
-            if im0 is None:
-                raise FileNotFoundError(f'Image Not Found {path}')
+            frames = [None] * self.batch_size
+            frame_paths = []
+            for i in range(self.batch_size):
+                if self.count == self.nf:
+                    break
+                path = self.files[self.count]
+                im0 = resize_and_pad(path)  # Read in grayscale
+                if im0 is None:
+                    raise FileNotFoundError(f'Image Not Found {path}')
+                im0 = torch.from_numpy(im0).float()
+                frames[i] = im0
+                frame_paths.append(path)
+                self.count += 1
+
+            if any(x is None for x in frames):
+                raise StopIteration
+            if len(frames) < self.batch_size:
+                raise StopIteration
+
+            # Concatenate frames along channel dimension
+            frames = np.stack(frames, axis=-1)  # Shape: (H, W, batch_size)
+
             s = f'image {self.count}/{self.nf} {path}: '
 
-        return [path], [im0], self.cap, s
+        return frame_paths, frames, self.cap, s
 
     def _new_video(self, path):
         """Create a new video capture object."""
         self.frame = 0
         self.cap = cv2.VideoCapture(path)
         self.frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT) / self.vid_stride)
-        if hasattr(cv2, 'CAP_PROP_ORIENTATION_META'):  # cv2<4.6.0 compatibility
-            self.orientation = int(self.cap.get(cv2.CAP_PROP_ORIENTATION_META))  # rotation degrees
-            # Disable auto-orientation due to known issues in https://github.com/ultralytics/yolov5/issues/8493
-            # self.cap.set(cv2.CAP_PROP_ORIENTATION_AUTO, 0)
+        if hasattr(cv2, 'CAP_PROP_ORIENTATION_META'):
+            self.orientation = int(self.cap.get(cv2.CAP_PROP_ORIENTATION_META))
 
     def _cv2_rotate(self, im):
         """Rotate a cv2 video manually."""
@@ -260,7 +289,8 @@ class LoadImages:
 
     def __len__(self):
         """Returns the number of files in the object."""
-        return self.nf  # number of files
+        return self.nf // self.batch_size  # Adjust length to reflect batch processing
+
 
 
 class LoadPilAndNumpy:
