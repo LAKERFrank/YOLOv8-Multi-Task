@@ -58,6 +58,7 @@ class TrackNetPredictor(BasePredictor):
         # if not_tensor:
         #     img /= 255  # 0 - 255 to 0.0 - 1.0
         img = img.view(1, 10, 640, 640)
+        print(img.shape)
         return img
     def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
