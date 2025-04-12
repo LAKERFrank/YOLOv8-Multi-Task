@@ -117,7 +117,9 @@ class TrackNetPredictor(BasePredictor):
 
         orig_images_clone = orig_imgs.transpose(2, 0, 1)
 
-        save_path = os.path.join(self.save_dir, "predict")
+        p = Path(self.batch[0][0])
+        parent_dir = p.parent.name
+        save_path = os.path.join(self.save_dir, parent_dir)
         os.makedirs(save_path, exist_ok=True)
         result = []
         for frame_idx in range(10):
@@ -171,8 +173,8 @@ class TrackNetPredictor(BasePredictor):
                 # cv2.waitKey(1)
 
             # 儲存圖片
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            cv2.imwrite(f"{save_path}/frame_{timestamp}_{frame_idx:02d}.jpg", img_np)
+            idx_p = Path(self.batch[0][frame_idx])
+            cv2.imwrite(f"{save_path}/{idx_p.name}", img_np)
         
         # TODO: 這裡需要將結果轉換為原始圖片的座標系統
         # result = revert_coordinates(result, orig_imgs[0].shape[2], orig_imgs[0].shape[3], img[0].shape[2])
