@@ -2,8 +2,12 @@
 
 ## dataset
 - in 140.113.208.122 coachbox
-- /hdd/dataset/alex_tracknet
-- /hdd/dataset/blion_tracknet
+    - training data
+        - /hdd/dataset/alex_tracknet
+        - /hdd/dataset/blion_tracknet
+        - /hdd/dataset/profession_match_{n}
+    - testing data
+        - /hdd/dataset/profession_match_{n}_test
 
 ## how to build
 ULTRALYTICS_BRANCH: 指定使用分之
