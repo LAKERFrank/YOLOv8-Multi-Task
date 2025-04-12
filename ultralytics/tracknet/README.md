@@ -5,6 +5,12 @@
 - /hdd/dataset/alex_tracknet
 - /hdd/dataset/blion_tracknet
 
+## how to build
+分支可調整
+```
+docker build -f ultralytics/tracknet/Dockerfile --build-arg ULTRALYTICS_BRANCH=feat/p3p4p5-test2 -t tracknet1000:latest .
+```
+
 ## how to run
 ```
 docker run --gpus all --ipc=host \
