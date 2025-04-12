@@ -172,7 +172,7 @@ class TrackNetPredictor(BasePredictor):
 
             # 儲存圖片
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            cv2.imwrite(f"{save_path}/frame_{frame_idx:02d}_{timestamp}.jpg", img_np)
+            cv2.imwrite(f"{save_path}/frame_{timestamp}_{frame_idx:02d}.jpg", img_np)
         
         # TODO: 這裡需要將結果轉換為原始圖片的座標系統
         # result = revert_coordinates(result, orig_imgs[0].shape[2], orig_imgs[0].shape[3], img[0].shape[2])
