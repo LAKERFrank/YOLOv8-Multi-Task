@@ -4,6 +4,7 @@ import os
 from matplotlib import pyplot as plt
 import torch
 import numpy as np
+from ultralytics.tracknet.utils.nms import non_max_suppression
 from ultralytics.tracknet.utils.transform import revert_coordinates
 from ultralytics.yolo.data.build import load_inference_source
 from ultralytics.yolo.engine.predictor import STREAM_WARNING, BasePredictor
@@ -89,6 +90,8 @@ class TrackNetPredictor(BasePredictor):
         return img
     def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
+        use_nms = True
+        conf_threshold = 0.5
         nc = 1
         reg_max = 16
         feat_no = 8
@@ -132,45 +135,53 @@ class TrackNetPredictor(BasePredictor):
             # 獲取當前圖片的 conf
             p_conf = each_probs[frame_idx]
 
-            ############## MAX ##############
-            conf_threshold = 0.5
-            p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
-            max_position = torch.argmax(p_conf_masked)
-            # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
-            max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
-            max_conf = p_conf[max_y, max_x]
+            frame_preds = []
+            if use_nms:
+                nms_preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=20)
+
+                # 取出 nms 的結果
+                for pred in nms_preds:
+                    max_x, max_y, max_conf = pred
+                    pred_x = max_x*stride + (center*stride-p_cell_x[int(max_y)][int(max_x)][0]+p_cell_x[int(max_y)][int(max_x)][1])
+                    pred_y = max_y*stride + (center*stride-p_cell_y[int(max_y)][int(max_x)][0]+p_cell_y[int(max_y)][int(max_x)][1])
+
+                    frame_preds.append(ResultItem(
+                        pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
+                        speed={'preprocess': None, 'inference': None, 'postprocess': None }
+                    ))
+            else:
+                p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
+                max_position = torch.argmax(p_conf_masked)
+                # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
+                max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
+                max_conf = p_conf[max_y, max_x].item()
+
+                pred_x = max_x*stride + (center*stride-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1])
+                pred_y = max_y*stride + (center*stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
+                frame_preds.append(ResultItem(
+                    pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
+                    speed={'preprocess': None, 'inference': None, 'postprocess': None }
+                ))
             
-            ############# 多球 #############
-
-            ### max_conf 版本 ###
-            preds = [(max_x, max_y, max_conf)]
-            ### max_conf 版本 ###
-
-            ### nms 版本 ###
-            # preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=12)
-            ### nms 版本 ###
-
-            pred_x = max_x*stride + (center*stride-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1])
-            pred_y = max_y*stride + (center*stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
             result.append(ResultItem(
-                pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
-                speed={'preprocess': None, 'inference': None, 'postprocess': None }
+                pred=frame_preds if use_nms else frame_preds[0],
+                speed={'preprocess': None, 'inference': None, 'postprocess': None}
             ))
             
-            
-            # 取出第 frame_idx 張圖片
+            # 視覺化與儲存圖片
             img_np = orig_images_clone[frame_idx, :, :]
             img_np = img_np.astype(np.uint8)
             img_np = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
             img_np = np.ascontiguousarray(img_np.copy())
 
-            if max_conf >= conf_threshold:
-                cv2.circle(img_np, (int(pred_x.item()), int(pred_y.item())), radius=3, color=(0, 0, 255), thickness=-1)
-                conf_text = f"{max_conf.item():.2f}"
-                cv2.putText(img_np, conf_text, (int(pred_x.item()) + 5, int(pred_y.item()) - 5),
-                            cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=1)
-                # cv2.imshow(f"frame_{frame_idx}", img_np)
-                # cv2.waitKey(1)
+            for frame_pred in frame_preds:
+                pred = frame_pred.pred
+                if pred.conf >= conf_threshold:
+                    cv2.circle(img_np, (int(pred.x.item()), int(pred.y.item())), radius=3, color=(0, 0, 255), thickness=-1)
+                    conf_text = f"{pred.conf:.2f}"
+                    cv2.putText(img_np, conf_text, (int(pred.x.item()) + 5, int(pred.y.item()) - 5),
+                                cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=1)
+
 
             # 儲存圖片
             idx_p = Path(self.batch[0][frame_idx])
