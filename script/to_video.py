@@ -4,7 +4,7 @@ import os
 def images_to_video(image_folder, output_video, fps=30, scale=1.5):
     # 取得所有照片檔案並排序
     images = [img for img in os.listdir(image_folder) if img.endswith(".png")]
-    images.sort()  # 根據檔案名稱順序排列
+    images.sort(key=lambda x: int(os.path.splitext(x)[0]))
 
     # 讀取第一張照片取得其大小
     first_image_path = os.path.join(image_folder, images[0])
