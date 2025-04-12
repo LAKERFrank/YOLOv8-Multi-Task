@@ -56,19 +56,19 @@ class TrackNetPredictor(BasePredictor):
             im = np.ascontiguousarray(im)  # contiguous
             im = torch.from_numpy(im)
 
+        assert im.ndim == 3 and im.shape[0] == 10, "Expect shape (10, H, W)"
         img = im.to(self.device)
-        img = img.half() if self.model.fp16 else img.float()  # uint8 to fp16/32
-        # if not_tensor:
-        #     img /= 255  # 0 - 255 to 0.0 - 1.0
-        # 儲存轉換前的第一張圖片（轉成 numpy，供顯示用）
-        img_before = img[0].detach().cpu().numpy()
 
-        # 中位數去除背景
-        if img.ndim == 3 and img.shape[0] == 10:
-            median = img.median(dim=0).values
-            img = img - median
+        img = img.float()  # 若 im 是 uint8，轉為 float32
+        median = img.median(dim=0).values  # shape: (H, W)
+        img = img - median
+        img = torch.clamp(img, 0, 255)
 
-        img = img.view(1, 10, 640, 640)
+        # Normalize
+        img /= 255.0
+
+        # Output shape: (1, 10, 640, 640)
+        return img.unsqueeze(0).to(self.device).half() if self.model.fp16 else img.unsqueeze(0).to(self.device)
 
         # 顯示第一張圖片：轉換前 vs. 轉換後
         # img_after = img[0, 0].detach().cpu().numpy()
