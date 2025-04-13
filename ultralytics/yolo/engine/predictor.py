@@ -29,6 +29,7 @@ Usage - formats:
 """
 import platform
 from pathlib import Path
+from time import time
 
 import cv2
 import numpy as np
@@ -234,6 +235,9 @@ class BasePredictor:
         if not self.done_warmup:
             self.model.warmup(imgsz=(1 if self.model.pt or self.model.triton else self.dataset.bs, 10, *self.imgsz))
             self.done_warmup = True
+        
+        total_start_time = time.time()
+        total_images = 0
 
         self.seen, self.windows, self.batch, profilers = 0, [], None, (ops.Profile(), ops.Profile(), ops.Profile())
         self.run_callbacks('on_predict_start')
@@ -241,6 +245,9 @@ class BasePredictor:
             self.run_callbacks('on_predict_batch_start')
             self.batch = batch
             path, im0s, vid_cap, s = batch
+
+            n = im0s.shape[2]
+            total_images += n
 
             # Preprocess
             with profilers[0]:
@@ -256,7 +263,6 @@ class BasePredictor:
             self.run_callbacks('on_predict_postprocess_end')
 
             # Visualize, save, write results
-            n = im0s.shape[2]
             for i in range(n):
                 self.seen += 1
                 self.results[i].speed = {
@@ -292,6 +298,12 @@ class BasePredictor:
             t = tuple(x.t / self.seen * 1E3 for x in profilers)  # speeds per image
             LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
                         f'{(1, 1, *im.shape[2:])}' % t)
+        
+        total_elapsed = time.time() - total_start_time
+        avg_time_per_image = total_elapsed / total_images * 1000
+        fps = total_images / total_elapsed
+        LOGGER.info(f"[Total] {total_images} images in {total_elapsed:.2f}s, Avg: {avg_time_per_image:.2f}ms/image, {fps:.2f} FPS")
+
         if self.args.save or self.args.save_txt or self.args.save_crop:
             nl = len(list(self.save_dir.glob('labels/*.txt')))  # number of labels
             s = f"\n{nl} label{'s' * (nl > 1)} saved to {self.save_dir / 'labels'}" if self.args.save_txt else ''
