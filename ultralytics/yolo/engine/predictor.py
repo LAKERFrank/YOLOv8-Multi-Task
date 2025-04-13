@@ -29,7 +29,7 @@ Usage - formats:
 """
 import platform
 from pathlib import Path
-import time
+from time import time
 
 import cv2
 import numpy as np
