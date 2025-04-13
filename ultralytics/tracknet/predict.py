@@ -163,6 +163,7 @@ class TrackNetPredictor(BasePredictor):
         os.makedirs(csv_save_path, exist_ok=True)
         result = []
         csv_rows = []
+        real_frame_idx = int(p.stem)
         for frame_idx in range(10):
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
@@ -215,7 +216,7 @@ class TrackNetPredictor(BasePredictor):
             for frame_pred in frame_preds:
                 pred = frame_pred.pred
                 csv_rows.append({
-                    'Frame': frame_idx,
+                    'Frame': real_frame_idx+frame_idx,
                     'Visibility': 1 if pred.conf >= conf_threshold else 0,
                     'X': round(pred.x.item(), 2),
                     'Y': round(pred.y.item(), 2),
@@ -232,8 +233,8 @@ class TrackNetPredictor(BasePredictor):
             idx_p = Path(self.batch[0][frame_idx])
             save_img_path = f"{frame_save_path}/{idx_p.name}"
             self.saver.save_image(save_img_path, img_np)
-            save_csv_path = os.path.join(csv_save_path, "predictions.csv")
-            self.saver.save_csv(save_csv_path, csv_rows)
+        save_csv_path = os.path.join(csv_save_path, f"{p.stem}.csv")
+        self.saver.save_csv(save_csv_path, csv_rows)
 
         
         # TODO: 這裡需要將結果轉換為原始圖片的座標系統
