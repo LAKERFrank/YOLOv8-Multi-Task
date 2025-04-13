@@ -35,6 +35,7 @@ import numpy as np
 import torch
 
 from ultralytics.nn.autobackend import AutoBackend
+from ultralytics.tracknet.utils.postprocess import PostprocessSaver
 from ultralytics.yolo.cfg import get_cfg
 from ultralytics.yolo.data import load_inference_source
 from ultralytics.yolo.data.augment import LetterBox, classify_transforms
@@ -104,6 +105,7 @@ class BasePredictor:
         self.batch = None
         self.results = None
         self.transforms = None
+        self.saver = PostprocessSaver(num_workers=self.args.workers)
         self.callbacks = _callbacks or callbacks.get_default_callbacks()
         callbacks.add_integration_callbacks(self)
 
@@ -287,6 +289,8 @@ class BasePredictor:
         if isinstance(self.vid_writer[-1], cv2.VideoWriter):
             self.vid_writer[-1].release()  # release final video writer
 
+        self.saver.flush()  # flush all postprocess tasks
+        
         # Print results
         if self.args.verbose and self.seen:
             t = tuple(x.t / self.seen * 1E3 for x in profilers)  # speeds per image

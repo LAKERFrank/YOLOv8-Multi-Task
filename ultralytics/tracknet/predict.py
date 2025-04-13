@@ -5,7 +5,6 @@ from matplotlib import pyplot as plt
 import torch
 import numpy as np
 from ultralytics.tracknet.utils.nms import non_max_suppression
-from ultralytics.tracknet.utils.transform import revert_coordinates
 from ultralytics.yolo.data.build import load_inference_source
 from ultralytics.yolo.engine.predictor import STREAM_WARNING, BasePredictor
 from ultralytics.yolo.engine.results import Results
@@ -13,13 +12,9 @@ from ultralytics.yolo.engine.results import Results
 from ultralytics.yolo.utils import LOGGER, ops
 from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.torch_utils import select_device
-import platform
 from pathlib import Path
 import cv2
 from dataclasses import dataclass
-from typing import Optional
-import psutil
-import pynvml
 
 
 @dataclass
@@ -34,27 +29,27 @@ class ResultItem:
     speed: dict[str, float | None]
 
 class TrackNetPredictor(BasePredictor):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        try:
-            pynvml.nvmlInit()
-            self.gpu_available = True
-            self.gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-        except (ImportError, pynvml.NVMLError_LibraryNotFound):
-            print("⚠️ NVML not available on this system (probably no NVIDIA GPU).")
-            self.gpu_available = False
-        self.proc = psutil.Process(os.getpid())
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
+    #     try:
+    #         pynvml.nvmlInit()
+    #         self.gpu_available = True
+    #         self.gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+    #     except (ImportError, pynvml.NVMLError_LibraryNotFound):
+    #         print("⚠️ NVML not available on this system (probably no NVIDIA GPU).")
+    #         self.gpu_available = False
+    #     self.proc = psutil.Process(os.getpid())
 
-    def profile_resources(self, tag=""):
-        cpu = self.proc.cpu_percent(interval=None)
-        mem = self.proc.memory_info().rss / 1024**2
-        if self.gpu_available:
-            torch.cuda.synchronize()
-            util = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
-            mem_info = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
-            print(f"[{tag}] CPU: {cpu:.1f}%, RAM: {mem:.1f}MB, GPU: {util.gpu}%, vRAM: {mem_info.used/1024**2:.1f}MB")
-        else:
-            print(f"[{tag}] CPU: {cpu:.1f}%, RAM: {mem:.1f}MB (No GPU available)")
+    # def profile_resources(self, tag=""):
+    #     cpu = self.proc.cpu_percent(interval=None)
+    #     mem = self.proc.memory_info().rss / 1024**2
+    #     if self.gpu_available:
+    #         torch.cuda.synchronize()
+    #         util = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
+    #         mem_info = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
+    #         print(f"[{tag}] CPU: {cpu:.1f}%, RAM: {mem:.1f}MB, GPU: {util.gpu}%, vRAM: {mem_info.used/1024**2:.1f}MB")
+    #     else:
+    #         print(f"[{tag}] CPU: {cpu:.1f}%, RAM: {mem:.1f}MB (No GPU available)")
 
     def setup_source(self, source):
         """Sets up source and inference mode."""
@@ -161,9 +156,13 @@ class TrackNetPredictor(BasePredictor):
 
         p = Path(self.batch[0][0])
         parent_dir = p.parent.name
-        save_path = os.path.join(self.save_dir, parent_dir)
-        os.makedirs(save_path, exist_ok=True)
+        match_dir = p.parent.parent.parent.name
+        frame_save_path = os.path.join(self.save_dir, match_dir, 'frame', parent_dir)
+        csv_save_path = os.path.join(self.save_dir, match_dir, 'csv', parent_dir)
+        os.makedirs(frame_save_path, exist_ok=True)
+        os.makedirs(csv_save_path, exist_ok=True)
         result = []
+        csv_rows = []
         for frame_idx in range(10):
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
@@ -215,6 +214,13 @@ class TrackNetPredictor(BasePredictor):
 
             for frame_pred in frame_preds:
                 pred = frame_pred.pred
+                csv_rows.append({
+                    'Frame': frame_idx,
+                    'Visibility': 1 if pred.conf >= conf_threshold else 0,
+                    'X': round(pred.x.item(), 2),
+                    'Y': round(pred.y.item(), 2),
+                    'Conf': round(pred.conf, 2)
+                })
                 if pred.conf >= conf_threshold:
                     cv2.circle(img_np, (int(pred.x.item()), int(pred.y.item())), radius=3, color=(0, 0, 255), thickness=-1)
                     conf_text = f"{pred.conf:.2f}"
@@ -224,7 +230,11 @@ class TrackNetPredictor(BasePredictor):
 
             # 儲存圖片
             idx_p = Path(self.batch[0][frame_idx])
-            cv2.imwrite(f"{save_path}/{idx_p.name}", img_np)
+            save_img_path = f"{frame_save_path}/{idx_p.name}"
+            self.saver.save_image(save_img_path, img_np)
+            save_csv_path = os.path.join(csv_save_path, "predictions.csv")
+            self.saver.save_csv(save_csv_path, csv_rows)
+
         
         # TODO: 這裡需要將結果轉換為原始圖片的座標系統
         # result = revert_coordinates(result, orig_imgs[0].shape[2], orig_imgs[0].shape[3], img[0].shape[2])
