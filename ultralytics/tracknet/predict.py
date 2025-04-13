@@ -74,33 +74,33 @@ class TrackNetPredictor(BasePredictor):
         timings = {}
 
         # Step 1: 檢查是否為 tensor
-        # t0 = time.perf_counter()
+        t0 = time.perf_counter()
         not_tensor = not isinstance(im, torch.Tensor)
-        # t1 = time.perf_counter()
-        # timings["is_tensor_check"] = (t1 - t0) * 1000
+        t1 = time.perf_counter()
+        timings["is_tensor_check"] = (t1 - t0) * 1000
 
         # Step 2: 若是 numpy，轉成 torch tensor
         if not_tensor:
             # Step 4: median subtraction
-            t1 = time.perf_counter()
+            t6 = time.perf_counter()
             median = np.median(im, axis=2, keepdims=True)  # shape: (H, W, 1)
             im = im - median  # shape: (H, W, C)
             im = im.astype(np.float32)
             im = np.clip(im, 0, 255) / 255.0
-            t2 = time.perf_counter()
-            timings["median_subtract"] = (t2 - t1) * 1000
 
-            t3 = time.perf_counter()
+            t7 = time.perf_counter()
+            timings["median_subtract"] = (t7 - t6) * 1000
+            t2 = time.perf_counter()
             im = torch.from_numpy(np.asarray([im]))    # 直接轉換, shape = (H, W, C)
             im = im.permute(0, 3, 1, 2).contiguous()  # (HWC -> CHW)
-            t4 = time.perf_counter()
-            timings["numpy_to_tensor"] = (t4 - t3) * 1000
+            t3 = time.perf_counter()
+            timings["numpy_to_tensor"] = (t3 - t2) * 1000
 
         # Step 3: 移動到 device，並轉 float32
-        t5 = time.perf_counter()
+        t4 = time.perf_counter()
         im = im.to(self.device, non_blocking=self.device.type == "cuda")
-        t6 = time.perf_counter()
-        timings["to_device"] = (t6 - t5) * 1000
+        t5 = time.perf_counter()
+        timings["to_device"] = (t5 - t4) * 1000
 
         # Step 4: median subtraction
         # t6 = time.perf_counter()
@@ -122,11 +122,11 @@ class TrackNetPredictor(BasePredictor):
         # timings["unsqueeze"] = (t11 - t10) * 1000
 
         # Step 7: convert to half if needed
-        t7 = time.perf_counter()
+        t12 = time.perf_counter()
         if self.model.fp16:
             im = im.half()
-        t8 = time.perf_counter()
-        timings["fp16_convert"] = (t8 - t7) * 1000
+        t13 = time.perf_counter()
+        timings["fp16_convert"] = (t13 - t12) * 1000
 
         # Log all timing
         print("[Preprocess Timing (ms)]")
