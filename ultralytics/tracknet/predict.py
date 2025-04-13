@@ -85,8 +85,8 @@ class TrackNetPredictor(BasePredictor):
         im = im.to(self.device, dtype=torch.float32)
 
         # Median subtraction in-place
-        median = im.median(dim=0).values  # shape: (H, W)
-        im.sub_(median)  # in-place subtraction
+        #median = im.median(dim=0).values  # shape: (H, W)
+        #im.sub_(median)  # in-place subtraction
         im.clamp_(0, 255).div_(255.0)  # in-place clamp and normalize
 
         # Add batch dimension and convert to half if needed
