@@ -71,6 +71,55 @@ class TrackNetPredictor(BasePredictor):
     #     # self.args.half = self.args.half  # update half
     #     self.model.eval()
     def preprocess(self, im):
+        not_tensor = not isinstance(im, torch.Tensor)
+
+        if not_tensor:
+            im = torch.from_numpy(im)    # 直接轉換, shape = (H, W, C)
+            im = im.permute(2, 0, 1).contiguous()  # (HWC -> CHW)
+
+        im = im.to(self.device, dtype=torch.float32)
+
+        median = im.median(dim=0).values  # shape: (H, W)
+        im.sub_(median).clamp_(0, 255).div_(255.0)
+
+        im = im.unsqueeze(0)
+
+        if self.model.fp16:
+            im = im.half()
+
+        return im
+    
+        # assert im.ndim == 3 and im.shape[0] == 10, "Expect shape (10, H, W)"
+        # img = im.to(self.device)
+
+        # img = img.float()  # 若 im 是 uint8，轉為 float32
+        # median = img.median(dim=0).values  # shape: (H, W)
+        # img = img - median
+        # img = torch.clamp(img, 0, 255)
+
+        # # Normalize
+        # img /= 255.0
+
+        # # Output shape: (1, 10, 640, 640)
+        # result = img.unsqueeze(0).to(self.device).half() if self.model.fp16 else img.unsqueeze(0).to(self.device)
+        # # self.profile_resources("Preprocess (after)")
+        # return result
+
+    # def inference(self, im, *args, **kwargs):
+    #     self.profile_resources("Inference (before)")
+    #     with torch.profiler.profile(
+    #         activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+    #         record_shapes=True
+    #     ) as prof:
+    #         result = super().inference(im, *args, **kwargs)
+    #         torch.cuda.synchronize()
+    #         prof.step()
+            
+    #     print(prof.key_averages().table(sort_by="cuda_time_total"))
+    #     self.profile_resources("Inference (after)")
+    #     return result
+
+    def preprocess_with_log(self, im):
         timings = {}
 
         # Step 1: 檢查是否為 tensor
@@ -125,36 +174,6 @@ class TrackNetPredictor(BasePredictor):
             print(f"{k:25}: {v:.3f} ms")
 
         return im
-    
-        # assert im.ndim == 3 and im.shape[0] == 10, "Expect shape (10, H, W)"
-        # img = im.to(self.device)
-
-        # img = img.float()  # 若 im 是 uint8，轉為 float32
-        # median = img.median(dim=0).values  # shape: (H, W)
-        # img = img - median
-        # img = torch.clamp(img, 0, 255)
-
-        # # Normalize
-        # img /= 255.0
-
-        # # Output shape: (1, 10, 640, 640)
-        # result = img.unsqueeze(0).to(self.device).half() if self.model.fp16 else img.unsqueeze(0).to(self.device)
-        # # self.profile_resources("Preprocess (after)")
-        # return result
-
-    # def inference(self, im, *args, **kwargs):
-    #     self.profile_resources("Inference (before)")
-    #     with torch.profiler.profile(
-    #         activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
-    #         record_shapes=True
-    #     ) as prof:
-    #         result = super().inference(im, *args, **kwargs)
-    #         torch.cuda.synchronize()
-    #         prof.step()
-            
-    #     print(prof.key_averages().table(sort_by="cuda_time_total"))
-    #     self.profile_resources("Inference (after)")
-    #     return result
 
     def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
