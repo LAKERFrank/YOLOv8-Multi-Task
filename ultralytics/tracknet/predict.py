@@ -18,6 +18,9 @@ from pathlib import Path
 import cv2
 from dataclasses import dataclass
 from typing import Optional
+import psutil
+import pynvml
+
 
 @dataclass
 class Prediction:
@@ -31,11 +34,31 @@ class ResultItem:
     speed: dict[str, float | None]
 
 class TrackNetPredictor(BasePredictor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            pynvml.nvmlInit()
+            self.gpu_available = True
+            self.gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+        except (ImportError, pynvml.NVMLError_LibraryNotFound):
+            print("⚠️ NVML not available on this system (probably no NVIDIA GPU).")
+            self.gpu_available = False
+        self.proc = psutil.Process(os.getpid())
+
+    def profile_resources(self, tag=""):
+        cpu = self.proc.cpu_percent(interval=None)
+        mem = self.proc.memory_info().rss / 1024**2
+        if self.gpu_available:
+            util = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
+            mem_info = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
+            print(f"[{tag}] CPU: {cpu:.1f}%, RAM: {mem:.1f}MB, GPU: {util.gpu}%, vRAM: {mem_info.used/1024**2:.1f}MB")
+        else:
+            print(f"[{tag}] CPU: {cpu:.1f}%, RAM: {mem:.1f}MB (No GPU available)")
+
     def setup_source(self, source):
         """Sets up source and inference mode."""
         self.imgsz = check_imgsz(self.args.imgsz, stride=self.model.stride, min_dim=2)  # check image size
         self.transforms = None
-        images = load_inference_source(source=source, imgsz=self.imgsz, vid_stride=self.args.vid_stride)
         self.dataset = load_inference_source(source=source, imgsz=self.imgsz, vid_stride=self.args.vid_stride)
         self.source_type = self.dataset.source_type
         if not getattr(self, 'stream', True) and (self.dataset.mode == 'stream' or  # streams
@@ -51,6 +74,7 @@ class TrackNetPredictor(BasePredictor):
     #     # self.args.half = self.args.half  # update half
     #     self.model.eval()
     def preprocess(self, im):
+        self.profile_resources("Preprocess")
         not_tensor = not isinstance(im, torch.Tensor)
         if not_tensor:
             im = im.transpose((2, 0, 1))  # BGR to RGB, BHWC to BCHW, (n, 3, h, w)
@@ -71,23 +95,6 @@ class TrackNetPredictor(BasePredictor):
         # Output shape: (1, 10, 640, 640)
         return img.unsqueeze(0).to(self.device).half() if self.model.fp16 else img.unsqueeze(0).to(self.device)
 
-        # 顯示第一張圖片：轉換前 vs. 轉換後
-        # img_after = img[0, 0].detach().cpu().numpy()
-
-        # fig, axs = plt.subplots(1, 2, figsize=(10, 5))
-        # axs[0].imshow(img_before, cmap='gray')
-        # axs[0].set_title("Before Median Subtraction")
-        # axs[0].axis('off')
-
-        # axs[1].imshow(img_after, cmap='gray')
-        # axs[1].set_title("After Median Subtraction")
-        # axs[1].axis('off')
-
-        # plt.tight_layout()
-        # plt.show()
-        # plt.close(fig)
-
-        return img
     def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
         use_nms = True
