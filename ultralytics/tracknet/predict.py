@@ -98,8 +98,15 @@ class TrackNetPredictor(BasePredictor):
         self.profile_resources("Preprocess (after)")
         return result
 
+    def inference(self, im, *args, **kwargs):
+        self.profile_resources("Inference (before)")
+        result = super().inference(im, *args, **kwargs)
+        self.profile_resources("Inference (after)")
+        return result
+
     def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
+        self.profile_resources("Postprocess (before)")
         use_nms = True
         conf_threshold = 0.5
         nc = 1
@@ -199,6 +206,7 @@ class TrackNetPredictor(BasePredictor):
         
         # TODO: 這裡需要將結果轉換為原始圖片的座標系統
         # result = revert_coordinates(result, orig_imgs[0].shape[2], orig_imgs[0].shape[3], img[0].shape[2])
+        self.profile_resources("Postprocess (after)")
         return result
     def write_results(self, idx, results, batch):
         return "todo"
