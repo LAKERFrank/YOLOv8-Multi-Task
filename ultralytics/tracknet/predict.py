@@ -15,6 +15,7 @@ from ultralytics.yolo.utils.torch_utils import select_device
 from pathlib import Path
 import cv2
 from dataclasses import dataclass
+import time
 
 
 @dataclass
@@ -70,24 +71,59 @@ class TrackNetPredictor(BasePredictor):
     #     # self.args.half = self.args.half  # update half
     #     self.model.eval()
     def preprocess(self, im):
-        # self.profile_resources("Preprocess (before)")
+        timings = {}
+
+        # Step 1: 檢查是否為 tensor
+        t0 = time.perf_counter()
         not_tensor = not isinstance(im, torch.Tensor)
+        t1 = time.perf_counter()
+        timings["is_tensor_check"] = (t1 - t0) * 1000
+
+        # Step 2: 若是 numpy，轉成 torch tensor
         if not_tensor:
-            im = im.transpose((2, 0, 1))  # BGR to RGB, BHWC to BCHW, (n, 3, h, w)
-            im = np.ascontiguousarray(im)  # contiguous
+            t2 = time.perf_counter()
+            im = im.transpose((2, 0, 1))  # (HWC -> CHW)
+            im = np.ascontiguousarray(im)
             im = torch.from_numpy(im)
+            t3 = time.perf_counter()
+            timings["numpy_to_tensor"] = (t3 - t2) * 1000
 
+        # Step 3: 移動到 device，並轉 float32
+        t4 = time.perf_counter()
         im = im.to(self.device, dtype=torch.float32)
+        t5 = time.perf_counter()
+        timings["to_device_and_fp32"] = (t5 - t4) * 1000
 
-        # Median subtraction in-place
+        # Step 4: median subtraction
+        t6 = time.perf_counter()
         median = im.median(dim=0).values  # shape: (H, W)
-        im.sub_(median)  # in-place subtraction
-        im.clamp_(0, 255).div_(255.0)  # in-place clamp and normalize
+        im.sub_(median)
+        t7 = time.perf_counter()
+        timings["median_subtract"] = (t7 - t6) * 1000
 
-        # Add batch dimension and convert to half if needed
+        # Step 5: clamp & normalize
+        t8 = time.perf_counter()
+        im.clamp_(0, 255).div_(255.0)
+        t9 = time.perf_counter()
+        timings["clamp_and_normalize"] = (t9 - t8) * 1000
+
+        # Step 6: add batch dim
+        t10 = time.perf_counter()
         im = im.unsqueeze(0)
+        t11 = time.perf_counter()
+        timings["unsqueeze"] = (t11 - t10) * 1000
+
+        # Step 7: convert to half if needed
+        t12 = time.perf_counter()
         if self.model.fp16:
             im = im.half()
+        t13 = time.perf_counter()
+        timings["fp16_convert"] = (t13 - t12) * 1000
+
+        # Log all timing
+        print("[Preprocess Timing (ms)]")
+        for k, v in timings.items():
+            print(f"{k:25}: {v:.3f} ms")
 
         return im
     
