@@ -107,7 +107,8 @@ class TrackNetPredictor(BasePredictor):
             result = super().inference(im, *args, **kwargs)
             torch.cuda.synchronize()
             prof.step()
-            print(prof.key_averages().table(sort_by="cuda_time_total"))
+            
+        print(prof.key_averages().table(sort_by="cuda_time_total"))
         self.profile_resources("Inference (after)")
         return result
 
