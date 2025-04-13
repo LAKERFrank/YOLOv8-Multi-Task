@@ -94,11 +94,11 @@ class TrackNetPredictor(BasePredictor):
         timings["to_device_and_fp32"] = (t5 - t4) * 1000
 
         # Step 4: median subtraction
-        # t6 = time.perf_counter()
-        # median = im.median(dim=0).values  # shape: (H, W)
-        # im.sub_(median)
-        # t7 = time.perf_counter()
-        # timings["median_subtract"] = (t7 - t6) * 1000
+        t6 = time.perf_counter()
+        median = im.median(dim=0).values  # shape: (H, W)
+        im.sub_(median)
+        t7 = time.perf_counter()
+        timings["median_subtract"] = (t7 - t6) * 1000
 
         # Step 5: clamp & normalize
         t8 = time.perf_counter()
