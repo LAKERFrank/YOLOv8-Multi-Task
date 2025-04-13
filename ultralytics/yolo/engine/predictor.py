@@ -283,14 +283,14 @@ class BasePredictor:
             # Print time (inference-only)
             if self.args.verbose:
                 # LOGGER.info(f'{s}{profilers[1].dt * 1E3:.1f}ms')
-                LOGGER.info(f'{profilers[1].dt * 1E3:.1f}ms')
+                LOGGER.info(f'{profilers[0].dt * 1E3:.1f}ms {profilers[1].dt * 1E3:.1f}ms')
 
         # Release assets
         if isinstance(self.vid_writer[-1], cv2.VideoWriter):
             self.vid_writer[-1].release()  # release final video writer
 
         self.saver.flush()  # flush all postprocess tasks
-        
+
         # Print results
         if self.args.verbose and self.seen:
             t = tuple(x.t / self.seen * 1E3 for x in profilers)  # speeds per image
