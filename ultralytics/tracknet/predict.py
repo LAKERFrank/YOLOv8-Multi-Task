@@ -49,6 +49,7 @@ class TrackNetPredictor(BasePredictor):
         cpu = self.proc.cpu_percent(interval=None)
         mem = self.proc.memory_info().rss / 1024**2
         if self.gpu_available:
+            torch.cuda.synchronize()
             util = pynvml.nvmlDeviceGetUtilizationRates(self.gpu_handle)
             mem_info = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
             print(f"[{tag}] CPU: {cpu:.1f}%, RAM: {mem:.1f}MB, GPU: {util.gpu}%, vRAM: {mem_info.used/1024**2:.1f}MB")
@@ -74,7 +75,7 @@ class TrackNetPredictor(BasePredictor):
     #     # self.args.half = self.args.half  # update half
     #     self.model.eval()
     def preprocess(self, im):
-        self.profile_resources("Preprocess")
+        self.profile_resources("Preprocess (before)")
         not_tensor = not isinstance(im, torch.Tensor)
         if not_tensor:
             im = im.transpose((2, 0, 1))  # BGR to RGB, BHWC to BCHW, (n, 3, h, w)
@@ -93,7 +94,9 @@ class TrackNetPredictor(BasePredictor):
         img /= 255.0
 
         # Output shape: (1, 10, 640, 640)
-        return img.unsqueeze(0).to(self.device).half() if self.model.fp16 else img.unsqueeze(0).to(self.device)
+        result = img.unsqueeze(0).to(self.device).half() if self.model.fp16 else img.unsqueeze(0).to(self.device)
+        self.profile_resources("Preprocess (after)")
+        return result
 
     def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
