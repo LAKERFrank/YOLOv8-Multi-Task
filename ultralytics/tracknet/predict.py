@@ -82,21 +82,19 @@ class TrackNetPredictor(BasePredictor):
             im = np.ascontiguousarray(im)  # contiguous
             im = torch.from_numpy(im)
 
-        assert im.ndim == 3 and im.shape[0] == 10, "Expect shape (10, H, W)"
-        img = im.to(self.device)
+        im = im.clone().to(self.device, dtype=torch.float32)
 
-        img = img.float()  # 若 im 是 uint8，轉為 float32
-        median = img.median(dim=0).values  # shape: (H, W)
-        img = img - median
-        img = torch.clamp(img, 0, 255)
+        # Median subtraction in-place
+        median = im.median(dim=0).values  # shape: (H, W)
+        im.sub_(median)  # in-place subtraction
+        im.clamp_(0, 255).div_(255.0)  # in-place clamp and normalize
 
-        # Normalize
-        img /= 255.0
+        # Add batch dimension and convert to half if needed
+        im = im.unsqueeze(0)
+        if self.model.fp16:
+            im = im.half()
 
-        # Output shape: (1, 10, 640, 640)
-        result = img.unsqueeze(0).to(self.device).half() if self.model.fp16 else img.unsqueeze(0).to(self.device)
-        # self.profile_resources("Preprocess (after)")
-        return result
+        return im
 
     # def inference(self, im, *args, **kwargs):
     #     self.profile_resources("Inference (before)")
