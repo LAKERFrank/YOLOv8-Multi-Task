@@ -90,7 +90,7 @@ class TrackNetPredictor(BasePredictor):
 
         # Step 3: 移動到 device，並轉 float32
         t4 = time.perf_counter()
-        im = im.to(self.device, dtype=torch.float32)
+        im = im.to(self.device, dtype=torch.float32, non_blocking=self.device.type == "cuda")
         t5 = time.perf_counter()
         timings["to_device_and_fp32"] = (t5 - t4) * 1000
 
