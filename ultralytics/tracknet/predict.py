@@ -82,9 +82,11 @@ class TrackNetPredictor(BasePredictor):
         # Step 2: 若是 numpy，轉成 torch tensor
         if not_tensor:
             t2 = time.perf_counter()
-            im = im.transpose((2, 0, 1))  # (HWC -> CHW)
-            im = np.ascontiguousarray(im)
-            im = torch.from_numpy(im)
+            im = torch.from_numpy(im)    # 直接轉換, shape = (H, W, C)
+            im = im.permute(2, 0, 1)  # (HWC -> CHW)
+            if not tensor_im.is_contiguous():
+                tensor_im = tensor_im.contiguous()
+                print("Tensor is not contiguous, converting to contiguous tensor.")
             t3 = time.perf_counter()
             timings["numpy_to_tensor"] = (t3 - t2) * 1000
 
