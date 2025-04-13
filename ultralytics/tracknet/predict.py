@@ -75,7 +75,7 @@ class TrackNetPredictor(BasePredictor):
     #     # self.args.half = self.args.half  # update half
     #     self.model.eval()
     def preprocess(self, im):
-        self.profile_resources("Preprocess (before)")
+        # self.profile_resources("Preprocess (before)")
         not_tensor = not isinstance(im, torch.Tensor)
         if not_tensor:
             im = im.transpose((2, 0, 1))  # BGR to RGB, BHWC to BCHW, (n, 3, h, w)
@@ -95,26 +95,26 @@ class TrackNetPredictor(BasePredictor):
 
         # Output shape: (1, 10, 640, 640)
         result = img.unsqueeze(0).to(self.device).half() if self.model.fp16 else img.unsqueeze(0).to(self.device)
-        self.profile_resources("Preprocess (after)")
+        # self.profile_resources("Preprocess (after)")
         return result
 
-    def inference(self, im, *args, **kwargs):
-        self.profile_resources("Inference (before)")
-        with torch.profiler.profile(
-            activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
-            record_shapes=True
-        ) as prof:
-            result = super().inference(im, *args, **kwargs)
-            torch.cuda.synchronize()
-            prof.step()
+    # def inference(self, im, *args, **kwargs):
+    #     self.profile_resources("Inference (before)")
+    #     with torch.profiler.profile(
+    #         activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+    #         record_shapes=True
+    #     ) as prof:
+    #         result = super().inference(im, *args, **kwargs)
+    #         torch.cuda.synchronize()
+    #         prof.step()
             
-        print(prof.key_averages().table(sort_by="cuda_time_total"))
-        self.profile_resources("Inference (after)")
-        return result
+    #     print(prof.key_averages().table(sort_by="cuda_time_total"))
+    #     self.profile_resources("Inference (after)")
+    #     return result
 
     def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
-        self.profile_resources("Postprocess (before)")
+        # self.profile_resources("Postprocess (before)")
         use_nms = True
         conf_threshold = 0.5
         nc = 1
@@ -214,7 +214,7 @@ class TrackNetPredictor(BasePredictor):
         
         # TODO: 這裡需要將結果轉換為原始圖片的座標系統
         # result = revert_coordinates(result, orig_imgs[0].shape[2], orig_imgs[0].shape[3], img[0].shape[2])
-        self.profile_resources("Postprocess (after)")
+        # self.profile_resources("Postprocess (after)")
         return result
     def write_results(self, idx, results, batch):
         return "todo"
