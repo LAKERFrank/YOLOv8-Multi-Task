@@ -81,26 +81,17 @@ class TrackNetPredictor(BasePredictor):
 
         # Step 2: 若是 numpy，轉成 torch tensor
         if not_tensor:
-            # Step 4: median subtraction
-            t6 = time.perf_counter()
-            median = np.median(im, axis=2, keepdims=True)  # shape: (H, W, 1)
-            im = im - median  # shape: (H, W, C)
-            im = im.astype(np.float32)
-            im = np.clip(im, 0, 255) / 255.0
-
-            t7 = time.perf_counter()
-            timings["median_subtract"] = (t7 - t6) * 1000
             t2 = time.perf_counter()
-            im = torch.from_numpy(np.asarray([im]))    # 直接轉換, shape = (H, W, C)
-            im = im.permute(0, 3, 1, 2).contiguous()  # (HWC -> CHW)
+            im = torch.from_numpy(im)    # 直接轉換, shape = (H, W, C)
+            im = im.permute(2, 0, 1).contiguous()  # (HWC -> CHW)
             t3 = time.perf_counter()
             timings["numpy_to_tensor"] = (t3 - t2) * 1000
 
         # Step 3: 移動到 device，並轉 float32
         t4 = time.perf_counter()
-        im = im.to(self.device, non_blocking=self.device.type == "cuda")
+        im = im.to(self.device, dtype=torch.float32, non_blocking=self.device.type == "cuda")
         t5 = time.perf_counter()
-        timings["to_device"] = (t5 - t4) * 1000
+        timings["to_device_and_fp32"] = (t5 - t4) * 1000
 
         # Step 4: median subtraction
         # t6 = time.perf_counter()
@@ -110,16 +101,16 @@ class TrackNetPredictor(BasePredictor):
         # timings["median_subtract"] = (t7 - t6) * 1000
 
         # Step 5: clamp & normalize
-        # t8 = time.perf_counter()
-        # im.clamp_(0, 255).div_(255.0)
-        # t9 = time.perf_counter()
-        # timings["clamp_and_normalize"] = (t9 - t8) * 1000
+        t8 = time.perf_counter()
+        im.clamp_(0, 255).div_(255.0)
+        t9 = time.perf_counter()
+        timings["clamp_and_normalize"] = (t9 - t8) * 1000
 
         # Step 6: add batch dim
-        # t10 = time.perf_counter()
-        # im = im.unsqueeze(0)
-        # t11 = time.perf_counter()
-        # timings["unsqueeze"] = (t11 - t10) * 1000
+        t10 = time.perf_counter()
+        im = im.unsqueeze(0)
+        t11 = time.perf_counter()
+        timings["unsqueeze"] = (t11 - t10) * 1000
 
         # Step 7: convert to half if needed
         t12 = time.perf_counter()
