@@ -135,28 +135,36 @@ def split_into_segments(df, max_missing_frames=30):
 
     return segments
 
-def compute_motion_score(xy_seq):
+def compute_motion_score(xy_seq, fps, head_width_px=20.0):
     xy = np.array(xy_seq)
     if np.any(np.isnan(xy)):
         return 0.0
     max_disp = np.max(np.linalg.norm(xy - xy[0], axis=1))
+    
     speeds = np.linalg.norm(xy[1:] - xy[:-1], axis=1)
     mean_speed = np.mean(speeds)
     coord_variance = np.var(xy[:, 0]) + np.var(xy[:, 1])
-    path_length = np.sum(speeds)
+
+    displacements = np.linalg.norm(xy[1:] - xy[:-1], axis=1)  # shape: (N-1,)
+    path_length = np.sum(displacements)
+    total_time = (len(xy) - 1) / fps
+    avg_speed = path_length / total_time
+    real_avg_seed_cm = avg_speed * 20 / head_width_px
+
     motion_score = (
         0.8 * max_disp +
         1.0 * mean_speed +
         0.01 * coord_variance +    # 強縮放，避免爆炸
         0.8 * path_length
     )
-    return motion_score
+    return real_avg_seed_cm
 
 def preprocess_csv_per_frame_motion_filter_with_padding_v2(
     csv_path,
-    window_size=10,
     motion_score_threshold=40.0,
-    min_visible_in_window=5
+    fps = 120,
+    duration_s = 1/3,
+    head_width_px = 36.0,
 ):
     """
     幀級靜止球過濾版本（最終版）：對每一幀根據其周圍 window_size 幀計算 motion score，
@@ -168,7 +176,10 @@ def preprocess_csv_per_frame_motion_filter_with_padding_v2(
     if 'Visibility' not in df.columns or 'X' not in df.columns or 'Y' not in df.columns:
         raise ValueError("CSV 欄位缺少必要資訊")
 
+    window_size = int(duration_s*fps)
+
     half_w = window_size // 2
+    min_visible_in_window = half_w
     motion_scores = np.zeros(len(df))
     removed_mask = np.zeros(len(df), dtype=bool)
 
@@ -191,7 +202,7 @@ def preprocess_csv_per_frame_motion_filter_with_padding_v2(
         if len(visible_segment) < min_visible_in_window:
             continue
         xy_seq = list(zip(visible_segment['X'], visible_segment['Y']))
-        motion_scores[i] = compute_motion_score(xy_seq)
+        motion_scores[i] = compute_motion_score(xy_seq, fps=fps, head_width_px=head_width_px)
         if motion_scores[i] < motion_score_threshold and df.loc[i, 'Visibility'] == 1:
             removed_mask[i] = True
 
@@ -201,7 +212,7 @@ def preprocess_csv_per_frame_motion_filter_with_padding_v2(
     return df
 
 def preprocess_csvV4(csv_path):
-    df_filtered = preprocess_csv_per_frame_motion_filter_with_padding_v2(csv_path, motion_score_threshold=25.0)
+    df_filtered = preprocess_csv_per_frame_motion_filter_with_padding_v2(csv_path, motion_score_threshold=80)
     plot_visibility_removed_points_2d(df_filtered, save_path=convert_to_static_removal_path(csv_path))
     df_filtered.to_csv(convert_to_static_removal_csv_path(csv_path, 'static_removal_before_csv'), index=False)
     
@@ -465,7 +476,9 @@ def plot_static_removal_comparison(df, save_path=None):
 
 if __name__ == "__main__":
     # Example usage
-    csv_file = '/Users/bartek/git/BartekTao/datasets/blion_tracknet_partial/csv/'
+    csv_file = '/Users/bartek/git/BartekTao/datasets/sportxai_2025/csv/'
+    # csv_file = '/Users/bartek/git/BartekTao/datasets/blion_tracknet_partial/csv/'
+
     # foreach read all csv files in the directory
     csv_files = [os.path.join(csv_file, f) for f in os.listdir(csv_file) if f.endswith('.csv')]
     for csv_file in csv_files:
