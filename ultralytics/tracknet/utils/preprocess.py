@@ -4,6 +4,7 @@ import pandas as pd
 import math
 import matplotlib.pyplot as plt
 
+
 def preprocess_csv(csv_file):
     # Read the ball_trajectory csv file
     ball_trajectory_df = pd.read_csv(csv_file)
@@ -161,10 +162,10 @@ def compute_motion_score(xy_seq, fps, head_width_px=20.0):
 
 def preprocess_csv_per_frame_motion_filter_with_padding_v2(
     csv_path,
-    motion_score_threshold=40.0,
-    fps = 120,
+    motion_score_threshold,
+    fps,
+    head_width_px,
     duration_s = 1/3,
-    head_width_px = 36.0,
 ):
     """
     幀級靜止球過濾版本（最終版）：對每一幀根據其周圍 window_size 幀計算 motion score，
@@ -209,10 +210,63 @@ def preprocess_csv_per_frame_motion_filter_with_padding_v2(
     df['motion_score'] = motion_scores
     df['static_ball'] = removed_mask
 
+    df = apply_segment_seeded_consistency(
+        df,
+        fps=fps,
+        duration_s=duration_s,
+        static_ratio_threshold=0.6,
+        dynamic_ratio_threshold=0.4
+    )
+
     return df
 
-def preprocess_csvV4(csv_path):
-    df_filtered = preprocess_csv_per_frame_motion_filter_with_padding_v2(csv_path, motion_score_threshold=80)
+def apply_segment_seeded_consistency(df,
+                                     fps,
+                                     duration_s,
+                                     static_ratio_threshold=0.6,
+                                     dynamic_ratio_threshold=0.4):
+    """
+    雙向區段一致性處理：
+    - 靜止點 seed：若 static_ratio >= 靜止閾值，整段設為靜止
+    - 動態點 seed：若 static_ratio <= 動態閾值，整段取消靜止
+    """
+    window_size = int(duration_s * fps)
+    is_static = df['static_ball'].values
+    final_mask = np.array(is_static)
+    N = len(df)
+
+    i = 0
+    while i < N:
+        curr = is_static[i]
+
+        if curr:
+            start = i
+            end = min(i + window_size, N)
+            while end < N and is_static[end]:
+                end += 1
+            segment = is_static[start:end]
+            static_ratio = np.mean(segment)
+
+            if static_ratio >= static_ratio_threshold:
+                final_mask[start:end] = True
+                i = end
+                continue
+            else:
+                final_mask[start:end] = False
+                i = end
+                continue
+            # elif static_ratio <= dynamic_ratio_threshold:
+            #     final_mask[start:end] = False
+            #     i = end
+            #     continue
+
+        i += 1
+
+    df['static_ball'] = final_mask
+    return df
+
+def preprocess_csvV4(csv_path, fps, head_width_px=20.0, duration_s=1/3):
+    df_filtered = preprocess_csv_per_frame_motion_filter_with_padding_v2(csv_path, 80, fps, head_width_px, duration_s)
     plot_visibility_removed_points_2d(df_filtered, save_path=convert_to_static_removal_path(csv_path))
     df_filtered.to_csv(convert_to_static_removal_csv_path(csv_path, 'static_removal_before_csv'), index=False)
     
@@ -483,4 +537,5 @@ if __name__ == "__main__":
     csv_files = [os.path.join(csv_file, f) for f in os.listdir(csv_file) if f.endswith('.csv')]
     for csv_file in csv_files:
         print(f"Processing {csv_file}...")
-        df = preprocess_csvV4(csv_file)
+        # df = preprocess_csvV4(csv_file, fps=30, head_width_px=20.0, duration_s=1/3)
+        df = preprocess_csvV4(csv_file, fps=120, head_width_px=36.0, duration_s=1/3)
