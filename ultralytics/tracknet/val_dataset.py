@@ -1,3 +1,4 @@
+import json
 from matplotlib import patches, pyplot as plt
 import torch
 from torch.utils.data import Dataset
@@ -24,7 +25,7 @@ class TrackNetValDataset(Dataset):
 
         self.idx = set()
 
-        image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png"))) - 10
+        image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
         self.pbar = tqdm(total=image_count, miniters=1, smoothing=1)
         # Traverse all matches
@@ -41,6 +42,12 @@ class TrackNetValDataset(Dataset):
         self.pbar.close()
 
     def read_match(self, match_name):
+        metadata_path = os.path.join(self.root_dir, match_name, 'metadata.json')
+        # 讀取 JSON 檔案
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        head_width = data['calibration']['near_camera_head_width_px']
+        
         video_dir = os.path.join(self.root_dir, match_name, 'video')
         csv_dir = os.path.join(self.root_dir, match_name, 'csv')
 
@@ -48,11 +55,16 @@ class TrackNetValDataset(Dataset):
 
         # Traverse all videos in the match directory
         for video_name in glob("*.mp4", root_dir=video_dir):
+            # get video fps
+            video_path = os.path.join(video_dir, video_name)
+            cap = cv2.VideoCapture(video_path)
+            fps = cap.get(cv2.CAP_PROP_FPS)
+
             video_name = video_name.removesuffix('.mp4')
 
             csv_file = os.path.join(csv_dir, video_name + "_ball" + '.csv')
             
-            ball_trajectory_df = self.__preprocess_csv(csv_file)
+            ball_trajectory_df = self.__preprocess_csv(csv_file, fps, head_width)
 
             #print(ball_trajectory_df.columns)
             #['Frame', 'Visibility', 'X', 'Y', 'dX', 'dY', 'hit']
@@ -62,11 +74,10 @@ class TrackNetValDataset(Dataset):
             img_files = sorted(glob("*.png", root_dir=frame_dir), key=lambda x: int(x.removesuffix(".png")))
             img = cv2.cvtColor(cv2.imread(os.path.join(frame_dir, img_files[0])), cv2.COLOR_BGR2GRAY)
             h, w = img.shape
+            total_img_len = len(img_files)
 
             # Create sliding windows of num_input frames, stride = 10
             for i in range(len(img_files)//10):
-                self.pbar.update(1)
-
                 frames = img_files[i*self.num_input: i*self.num_input + self.num_input]
 
                 target = ball_trajectory_df.iloc[i*self.num_input: i*self.num_input + self.num_input].values
@@ -87,30 +98,7 @@ class TrackNetValDataset(Dataset):
 
                     self.img_cache(match_name, video_name, frames, npy_path)
 
-            # 降低 FPS 120 => 60
-            # for i in range(len(img_files)//20):
-            #     self.pbar.update(1)
-
-            #     frames = img_files[i*self.num_input*2: i*self.num_input*2 + self.num_input*2: 2]
-
-            #     target = ball_trajectory_df.iloc[i*self.num_input*2: i*self.num_input*2 + self.num_input*2: 2].values
-            #     target = self.transform_coordinates(target, w, h)
-
-            #     # Avoid invalid data
-            #     if len(frames) == self.num_input and len(target) == self.num_input:
-            #         npy_path = self.img_cache_dir(match_name, video_name, frames)
-
-            #         self.samples.append({
-            #             "match_name": match_name,
-            #             "video_name": video_name,
-            #             "cache_npy": npy_path,
-            #             "img_files": frames,
-            #             "target": target
-            #         })
-
-            #         self.img_cache(match_name, video_name, frames, npy_path)
-
-            self.pbar.update(self.num_input-1)
+            self.pbar.update(total_img_len)
 
     def img_cache_dir(self, match_name, video_name, img_files):
         s = '|'.join([match_name]+[video_name]+img_files)
@@ -155,8 +143,8 @@ class TrackNetValDataset(Dataset):
         except Exception as e:
             raise Exception("File corrupted: " + path)
 
-    def __preprocess_csv(self, csv_file):
-        return preprocess_csvV4(csv_file)
+    def __preprocess_csv(self, csv_file, fps, head_width_px):
+        return preprocess_csvV4(csv_file, fps, head_width_px)
     
     def __len__(self):
         return len(self.samples)

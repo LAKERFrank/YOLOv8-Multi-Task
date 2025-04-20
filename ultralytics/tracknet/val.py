@@ -523,7 +523,7 @@ class TrackNetValidator(BaseValidator):
         self.pos_precision = 0
         self.ball_count = 0
         self.pred_ball_count = 0
-        device = device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.reg_max = 16
         self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
         self.feat_no = 8
