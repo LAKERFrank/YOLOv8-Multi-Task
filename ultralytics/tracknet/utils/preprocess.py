@@ -266,7 +266,7 @@ def apply_segment_seeded_consistency(df,
     return df
 
 def preprocess_csvV4(csv_path, fps, head_width_px=20.0, duration_s=1/3):
-    df_filtered = preprocess_csv_per_frame_motion_filter_with_padding_v2(csv_path, 16, fps, head_width_px, duration_s)
+    df_filtered = preprocess_csv_per_frame_motion_filter_with_padding_v2(csv_path, 13, fps, head_width_px, duration_s)
     plot_visibility_removed_points_2d(df_filtered, save_path=convert_to_static_removal_path(csv_path))
     df_filtered.to_csv(convert_to_static_removal_csv_path(csv_path, 'static_removal_before_csv'), index=False)
     
