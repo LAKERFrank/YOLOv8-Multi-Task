@@ -142,23 +142,23 @@ def compute_motion_score(xy_seq, fps, head_width_px=20.0):
         return 0.0
     max_disp = np.max(np.linalg.norm(xy - xy[0], axis=1))
     
-    speeds = np.linalg.norm(xy[1:] - xy[:-1], axis=1)
-    mean_speed = np.mean(speeds)
-    coord_variance = np.var(xy[:, 0]) + np.var(xy[:, 1])
+    # speeds = np.linalg.norm(xy[1:] - xy[:-1], axis=1)
+    # mean_speed = np.mean(speeds)
+    # coord_variance = np.var(xy[:, 0]) + np.var(xy[:, 1])
 
-    displacements = np.linalg.norm(xy[1:] - xy[:-1], axis=1)  # shape: (N-1,)
-    path_length = np.sum(displacements)
-    total_time = (len(xy) - 1) / fps
-    avg_speed = path_length / total_time
-    real_avg_seed_cm = avg_speed * 20 / head_width_px
-
-    motion_score = (
-        0.8 * max_disp +
-        1.0 * mean_speed +
-        0.01 * coord_variance +    # 強縮放，避免爆炸
-        0.8 * path_length
-    )
-    return real_avg_seed_cm
+    # displacements = np.linalg.norm(xy[1:] - xy[:-1], axis=1)  # shape: (N-1,)
+    # path_length = np.sum(displacements)
+    # total_time = (len(xy) - 1) / fps
+    # avg_speed = path_length / total_time
+    # real_avg_seed_cm = avg_speed * 20 / head_width_px
+    max_disp_cm = max_disp * 20 / head_width_px
+    # motion_score = (
+    #     0.8 * max_disp +
+    #     1.0 * mean_speed +
+    #     0.01 * coord_variance +    # 強縮放，避免爆炸
+    #     0.8 * path_length
+    # )
+    return max_disp_cm
 
 def preprocess_csv_per_frame_motion_filter_with_padding_v2(
     csv_path,
@@ -266,7 +266,7 @@ def apply_segment_seeded_consistency(df,
     return df
 
 def preprocess_csvV4(csv_path, fps, head_width_px=20.0, duration_s=1/3):
-    df_filtered = preprocess_csv_per_frame_motion_filter_with_padding_v2(csv_path, 80, fps, head_width_px, duration_s)
+    df_filtered = preprocess_csv_per_frame_motion_filter_with_padding_v2(csv_path, 16, fps, head_width_px, duration_s)
     plot_visibility_removed_points_2d(df_filtered, save_path=convert_to_static_removal_path(csv_path))
     df_filtered.to_csv(convert_to_static_removal_csv_path(csv_path, 'static_removal_before_csv'), index=False)
     
@@ -530,12 +530,14 @@ def plot_static_removal_comparison(df, save_path=None):
 
 if __name__ == "__main__":
     # Example usage
-    csv_file = '/Users/bartek/git/BartekTao/datasets/sportxai_2025/csv/'
-    # csv_file = '/Users/bartek/git/BartekTao/datasets/blion_tracknet_partial/csv/'
+    #csv_file = '/Users/bartek/git/BartekTao/datasets/blion_tracknet_partial/csv/'
+    #csv_file = '/Users/bartek/git/BartekTao/datasets/sportxai_2025/csv/'
+    csv_file = '/Users/bartek/git/BartekTao/datasets/sportxai_rally/csv/'
 
     # foreach read all csv files in the directory
     csv_files = [os.path.join(csv_file, f) for f in os.listdir(csv_file) if f.endswith('.csv')]
     for csv_file in csv_files:
         print(f"Processing {csv_file}...")
-        # df = preprocess_csvV4(csv_file, fps=30, head_width_px=20.0, duration_s=1/3)
-        df = preprocess_csvV4(csv_file, fps=120, head_width_px=36.0, duration_s=1/3)
+        #df = preprocess_csvV4(csv_file, fps=30, head_width_px=20.0, duration_s=1/3)
+        #df = preprocess_csvV4(csv_file, fps=120, head_width_px=36.0, duration_s=1/2)
+        df = preprocess_csvV4(csv_file, fps=120, head_width_px=35.0, duration_s=1/3)
