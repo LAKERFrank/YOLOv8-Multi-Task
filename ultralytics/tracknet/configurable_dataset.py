@@ -181,7 +181,7 @@ class TrackNetConfigurableDataset(Dataset):
         f = os.path.join(d, f"{filename}.npy")
         return f
 
-    def img_cache(self, match_name, video_name, img_files, npy_path, mix=True):
+    def img_cache(self, match_name, video_name, img_files, npy_path):
 
         if os.path.isfile(npy_path):
             return
@@ -191,10 +191,7 @@ class TrackNetConfigurableDataset(Dataset):
                 for fp in img_files]
         frames = np.array(frames)  # 轉換為 NumPy 陣列
 
-        if mix:
-            background_remove = np.random.choice([True, False])
-        else:
-            background_remove = True
+        background_remove = True
 
         if background_remove:
             # 計算中位數影像，確保 dtype 為 float32
