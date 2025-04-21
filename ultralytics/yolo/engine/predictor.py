@@ -320,7 +320,7 @@ class BasePredictor:
             self.model.warmup(imgsz=(1 if self.model.pt or self.model.triton else self.dataset.bs, 10, *self.imgsz))
             self.done_warmup = True
 
-        num_streams = 4
+        num_streams = 1
         streams = [torch.cuda.Stream() for _ in range(num_streams)]
         queue = Queue(maxsize=32)
         pending = []
