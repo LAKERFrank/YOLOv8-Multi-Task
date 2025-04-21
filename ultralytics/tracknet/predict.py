@@ -261,19 +261,9 @@ class TrackNetPredictor(BasePredictor):
                 speed={'preprocess': None, 'inference': None, 'postprocess': None}
             ))
             
-            # 視覺化與儲存圖片
-            img_np = orig_images_clone[frame_idx, :, :]
-            img_np = img_np.astype(np.uint8)
-            img_np = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
-            img_np = np.ascontiguousarray(img_np.copy())
-
             for frame_pred in frame_preds:
                 pred = frame_pred.pred
                 if pred.conf >= conf_threshold:
-                    cv2.circle(img_np, (int(pred.x.item()), int(pred.y.item())), radius=3, color=(0, 0, 255), thickness=-1)
-                    conf_text = f"{pred.conf:.2f}"
-                    cv2.putText(img_np, conf_text, (int(pred.x.item()) + 5, int(pred.y.item()) - 5),
-                                cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=1)
                     csv_rows.append({
                         'Frame': real_frame_idx+frame_idx,
                         'Visibility': 1,
@@ -281,14 +271,34 @@ class TrackNetPredictor(BasePredictor):
                         'Y': round(pred.y.item(), 2),
                         'Conf': round(pred.conf, 2)
                     })
+            # 視覺化與儲存圖片
+            # img_np = orig_images_clone[frame_idx, :, :]
+            # img_np = img_np.astype(np.uint8)
+            # img_np = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
+            # img_np = np.ascontiguousarray(img_np.copy())
+
+            # for frame_pred in frame_preds:
+            #     pred = frame_pred.pred
+            #     if pred.conf >= conf_threshold:
+            #         cv2.circle(img_np, (int(pred.x.item()), int(pred.y.item())), radius=3, color=(0, 0, 255), thickness=-1)
+            #         conf_text = f"{pred.conf:.2f}"
+            #         cv2.putText(img_np, conf_text, (int(pred.x.item()) + 5, int(pred.y.item()) - 5),
+            #                     cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=1)
+            #         csv_rows.append({
+            #             'Frame': real_frame_idx+frame_idx,
+            #             'Visibility': 1,
+            #             'X': round(pred.x.item(), 2),
+            #             'Y': round(pred.y.item(), 2),
+            #             'Conf': round(pred.conf, 2)
+            #         })
 
 
             # 儲存圖片
-            idx_p = Path(self.batch[0][frame_idx])
-            save_img_path = f"{frame_save_path}/{idx_p.name}"
-            self.saver.save_image(save_img_path, img_np)
-        save_csv_path = os.path.join(csv_save_path, f"{p.stem}.csv")
-        self.saver.save_csv(save_csv_path, csv_rows)
+            # idx_p = Path(self.batch[0][frame_idx])
+            # save_img_path = f"{frame_save_path}/{idx_p.name}"
+            # self.saver.save_image(save_img_path, img_np)
+        # save_csv_path = os.path.join(csv_save_path, f"{p.stem}.csv")
+        # self.saver.save_csv(save_csv_path, csv_rows)
 
         
         # TODO: 這裡需要將結果轉換為原始圖片的座標系統
