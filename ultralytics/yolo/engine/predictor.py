@@ -327,11 +327,13 @@ class BasePredictor:
 
         pre_total, infer_total, post_total = 0.0, 0.0, 0.0
         total_images = 0
+        feeder_finished = False
 
         def batch_feeder():
+            nonlocal feeder_finished
             for i, batch in enumerate(self.dataset):
                 queue.put((i, batch))
-            queue.put(None)  # Sentinel
+            feeder_finished = True
 
         Thread(target=batch_feeder, daemon=True).start()
         self.run_callbacks('on_predict_start')
@@ -419,7 +421,7 @@ class BasePredictor:
                     new_pending.append(p)
             pending = new_pending
 
-            if queue.queue[0] is None and not pending:
+            if feeder_finished and queue.empty() and not pending:
                 break
 
         self.run_callbacks('on_predict_end')
