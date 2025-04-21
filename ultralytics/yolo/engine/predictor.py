@@ -29,6 +29,8 @@ Usage - formats:
 """
 import platform
 from pathlib import Path
+from threading import Thread
+from queue import Queue
 
 import cv2
 import numpy as np
@@ -216,7 +218,7 @@ class BasePredictor:
         self.vid_path, self.vid_writer = [None] * self.dataset.bs, [None] * self.dataset.bs
 
     @smart_inference_mode()
-    def stream_inference(self, source=None, model=None, *args, **kwargs):
+    def stream_inference_v1(self, source=None, model=None, *args, **kwargs):
         """Streams real-time inference on camera feed and saves results to file."""
         if self.args.verbose:
             LOGGER.info('')
@@ -302,6 +304,129 @@ class BasePredictor:
             LOGGER.info(f"Results saved to {colorstr('bold', self.save_dir)}{s}")
 
         self.run_callbacks('on_predict_end')
+
+    @smart_inference_mode()
+    def stream_inference(self, source=None, model=None, *args, **kwargs):
+        """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
+
+        if not self.model:
+            self.setup_model(model)
+        self.setup_source(source if source is not None else self.args.source)
+
+        if self.args.save or self.args.save_txt:
+            (self.save_dir / 'labels' if self.args.save_txt else self.save_dir).mkdir(parents=True, exist_ok=True)
+
+        if not self.done_warmup:
+            self.model.warmup(imgsz=(1 if self.model.pt or self.model.triton else self.dataset.bs, 10, *self.imgsz))
+            self.done_warmup = True
+
+        num_streams = 4
+        streams = [torch.cuda.Stream() for _ in range(num_streams)]
+        queue = Queue(maxsize=32)
+        pending = []
+
+        pre_total, infer_total, post_total = 0.0, 0.0, 0.0
+        total_images = 0
+
+        def batch_feeder():
+            for i, batch in enumerate(self.dataset):
+                queue.put((i, batch))
+            queue.put(None)  # Sentinel
+
+        Thread(target=batch_feeder, daemon=True).start()
+        self.run_callbacks('on_predict_start')
+
+        while True:
+            while not queue.empty():
+                item = queue.get()
+                if item is None:
+                    queue.put(None)
+                    break
+                i, batch = item
+                self.batch = batch
+                path, im0s, vid_cap, s = batch
+                stream = streams[i % num_streams]
+
+                # Timing events
+                pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                infer_start, infer_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                end_event = torch.cuda.Event(True)
+
+                with torch.cuda.stream(stream):
+                    pre_start.record(stream)
+                    im = self.preprocess(im0s)
+                    pre_end.record(stream)
+
+                    infer_start.record(stream)
+                    preds = self.inference(im, *args, **kwargs)
+                    infer_end.record(stream)
+
+                    post_start.record(stream)
+                    results = self.postprocess(preds, im, im0s)
+                    post_end.record(stream)
+
+                    end_event.record(stream)
+
+                pending.append({
+                    "event": end_event,
+                    "stream": stream,
+                    "path": path,
+                    "im0s": im0s,
+                    "vid_cap": vid_cap,
+                    "results": results,
+                    "profiling": {
+                        "pre": (pre_start, pre_end),
+                        "infer": (infer_start, infer_end),
+                        "post": (post_start, post_end)
+                    }
+                })
+
+            new_pending = []
+            for p in pending:
+                if p["event"].query():
+                    n = p["im0s"].shape[2]
+                    pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
+                    infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
+                    post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
+
+                    pre_total += pre_e
+                    infer_total += infer_e
+                    post_total += post_e
+                    total_images += n
+
+                    for j in range(n):
+                        p["results"][j].speed = {
+                            'preprocess': pre_e / n,
+                            'inference': infer_e / n,
+                            'postprocess': post_e / n
+                        }
+                        pj = Path(p["path"][j])
+                        im0 = None if self.source_type.tensor else p["im0s"][j].copy()
+
+                        if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
+                            _ = self.write_results(j, p["results"], (pj, im, im0))
+                        if self.args.save or self.args.save_txt:
+                            p["results"][j].save_dir = str(self.save_dir)
+                        if self.args.show and self.plotted_img is not None:
+                            self.show(pj)
+                        if self.args.save and self.plotted_img is not None:
+                            self.save_preds(p["vid_cap"], j, str(self.save_dir / pj.name))
+
+                    self.run_callbacks('on_predict_batch_end')
+                    yield from p["results"]
+                else:
+                    new_pending.append(p)
+            pending = new_pending
+
+            if queue.queue[0] is None and not pending:
+                break
+
+        self.run_callbacks('on_predict_end')
+        if total_images:
+            LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
+                        f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
+
 
     def setup_model(self, model, verbose=True):
         """Initialize YOLO model with given parameters and set it to evaluation mode."""
