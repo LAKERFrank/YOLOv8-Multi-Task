@@ -334,6 +334,7 @@ class BasePredictor:
             for i, batch in enumerate(self.dataset):
                 queue.put((i, batch))
             feeder_finished = True
+            LOGGER.info(f'Feeder finished, {self.dataset.count} images loaded.')
 
         Thread(target=batch_feeder, daemon=True).start()
         self.run_callbacks('on_predict_start')
@@ -403,19 +404,20 @@ class BasePredictor:
                             'inference': infer_e / n,
                             'postprocess': post_e / n
                         }
-                        pj = Path(p["path"][j])
-                        im0 = None if self.source_type.tensor else p["im0s"][j].copy()
+                        # pj = Path(p["path"][j])
+                        # im0 = None if self.source_type.tensor else p["im0s"][j].copy()
 
-                        if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
-                            _ = self.write_results(j, p["results"], (pj, im, im0))
-                        if self.args.save or self.args.save_txt:
-                            p["results"][j].save_dir = str(self.save_dir)
-                        if self.args.show and self.plotted_img is not None:
-                            self.show(pj)
-                        if self.args.save and self.plotted_img is not None:
-                            self.save_preds(p["vid_cap"], j, str(self.save_dir / pj.name))
+                        # if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
+                        #     _ = self.write_results(j, p["results"], (pj, im, im0))
+                        # if self.args.save or self.args.save_txt:
+                        #     p["results"][j].save_dir = str(self.save_dir)
+                        # if self.args.show and self.plotted_img is not None:
+                        #     self.show(pj)
+                        # if self.args.save and self.plotted_img is not None:
+                        #     self.save_preds(p["vid_cap"], j, str(self.save_dir / pj.name))
 
                     self.run_callbacks('on_predict_batch_end')
+                    LOGGER.info(f'{p["path"]} {s} {pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
                     yield from p["results"]
                 else:
                     new_pending.append(p)
