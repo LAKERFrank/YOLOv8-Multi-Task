@@ -23,7 +23,7 @@ class TrackNetConfigurableDataset(Dataset):
         self.num_input = num_input
         self.samples = []
         self.prefix = prefix
-        self.path_counts = {f"profession_match_{i}": 1000 for i in range(1, 15)}
+        self.path_counts = {f"profession_match_{i}": 1000 for i in range(1, 30)}
         self.path_counts.update({
             "match_2": 5000, # for local test
             "AUX_nycu_new_court": 2000,
