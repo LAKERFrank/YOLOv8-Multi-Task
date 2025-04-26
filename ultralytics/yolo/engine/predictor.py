@@ -31,6 +31,7 @@ import platform
 from pathlib import Path
 from threading import Thread
 from queue import Queue
+import time
 
 import cv2
 import numpy as np
@@ -357,6 +358,7 @@ class BasePredictor:
                 end_event = torch.cuda.Event(True)
 
                 with torch.cuda.stream(stream):
+                    LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
                     pre_start.record(stream)
                     im = self.preprocess(im0s)
                     pre_end.record(stream)
@@ -370,6 +372,7 @@ class BasePredictor:
                     post_end.record(stream)
 
                     end_event.record(stream)
+                    LOGGER.info(f"[End] Stream {i % num_streams} finished batch {i} at {time.time():.4f}")
 
                 pending.append({
                     "event": end_event,
