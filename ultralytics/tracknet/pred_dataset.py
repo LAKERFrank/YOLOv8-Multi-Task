@@ -4,6 +4,7 @@ import cv2
 import torch
 from torch.utils.data import Dataset
 from glob import glob
+from tqdm import tqdm
 
 from ultralytics.yolo.data.build import check_source
 from ultralytics.yolo.data.dataloaders.stream_loaders import SourceTypes
@@ -24,7 +25,7 @@ class TrackNetPredDataset(Dataset):
                            key=lambda x: int(os.path.basename(x).split('.')[0]))
 
         total_batches = len(img_files) // num_input
-        for i in range(total_batches):
+        for i in tqdm(range(total_batches), desc="Loading batches", ncols=80):
             img_files_10 = img_files[i*self.num_input : i*self.num_input + self.num_input]
 
             frames = []
