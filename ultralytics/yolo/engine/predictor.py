@@ -36,6 +36,7 @@ import time
 import cv2
 import numpy as np
 import torch
+from torch.utils.data import DataLoader
 
 from ultralytics.nn.autobackend import AutoBackend
 from ultralytics.tracknet.utils.postprocess import PostprocessSaver
@@ -58,7 +59,6 @@ STREAM_WARNING = """
             masks = r.masks  # Masks object for segment masks outputs
             probs = r.probs  # Class probabilities for classification outputs
 """
-
 
 class BasePredictor:
     """
@@ -239,10 +239,16 @@ class BasePredictor:
         if not self.done_warmup:
             self.model.warmup(imgsz=(1 if self.model.pt or self.model.triton else self.dataset.bs, 10, *self.imgsz))
             self.done_warmup = True
-
+        dataloader = DataLoader(
+            self.dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=8,
+            pin_memory=True,
+        )
         self.seen, self.windows, self.batch, profilers = 0, [], None, (ops.Profile(), ops.Profile(), ops.Profile())
         self.run_callbacks('on_predict_start')
-        for batch in self.dataset:
+        for batch in dataloader:
             self.run_callbacks('on_predict_batch_start')
             self.batch = batch
             path, im0s, vid_cap, s = batch
@@ -261,25 +267,25 @@ class BasePredictor:
             self.run_callbacks('on_predict_postprocess_end')
 
             # Visualize, save, write results
-            n = im0s.shape[2]
+            n = im0s.shape[1]
             for i in range(n):
                 self.seen += 1
                 self.results[i].speed = {
                     'preprocess': profilers[0].dt * 1E3 / n,
                     'inference': profilers[1].dt * 1E3 / n,
                     'postprocess': profilers[2].dt * 1E3 / n}
-                p, im0 = path[i], None if self.source_type.tensor else im0s[i].copy()
-                p = Path(p)
+                # p, im0 = path[i], None if self.source_type.tensor else im0s[i].copy()
+                # p = Path(p)
 
-                if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
-                    s += self.write_results(i, self.results, (p, im, im0))
-                if self.args.save or self.args.save_txt:
-                    self.results[i].save_dir = self.save_dir.__str__()
-                if self.args.show and self.plotted_img is not None:
-                    self.show(p)
-                if self.args.save and self.plotted_img is not None:
-                    self.save_preds(vid_cap, i, str(self.save_dir / p.name))
-
+                # if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
+                #     s += self.write_results(i, self.results, (p, im, im0))
+                # if self.args.save or self.args.save_txt:
+                #     self.results[i].save_dir = self.save_dir.__str__()
+                # if self.args.show and self.plotted_img is not None:
+                #     self.show(p)
+                # if self.args.save and self.plotted_img is not None:
+                #     self.save_preds(vid_cap, i, str(self.save_dir / p.name))
+            LOGGER.info(f'{profilers[0].dt * 1E3:.1f}ms {profilers[1].dt * 1E3:.1f}ms {profilers[2].dt * 1E3:.1f}ms')
             self.run_callbacks('on_predict_batch_end')
             yield from self.results
 
@@ -320,7 +326,13 @@ class BasePredictor:
         if not self.done_warmup:
             self.model.warmup(imgsz=(1 if self.model.pt or self.model.triton else self.dataset.bs, 10, *self.imgsz))
             self.done_warmup = True
-
+        dataloader = DataLoader(
+            self.dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=8,
+            pin_memory=True,
+        )
         num_streams = 8
         streams = [torch.cuda.Stream() for _ in range(num_streams)]
         queue = Queue(maxsize=32)
@@ -332,7 +344,7 @@ class BasePredictor:
 
         def batch_feeder():
             nonlocal feeder_finished
-            for i, batch in enumerate(self.dataset):
+            for i, batch in enumerate(dataloader):
                 queue.put((i, batch))
                 LOGGER.info(f'Feeder: {i} images loaded.')
             feeder_finished = True
@@ -392,7 +404,7 @@ class BasePredictor:
             new_pending = []
             for p in pending:
                 if p["event"].query():
-                    n = p["im0s"].shape[2]
+                    n = p["im0s"].shape[1]
                     pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
                     infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
                     post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
