@@ -326,6 +326,7 @@ class BasePredictor:
         if not self.done_warmup:
             self.model.warmup(imgsz=(1 if self.model.pt or self.model.triton else self.dataset.bs, 10, *self.imgsz))
             self.done_warmup = True
+        start_time = time.time()
         dataloader = DataLoader(
             self.dataset,
             batch_size=1,
@@ -444,8 +445,11 @@ class BasePredictor:
 
         self.run_callbacks('on_predict_end')
         if total_images:
+            elapsed_time = time.time() - start_time  # 單位：秒
+            fps = total_images / elapsed_time
             LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
                         f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
+            LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
 
     def setup_model(self, model, verbose=True):
