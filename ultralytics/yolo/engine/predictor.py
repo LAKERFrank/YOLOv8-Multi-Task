@@ -334,6 +334,7 @@ class BasePredictor:
             nonlocal feeder_finished
             for i, batch in enumerate(self.dataset):
                 queue.put((i, batch))
+                LOGGER.info(f'Feeder: {i} images loaded.')
             feeder_finished = True
             LOGGER.info(f'Feeder finished, {self.dataset.count} images loaded.')
 
