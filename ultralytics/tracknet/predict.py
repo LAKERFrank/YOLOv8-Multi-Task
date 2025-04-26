@@ -206,18 +206,7 @@ class TrackNetPredictor(BasePredictor):
         each_probs = pred_probs.view(10, cell_num, cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, cell_num, cell_num, feat_no).split([2, 2, 2, 2], dim=3)
 
-        orig_images_clone = orig_imgs.transpose(2, 0, 1)
-
-        p = Path(self.batch[0][0])
-        parent_dir = p.parent.name
-        match_dir = p.parent.parent.parent.name
-        frame_save_path = os.path.join(self.save_dir, match_dir, 'frame', parent_dir)
-        csv_save_path = os.path.join(self.save_dir, match_dir, 'csv', parent_dir)
-        os.makedirs(frame_save_path, exist_ok=True)
-        os.makedirs(csv_save_path, exist_ok=True)
         result = []
-        csv_rows = []
-        real_frame_idx = int(p.stem)
         for frame_idx in range(10):
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
@@ -260,17 +249,72 @@ class TrackNetPredictor(BasePredictor):
                 pred=frame_preds if use_nms else frame_preds[0],
                 speed={'preprocess': None, 'inference': None, 'postprocess': None}
             ))
+        ######### 輸出檔案
+        # orig_images_clone = orig_imgs.transpose(2, 0, 1)
+
+        # p = Path(self.batch[0][0])
+        # parent_dir = p.parent.name
+        # match_dir = p.parent.parent.parent.name
+        # frame_save_path = os.path.join(self.save_dir, match_dir, 'frame', parent_dir)
+        # csv_save_path = os.path.join(self.save_dir, match_dir, 'csv', parent_dir)
+        # os.makedirs(frame_save_path, exist_ok=True)
+        # os.makedirs(csv_save_path, exist_ok=True)
+        # result = []
+        # csv_rows = []
+        # real_frame_idx = int(p.stem)
+        # for frame_idx in range(10):
+        #     p_cell_x = each_pos_x[frame_idx]
+        #     p_cell_y = each_pos_y[frame_idx]
+        #     p_cell_nx = each_pos_nx[frame_idx]
+        #     p_cell_ny = each_pos_ny[frame_idx]
+        #     center = 0.5
+
+        #     # 獲取當前圖片的 conf
+        #     p_conf = each_probs[frame_idx]
+
+        #     frame_preds = []
+        #     if use_nms:
+        #         nms_preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=20)
+
+        #         # 取出 nms 的結果
+        #         for pred in nms_preds:
+        #             max_x, max_y, max_conf = pred
+        #             pred_x = max_x*stride + (center*stride-p_cell_x[int(max_y)][int(max_x)][0]+p_cell_x[int(max_y)][int(max_x)][1])
+        #             pred_y = max_y*stride + (center*stride-p_cell_y[int(max_y)][int(max_x)][0]+p_cell_y[int(max_y)][int(max_x)][1])
+
+        #             frame_preds.append(ResultItem(
+        #                 pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
+        #                 speed={'preprocess': None, 'inference': None, 'postprocess': None }
+        #             ))
+        #     else:
+        #         p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
+        #         max_position = torch.argmax(p_conf_masked)
+        #         # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
+        #         max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
+        #         max_conf = p_conf[max_y, max_x].item()
+
+        #         pred_x = max_x*stride + (center*stride-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1])
+        #         pred_y = max_y*stride + (center*stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
+        #         frame_preds.append(ResultItem(
+        #             pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
+        #             speed={'preprocess': None, 'inference': None, 'postprocess': None }
+        #         ))
             
-            for frame_pred in frame_preds:
-                pred = frame_pred.pred
-                if pred.conf >= conf_threshold:
-                    csv_rows.append({
-                        'Frame': real_frame_idx+frame_idx,
-                        'Visibility': 1,
-                        'X': round(pred.x.item(), 2),
-                        'Y': round(pred.y.item(), 2),
-                        'Conf': round(pred.conf, 2)
-                    })
+        #     result.append(ResultItem(
+        #         pred=frame_preds if use_nms else frame_preds[0],
+        #         speed={'preprocess': None, 'inference': None, 'postprocess': None}
+        #     ))
+            
+        #     for frame_pred in frame_preds:
+        #         pred = frame_pred.pred
+        #         if pred.conf >= conf_threshold:
+        #             csv_rows.append({
+        #                 'Frame': real_frame_idx+frame_idx,
+        #                 'Visibility': 1,
+        #                 'X': round(pred.x.item(), 2),
+        #                 'Y': round(pred.y.item(), 2),
+        #                 'Conf': round(pred.conf, 2)
+        #             })
             # 視覺化與儲存圖片
             # img_np = orig_images_clone[frame_idx, :, :]
             # img_np = img_np.astype(np.uint8)
