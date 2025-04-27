@@ -653,7 +653,7 @@ class TrackNetPredictor(BasePredictor):
                                 raise ValueError(f"[inference_worker-{i}] Input is not a tensor")
                             if not torch.isfinite(im).all():
                                 raise ValueError(f"[inference_worker-{i}] Input tensor contains NaN or Inf")
-                            if im.dim() != 3:
+                            if im.dim() != 4:
                                 raise ValueError(f"[inference_worker-{i}] Input tensor should be 3D (C, H, W), got {im.shape}")
 
                             # Send to device
