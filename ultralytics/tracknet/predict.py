@@ -543,23 +543,85 @@ class TrackNetPredictor(BasePredictor):
             except Exception as e:
                 LOGGER.critical(f"[inference_worker-{i}] Fatal crash: {e}")
                 raise e
+        def postprocess_worker():
+            nonlocal total_images, pre_total, infer_total, post_total
+            pending = []
+
+            while True:
+                # 先拉新的資料
+                try:
+                    item = postprocess_queue.get(timeout=0.01)
+                    if item is None:
+                        break
+                    pending.append(item)
+                    postprocess_queue.task_done()
+                except Exception as e:
+                    LOGGER.debug(f"[postprocess_worker] queue empty: {e}")
+                    pass  # queue空就算了
+
+                # 檢查 pending 裡面有沒有完成的
+                new_pending = []
+                for item in pending:
+                    idx, path, preds, im0s, vid_cap, s, infer_start, infer_end = item
+
+                    if infer_end.query():  # 這個 batch 推論完成了
+                        elapsed_infer = infer_start.elapsed_time(infer_end)
+
+                        post_start_cpu = time.time()
+                        results = self.cpu_postprocess(preds, im0s)
+                        post_end_cpu = time.time()
+
+                        postprocess_time = (post_end_cpu - post_start_cpu) * 1000  # ms
+
+                        n = im0s.shape[2]
+                        infer_total += elapsed_infer
+                        post_total += postprocess_time
+                        total_images += n
+
+                        for j in range(n):
+                            results[j].speed = {
+                                'preprocess': 0.0,
+                                'inference': elapsed_infer / n,
+                                'postprocess': postprocess_time / n
+                            }
+
+                        self.run_callbacks('on_predict_batch_end')
+                        yield from results
+                    else:
+                        # 還沒好，留著下一輪再檢查
+                        new_pending.append(item)
+
+                pending = new_pending
 
         threading.Thread(target=batch_feeder, daemon=True).start()
         threading.Thread(target=preprocess_worker, daemon=True).start()
+        threading.Thread(target=postprocess_worker, daemon=True).start()
         num_infer_streams = 8
         infer_workers = [threading.Thread(target=inference_worker, args=(i, streams[i % num_infer_streams]), daemon=True) for i in range(num_infer_streams)]
         
         self.run_callbacks('on_predict_start')
         for w in infer_workers:
             w.start()
+        
+        while True:
+            LOGGER.info(f'[Monitor] feeder_finished={feeder_finished}, preprocess_queue={queue.qsize()}, infer_queue={infer_queue.qsize()}, postprocess_queue={postprocess_queue.qsize()}')
+            if feeder_finished and queue.empty() and infer_queue.empty() and postprocess_queue.empty():
+                break
+            time.sleep(0.01)  # 避免busy loop
+
+        # ======= Cleanup =======
+        for _ in infer_workers:
+            infer_queue.put(None)
 
         self.run_callbacks('on_predict_end')
-        if total_images:
-            elapsed_time = time.time() - start_time  # 單位：秒
-            fps = total_images / elapsed_time
-            LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
-                        f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
-            LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
+
+        torch.cuda.synchronize()
+
+        elapsed_time = time.time() - start_time
+        fps = total_images / elapsed_time
+        LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
+        LOGGER.info(f'Average Inference Time: {infer_total/total_images:.2f} ms')
+
 
     @smart_inference_mode()
     def stream_inference_(self, source=None, model=None, *args, **kwargs):
