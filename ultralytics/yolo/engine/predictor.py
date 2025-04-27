@@ -331,13 +331,13 @@ class BasePredictor:
             self.dataset,
             batch_size=1,
             shuffle=False,
-            num_workers=8,
+            num_workers=16,
             pin_memory=True,
-            prefetch_factor=4,
+            prefetch_factor=8,
         )
-        preprocess_num_streams = 4
-        inference_num_streams = 10
-        postprocess_num_streams = 4
+        preprocess_num_streams = 20
+        inference_num_streams = 16
+        postprocess_num_streams = 20
 
         preprocess_streams = [torch.cuda.Stream() for _ in range(preprocess_num_streams)]
         inference_streams = [torch.cuda.Stream() for _ in range(inference_num_streams)]
@@ -361,7 +361,7 @@ class BasePredictor:
 
         while True:
             while not queue.empty():
-                item = queue.get()
+                item = queue.get_nowait()
                 if item is None:
                     queue.put(None)
                     break
@@ -437,7 +437,7 @@ class BasePredictor:
                         }
 
                     self.run_callbacks('on_predict_batch_end')
-                    LOGGER.info(f'{path}: {pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
+                    # LOGGER.info(f'{path}: {pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
                     yield from p["results"]
                 else:
                     new_pending.append(p)

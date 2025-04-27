@@ -444,7 +444,7 @@ class TrackNetPredictor(BasePredictor):
     import torch
 
     @smart_inference_mode()
-    def stream_inference(self, source=None, model=None, *args, **kwargs):
+    def stream_inference_profiler(self, source=None, model=None, *args, **kwargs):
         """Optimized Asynchronous GPU inference pipeline with CUDA Streams and Events."""
 
         if not self.model:
