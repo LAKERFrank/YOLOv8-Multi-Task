@@ -463,7 +463,6 @@ class TrackNetPredictor(BasePredictor):
         streams = [torch.cuda.Stream() for _ in range(num_streams)]
         queue = Queue(maxsize=32)
         infer_queue = Queue(maxsize=32)
-        postprocess_queue = Queue(maxsize=32)
         pending = []
 
         pre_total, infer_total, post_total = 0.0, 0.0, 0.0
@@ -495,10 +494,10 @@ class TrackNetPredictor(BasePredictor):
         
         self.run_callbacks('on_predict_start')
         while True:
-            while not queue.empty():
-                item = queue.get()
+            while not infer_queue.empty():
+                item = infer_queue.get()
                 if item is None:
-                    queue.put(None)
+                    infer_queue.put(None)
                     break
                 i, batch = item
                 self.batch = batch
@@ -582,7 +581,7 @@ class TrackNetPredictor(BasePredictor):
                     new_pending.append(p)
             pending = new_pending
 
-            if feeder_finished and queue.empty() and not pending:
+            if feeder_finished and infer_queue.empty() and not pending:
                 break
 
         self.run_callbacks('on_predict_end')
