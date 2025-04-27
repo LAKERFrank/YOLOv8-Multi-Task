@@ -466,9 +466,10 @@ def stream_inference(self, source=None, model=None, *args, **kwargs):
     )
 
     # 加入 profiler
+    profiler_output_dir = os.path.abspath("./profiler_output")
     with torch.profiler.profile(
         schedule=torch.profiler.schedule(wait=1, warmup=1, active=10, repeat=1),
-        on_trace_ready=torch.profiler.tensorboard_trace_handler('/usr/src/ultralytics/profiler_output'),
+        on_trace_ready=torch.profiler.tensorboard_trace_handler(profiler_output_dir),
         record_shapes=True,
         profile_memory=True,
         with_stack=True,
@@ -588,6 +589,7 @@ def stream_inference(self, source=None, model=None, *args, **kwargs):
                 break
 
             # 更新 profiler 記錄
+            LOGGER.info(f'profiler_output_dir: {profiler_output_dir}')
             prof.step()
 
         self.run_callbacks('on_predict_end')
