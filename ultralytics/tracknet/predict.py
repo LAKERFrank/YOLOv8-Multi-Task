@@ -581,6 +581,7 @@ class TrackNetPredictor(BasePredictor):
         self.run_callbacks('on_predict_start')
 
         while True:
+            LOGGER.info(f'[Monitor] feeder_finished={feeder_finished}, preprocess_queue={preprocess_queue.qsize()}, infer_queue={infer_queue.qsize()}, postprocess_queue={postprocess_queue.qsize()}')
             if feeder_finished and preprocess_queue.empty() and infer_queue.empty() and postprocess_queue.empty():
                 break
             time.sleep(0.01)  # 避免busy loop
