@@ -488,141 +488,110 @@ class TrackNetPredictor(BasePredictor):
                 infer_queue.put((i, path, im, im0s, vid_cap, s))
                 queue.task_done()
                 LOGGER.info(f"[Preprocess] {i} done, queue size: {queue.qsize()}")
-        def inference_worker(i, stream):
-            try:
-                while True:
-                    item = infer_queue.get()
-                    if item is None:
-                        LOGGER.info(f"[inference_worker-{i}] Received shutdown signal.")
-                        break
-
-                    idx, path, im, im0s, vid_cap, s = item
-
-                    try:
-                        with torch.cuda.stream(stream):
-                            LOGGER.info(f"start {idx}")
-                            # Input sanity check
-                            if not torch.is_tensor(im):
-                                raise ValueError(f"[inference_worker-{i}] Input is not a tensor")
-                            if not torch.isfinite(im).all():
-                                raise ValueError(f"[inference_worker-{i}] Input tensor contains NaN or Inf")
-                            if im.dim() != 4:
-                                raise ValueError(f"[inference_worker-{i}] Input tensor should be 3D (C, H, W), got {im.shape}")
-
-                            # Send to device
-                            pre_start = torch.cuda.Event(enable_timing=True)
-                            infer_start = torch.cuda.Event(enable_timing=True)
-                            infer_end = torch.cuda.Event(enable_timing=True)
-
-                            pre_start.record()
-                            im = im.to(self.device, dtype=torch.float32, non_blocking=True)
-                            if self.model.fp16:
-                                im = im.half()
-
-                            # Inference
-                            infer_start.record()
-                            preds = self.inference(im, *args, **kwargs)
-                            infer_end.record()
-
-                            # Strong sync to catch CUDA error
-                            torch.cuda.current_stream().synchronize()
-                            LOGGER.info(f"end {idx}")
-                            
-                            # Sanity check output
-                            if preds is None:
-                                raise ValueError(f"[inference_worker-{i}] Inference output is None")
-                            if not isinstance(preds, (list, tuple)) or len(preds) == 0:
-                                raise ValueError(f"[inference_worker-{i}] Inference output invalid format: {type(preds)}")
-                            
-                            postprocess_queue.put((idx, path, preds, im0s, vid_cap, s, infer_start, infer_end))
-                            LOGGER.info(f"[inference_worker-{i}] Finished batch {idx}")
-                    except Exception as batch_e:
-                        LOGGER.error(f"[inference_worker-{i}] Skipping batch {idx} due to error: {batch_e}")
-                        # Don't crash entire worker, just skip this batch
-                    finally:
-                        infer_queue.task_done()
-
-            except Exception as e:
-                LOGGER.critical(f"[inference_worker-{i}] Fatal crash: {e}")
-                raise e
-        def postprocess_worker():
-            nonlocal total_images, pre_total, infer_total, post_total
-            pending = []
-
-            while True:
-                # 先拉新的資料
-                try:
-                    item = postprocess_queue.get(timeout=0.01)
-                    if item is None:
-                        break
-                    pending.append(item)
-                    postprocess_queue.task_done()
-                except Exception as e:
-                    LOGGER.debug(f"[postprocess_worker] queue empty: {e}")
-                    pass  # queue空就算了
-
-                # 檢查 pending 裡面有沒有完成的
-                new_pending = []
-                for item in pending:
-                    idx, path, preds, im0s, vid_cap, s, infer_start, infer_end = item
-
-                    if infer_end.query():  # 這個 batch 推論完成了
-                        elapsed_infer = infer_start.elapsed_time(infer_end)
-
-                        post_start_cpu = time.time()
-                        results = self.cpu_postprocess(preds, im0s)
-                        post_end_cpu = time.time()
-
-                        postprocess_time = (post_end_cpu - post_start_cpu) * 1000  # ms
-
-                        n = im0s.shape[2]
-                        infer_total += elapsed_infer
-                        post_total += postprocess_time
-                        total_images += n
-
-                        for j in range(n):
-                            results[j].speed = {
-                                'preprocess': 0.0,
-                                'inference': elapsed_infer / n,
-                                'postprocess': postprocess_time / n
-                            }
-
-                        self.run_callbacks('on_predict_batch_end')
-                        yield from results
-                    else:
-                        # 還沒好，留著下一輪再檢查
-                        new_pending.append(item)
-
-                pending = new_pending
+        
 
         threading.Thread(target=batch_feeder, daemon=True).start()
         threading.Thread(target=preprocess_worker, daemon=True).start()
-        threading.Thread(target=postprocess_worker, daemon=True).start()
-        num_infer_streams = 8
-        infer_workers = [threading.Thread(target=inference_worker, args=(i, streams[i % num_infer_streams]), daemon=True) for i in range(num_infer_streams)]
         
         self.run_callbacks('on_predict_start')
-        for w in infer_workers:
-            w.start()
-        
         while True:
-            LOGGER.info(f'[Monitor] feeder_finished={feeder_finished}, preprocess_queue={queue.qsize()}, infer_queue={infer_queue.qsize()}, postprocess_queue={postprocess_queue.qsize()}')
-            if feeder_finished and queue.empty() and infer_queue.empty() and postprocess_queue.empty():
-                break
-            time.sleep(0.01)  # 避免busy loop
+            while not queue.empty():
+                item = queue.get()
+                if item is None:
+                    queue.put(None)
+                    break
+                i, batch = item
+                self.batch = batch
+                path, im0s, vid_cap, s = batch
+                stream = streams[i % num_streams]
 
-        # ======= Cleanup =======
-        for _ in infer_workers:
-            infer_queue.put(None)
+                # Timing events
+                pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                infer_start, infer_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                end_event = torch.cuda.Event(True)
+
+                with torch.cuda.stream(stream):
+                    LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
+                    pre_start.record(stream)
+                    im = im0s.to(self.device, dtype=torch.float32, non_blocking=True)
+                    if self.model.fp16:
+                        im = im.half()
+                    pre_end.record(stream)
+
+                    infer_start.record(stream)
+                    preds = self.inference(im, *args, **kwargs)
+                    infer_end.record(stream)
+
+                    post_start.record(stream)
+                    results = self.postprocess(preds, im, im0s)
+                    post_end.record(stream)
+
+                    end_event.record(stream)
+                    LOGGER.info(f"[End] Stream {i % num_streams} finished batch {i} at {time.time():.4f}")
+
+                pending.append({
+                    "event": end_event,
+                    "stream": stream,
+                    "path": path,
+                    "im0s": im0s,
+                    "vid_cap": vid_cap,
+                    "results": results,
+                    "profiling": {
+                        "pre": (pre_start, pre_end),
+                        "infer": (infer_start, infer_end),
+                        "post": (post_start, post_end)
+                    }
+                })
+
+            new_pending = []
+            for p in pending:
+                if p["event"].query():
+                    n = p["im0s"].shape[1]
+                    pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
+                    infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
+                    post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
+
+                    pre_total += pre_e
+                    infer_total += infer_e
+                    post_total += post_e
+                    total_images += n
+
+                    for j in range(n):
+                        p["results"][j].speed = {
+                            'preprocess': pre_e / n,
+                            'inference': infer_e / n,
+                            'postprocess': post_e / n
+                        }
+                        # pj = Path(p["path"][j])
+                        # im0 = None if self.source_type.tensor else p["im0s"][j].copy()
+
+                        # if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
+                        #     _ = self.write_results(j, p["results"], (pj, im, im0))
+                        # if self.args.save or self.args.save_txt:
+                        #     p["results"][j].save_dir = str(self.save_dir)
+                        # if self.args.show and self.plotted_img is not None:
+                        #     self.show(pj)
+                        # if self.args.save and self.plotted_img is not None:
+                        #     self.save_preds(p["vid_cap"], j, str(self.save_dir / pj.name))
+
+                    self.run_callbacks('on_predict_batch_end')
+                    LOGGER.info(f'{pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
+                    yield from p["results"]
+                else:
+                    new_pending.append(p)
+            pending = new_pending
+
+            if feeder_finished and queue.empty() and not pending:
+                break
 
         self.run_callbacks('on_predict_end')
-
-        torch.cuda.synchronize()
-
-        elapsed_time = time.time() - start_time
-        fps = total_images / elapsed_time
-        LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
-        LOGGER.info(f'Average Inference Time: {infer_total/total_images:.2f} ms')
+        if total_images:
+            elapsed_time = time.time() - start_time  # 單位：秒
+            fps = total_images / elapsed_time
+            LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
+                        f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
+            LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
 
     @smart_inference_mode()
