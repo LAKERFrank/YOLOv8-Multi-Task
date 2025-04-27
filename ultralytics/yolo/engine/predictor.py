@@ -405,13 +405,13 @@ class BasePredictor:
             for p in pending:
                 if p["event"].query():
                     n = p["im0s"].shape[1]
-                    pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
-                    infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
-                    post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
+                    # pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
+                    # infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
+                    # post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
 
-                    pre_total += pre_e
-                    infer_total += infer_e
-                    post_total += post_e
+                    # pre_total += pre_e
+                    # infer_total += infer_e
+                    # post_total += post_e
                     total_images += n
 
                     for j in range(n):
