@@ -335,10 +335,13 @@ class BasePredictor:
             pin_memory=True,
             prefetch_factor=4,
         )
-        num_streams = 10
-        preprocess_num_streams = 4  # 自訂 Preprocess Stream 數量，可根據經驗調整
+        preprocess_num_streams = 4
+        inference_num_streams = 10
+        postprocess_num_streams = 4
+
         preprocess_streams = [torch.cuda.Stream() for _ in range(preprocess_num_streams)]
-        inference_streams = [torch.cuda.Stream() for _ in range(num_streams)]
+        inference_streams = [torch.cuda.Stream() for _ in range(inference_num_streams)]
+        postprocess_streams = [torch.cuda.Stream() for _ in range(postprocess_num_streams)]
 
         queue = Queue(maxsize=128)
         pending = []
@@ -367,7 +370,8 @@ class BasePredictor:
                 path, im0s, vid_cap, s = batch
 
                 preprocess_stream = preprocess_streams[i % preprocess_num_streams]
-                inference_stream = inference_streams[i % num_streams]
+                inference_stream = inference_streams[i % inference_num_streams]
+                postprocess_stream = postprocess_streams[i % postprocess_num_streams]
 
                 # CUDA Events
                 pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
@@ -375,29 +379,31 @@ class BasePredictor:
                 post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
                 end_event = torch.cuda.Event(True)
 
-                # Step 1: Preprocess 在 preprocess_stream 上執行
+                # Step 1: Preprocess
                 with torch.cuda.stream(preprocess_stream):
                     pre_start.record(preprocess_stream)
-                    im = self.preprocess(im0s)  # 可能會有 to(device)、normalize 等
+                    im = self.preprocess(im0s)
                     pre_end.record(preprocess_stream)
 
-                # Step 2: Inference + Postprocess 在 inference_stream 上執行
+                # Step 2: Inference (必須等待 preprocess 完成)
                 with torch.cuda.stream(inference_stream):
-                    inference_stream.wait_event(pre_end)  # 確保 Preprocess 完成
-
+                    inference_stream.wait_event(pre_end)
                     infer_start.record(inference_stream)
                     preds = self.inference(im, *args, **kwargs)
                     infer_end.record(inference_stream)
 
-                    post_start.record(inference_stream)
+                # Step 3: Postprocess (必須等待 inference 完成)
+                with torch.cuda.stream(postprocess_stream):
+                    postprocess_stream.wait_event(infer_end)
+                    post_start.record(postprocess_stream)
                     results = self.postprocess(preds, im, im0s)
-                    post_end.record(inference_stream)
+                    post_end.record(postprocess_stream)
 
-                    end_event.record(inference_stream)
+                    end_event.record(postprocess_stream)
 
                 pending.append({
                     "event": end_event,
-                    "stream": inference_stream,
+                    "stream": postprocess_stream,
                     "path": path,
                     "im0s": im0s,
                     "vid_cap": vid_cap,
@@ -413,6 +419,7 @@ class BasePredictor:
             for p in pending:
                 if p["event"].query():
                     n = p["im0s"].shape[1]
+                    path = p["path"]
                     pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
                     infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
                     post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
@@ -430,7 +437,7 @@ class BasePredictor:
                         }
 
                     self.run_callbacks('on_predict_batch_end')
-                    LOGGER.info(f'{pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
+                    LOGGER.info(f'{path}: {pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
                     yield from p["results"]
                 else:
                     new_pending.append(p)
