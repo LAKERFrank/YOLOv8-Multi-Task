@@ -313,8 +313,9 @@ class BasePredictor:
 
         self.run_callbacks('on_predict_end')
 
+    # stream_inference_profiler
     @smart_inference_mode()
-    def stream_inference(self, source=None, model=None, *args, **kwargs):
+    def stream_inference_profiler(self, source=None, model=None, *args, **kwargs):
         """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
         if not self.model:
             self.setup_model(model)
@@ -456,7 +457,7 @@ class BasePredictor:
 
     # stream_inference_single_stream
     @smart_inference_mode()
-    def stream_inference_single_stream(self, source=None, model=None, *args, **kwargs):
+    def stream_inference(self, source=None, model=None, *args, **kwargs):
         """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
 
         if not self.model:
@@ -511,7 +512,7 @@ class BasePredictor:
                     end_event = torch.cuda.Event(True)
 
                     with torch.cuda.stream(stream):
-                        # LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
+                        LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
                         pre_start.record(stream)
                         im = self.preprocess(im0s)
                         pre_end.record(stream)
@@ -525,7 +526,7 @@ class BasePredictor:
                         post_end.record(stream)
 
                         end_event.record(stream)
-                        # LOGGER.info(f"[End] Stream {i % num_streams} finished batch {i} at {time.time():.4f}")
+                        LOGGER.info(f"[End] Stream {i % num_streams} finished batch {i} at {time.time():.4f}")
 
                     pending.append({
                         "event": end_event,
