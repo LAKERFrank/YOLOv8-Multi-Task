@@ -335,7 +335,7 @@ class BasePredictor:
             pin_memory=True,
             prefetch_factor=8,
         )
-        preprocess_num_streams = 20
+        preprocess_num_streams = 32
         inference_num_streams = 16
         postprocess_num_streams = 20
 
