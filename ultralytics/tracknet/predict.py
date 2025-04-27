@@ -92,12 +92,6 @@ class TrackNetPredictor(BasePredictor):
         # 注意：此時 im shape = (C, H, W)
         return im
     def preprocess(self, im):
-        not_tensor = not isinstance(im, torch.Tensor)
-
-        if not_tensor:
-            im = torch.from_numpy(im)    # 直接轉換, shape = (H, W, C)
-            im = im.permute(2, 0, 1).contiguous()  # (HWC -> CHW)
-
         im = im.to(self.device, dtype=torch.float32, non_blocking=True)
 
         median = im.median(dim=0).values  # shape: (H, W)
@@ -297,48 +291,48 @@ class TrackNetPredictor(BasePredictor):
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, cell_num, cell_num, feat_no).split([2, 2, 2, 2], dim=3)
 
         result = []
-        for frame_idx in range(10):
-            p_cell_x = each_pos_x[frame_idx]
-            p_cell_y = each_pos_y[frame_idx]
-            p_cell_nx = each_pos_nx[frame_idx]
-            p_cell_ny = each_pos_ny[frame_idx]
-            center = 0.5
+        # for frame_idx in range(10):
+        #     p_cell_x = each_pos_x[frame_idx]
+        #     p_cell_y = each_pos_y[frame_idx]
+        #     p_cell_nx = each_pos_nx[frame_idx]
+        #     p_cell_ny = each_pos_ny[frame_idx]
+        #     center = 0.5
 
-            # 獲取當前圖片的 conf
-            p_conf = each_probs[frame_idx]
+        #     # 獲取當前圖片的 conf
+        #     p_conf = each_probs[frame_idx]
 
-            frame_preds = []
-            if use_nms:
-                nms_preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=20)
+        #     frame_preds = []
+        #     if use_nms:
+        #         nms_preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=20)
 
-                # 取出 nms 的結果
-                for pred in nms_preds:
-                    max_x, max_y, max_conf = pred
-                    pred_x = max_x*stride + (center*stride-p_cell_x[int(max_y)][int(max_x)][0]+p_cell_x[int(max_y)][int(max_x)][1])
-                    pred_y = max_y*stride + (center*stride-p_cell_y[int(max_y)][int(max_x)][0]+p_cell_y[int(max_y)][int(max_x)][1])
+        #         # 取出 nms 的結果
+        #         for pred in nms_preds:
+        #             max_x, max_y, max_conf = pred
+        #             pred_x = max_x*stride + (center*stride-p_cell_x[int(max_y)][int(max_x)][0]+p_cell_x[int(max_y)][int(max_x)][1])
+        #             pred_y = max_y*stride + (center*stride-p_cell_y[int(max_y)][int(max_x)][0]+p_cell_y[int(max_y)][int(max_x)][1])
 
-                    frame_preds.append(ResultItem(
-                        pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
-                        speed={'preprocess': None, 'inference': None, 'postprocess': None }
-                    ))
-            else:
-                p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
-                max_position = torch.argmax(p_conf_masked)
-                # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
-                max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
-                max_conf = p_conf[max_y, max_x].item()
+        #             frame_preds.append(ResultItem(
+        #                 pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
+        #                 speed={'preprocess': None, 'inference': None, 'postprocess': None }
+        #             ))
+        #     else:
+        #         p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
+        #         max_position = torch.argmax(p_conf_masked)
+        #         # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
+        #         max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
+        #         max_conf = p_conf[max_y, max_x].item()
 
-                pred_x = max_x*stride + (center*stride-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1])
-                pred_y = max_y*stride + (center*stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
-                frame_preds.append(ResultItem(
-                    pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
-                    speed={'preprocess': None, 'inference': None, 'postprocess': None }
-                ))
+        #         pred_x = max_x*stride + (center*stride-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1])
+        #         pred_y = max_y*stride + (center*stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
+        #         frame_preds.append(ResultItem(
+        #             pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
+        #             speed={'preprocess': None, 'inference': None, 'postprocess': None }
+        #         ))
             
-            result.append(ResultItem(
-                pred=frame_preds if use_nms else frame_preds[0],
-                speed={'preprocess': None, 'inference': None, 'postprocess': None}
-            ))
+        #     result.append(ResultItem(
+        #         pred=frame_preds if use_nms else frame_preds[0],
+        #         speed={'preprocess': None, 'inference': None, 'postprocess': None}
+        #     ))
         return result
         ######### 輸出檔案
         # orig_images_clone = orig_imgs.transpose(2, 0, 1)
