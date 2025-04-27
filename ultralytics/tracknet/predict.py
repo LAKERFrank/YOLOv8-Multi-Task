@@ -480,9 +480,9 @@ class TrackNetPredictor(BasePredictor):
             with_modules=True
         ) as prof:
 
-            preprocess_streams = [torch.cuda.Stream() for _ in range(10)]
-            inference_streams = [torch.cuda.Stream() for _ in range(5)]
-            postprocess_streams = [torch.cuda.Stream() for _ in range(5)]
+            preprocess_streams = [torch.cuda.Stream() for _ in range(15)]
+            inference_streams = [torch.cuda.Stream() for _ in range(10)]
+            postprocess_streams = [torch.cuda.Stream() for _ in range(15)]
 
             task_queue = Q.Queue(maxsize=256)
             pending = []
