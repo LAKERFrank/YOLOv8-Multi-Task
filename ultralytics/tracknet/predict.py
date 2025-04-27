@@ -487,30 +487,57 @@ class TrackNetPredictor(BasePredictor):
                 while True:
                     item = infer_queue.get()
                     if item is None:
-                        LOGGER.info(f"[inference_worker-{i}] finished")
+                        LOGGER.info(f"[inference_worker-{i}] Received shutdown signal.")
                         break
+
                     idx, path, im, im0s, vid_cap, s = item
 
-                    with torch.cuda.stream(stream):
-                        pre_start = torch.cuda.Event(enable_timing=True)
-                        infer_start = torch.cuda.Event(enable_timing=True)
-                        infer_end = torch.cuda.Event(enable_timing=True)
+                    try:
+                        with torch.cuda.stream(stream):
+                            # Input sanity check
+                            if not torch.is_tensor(im):
+                                raise ValueError(f"[inference_worker-{i}] Input is not a tensor")
+                            if not torch.isfinite(im).all():
+                                raise ValueError(f"[inference_worker-{i}] Input tensor contains NaN or Inf")
+                            if im.dim() != 3:
+                                raise ValueError(f"[inference_worker-{i}] Input tensor should be 3D (C, H, W), got {im.shape}")
 
-                        pre_start.record()
-                        im = im.to(self.device, dtype=torch.float32, non_blocking=True)
-                        if self.model.fp16:
-                            im = im.half()
+                            # Send to device
+                            pre_start = torch.cuda.Event(enable_timing=True)
+                            infer_start = torch.cuda.Event(enable_timing=True)
+                            infer_end = torch.cuda.Event(enable_timing=True)
 
-                        infer_start.record()
-                        preds = self.inference(im, *args, **kwargs)
-                        infer_end.record()
-                        # 不要馬上sync了，要用 event-based query
-                        postprocess_queue.put((idx, path, preds, im0s, vid_cap, s, infer_start, infer_end))
-                        LOGGER.info(f"[inference_worker-{i}] {idx} done, queue size: {infer_queue.qsize()}")
-                    infer_queue.task_done()
+                            pre_start.record()
+                            im = im.to(self.device, dtype=torch.float32, non_blocking=True)
+                            if self.model.fp16:
+                                im = im.half()
+
+                            # Inference
+                            infer_start.record()
+                            preds = self.inference(im, *args, **kwargs)
+                            infer_end.record()
+
+                            # Strong sync to catch CUDA error
+                            torch.cuda.current_stream().synchronize()
+
+                            # Sanity check output
+                            if preds is None:
+                                raise ValueError(f"[inference_worker-{i}] Inference output is None")
+                            if not isinstance(preds, (list, tuple)) or len(preds) == 0:
+                                raise ValueError(f"[inference_worker-{i}] Inference output invalid format: {type(preds)}")
+                            
+                            postprocess_queue.put((idx, path, preds, im0s, vid_cap, s, infer_start, infer_end))
+                            LOGGER.info(f"[inference_worker-{i}] Finished batch {idx}")
+                    except Exception as batch_e:
+                        LOGGER.error(f"[inference_worker-{i}] Skipping batch {idx} due to error: {batch_e}")
+                        # Don't crash entire worker, just skip this batch
+                    finally:
+                        infer_queue.task_done()
+
             except Exception as e:
-                LOGGER.error(f"[inference_worker-{i}] crashed with exception: {e}")
+                LOGGER.critical(f"[inference_worker-{i}] Fatal crash: {e}")
                 raise e
+
 
         # ======= Postprocess Stage =======
         def postprocess_worker():
