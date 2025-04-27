@@ -468,7 +468,7 @@ def stream_inference(self, source=None, model=None, *args, **kwargs):
     # 加入 profiler
     with torch.profiler.profile(
         schedule=torch.profiler.schedule(wait=1, warmup=1, active=10, repeat=1),
-        on_trace_ready=torch.profiler.tensorboard_trace_handler('./profiler_output'),
+        on_trace_ready=torch.profiler.tensorboard_trace_handler('/usr/src/ultralytics/profiler_output'),
         record_shapes=True,
         profile_memory=True,
         with_stack=True,
