@@ -482,31 +482,34 @@ class TrackNetPredictor(BasePredictor):
 
         # ======= Inference Stage =======
         def inference_worker(i, stream):
-            while True:
-                item = infer_queue.get()
-                if item is None:
-                    break
-                idx, path, im, im0s, vid_cap, s = item
+            try:
+                while True:
+                    item = infer_queue.get()
+                    if item is None:
+                        break
+                    idx, path, im, im0s, vid_cap, s = item
 
-                with torch.cuda.stream(stream):
-                    pre_start = torch.cuda.Event(enable_timing=True)
-                    infer_start = torch.cuda.Event(enable_timing=True)
-                    infer_end = torch.cuda.Event(enable_timing=True)
+                    with torch.cuda.stream(stream):
+                        pre_start = torch.cuda.Event(enable_timing=True)
+                        infer_start = torch.cuda.Event(enable_timing=True)
+                        infer_end = torch.cuda.Event(enable_timing=True)
 
-                    pre_start.record()
-                    im = im.to(self.device, dtype=torch.float32, non_blocking=True)
-                    if self.model.fp16:
-                        im = im.half()
+                        pre_start.record()
+                        im = im.to(self.device, dtype=torch.float32, non_blocking=True)
+                        if self.model.fp16:
+                            im = im.half()
 
-                    infer_start.record()
-                    preds = self.inference(im, *args, **kwargs)
-                    infer_end.record()
+                        infer_start.record()
+                        preds = self.inference(im, *args, **kwargs)
+                        infer_end.record()
 
-                    # 不要馬上 synchronize
-                    # 把 event一起丟到 postprocess queue
+                        # 不要馬上sync了，要用 event-based query
+                        postprocess_queue.put((idx, path, preds, im0s, vid_cap, s, infer_start, infer_end))
+                    infer_queue.task_done()
+            except Exception as e:
+                LOGGER.error(f"[inference_worker-{i}] crashed with exception: {e}")
+                raise e
 
-                    postprocess_queue.put((idx, path, preds, im0s, vid_cap, s, infer_start, infer_end))
-                infer_queue.task_done()
 
 
 
