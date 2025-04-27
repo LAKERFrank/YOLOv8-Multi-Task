@@ -499,9 +499,7 @@ class TrackNetPredictor(BasePredictor):
                 if item is None:
                     infer_queue.put(None)
                     break
-                i, batch = item
-                self.batch = batch
-                path, im0s, vid_cap, s = batch
+                i, path, im, im0s, vid_cap, s = item
                 stream = streams[i % num_streams]
 
                 # Timing events
