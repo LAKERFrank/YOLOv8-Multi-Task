@@ -361,10 +361,10 @@ class BasePredictor:
             activities=[torch.profiler.ProfilerActivity.CUDA],
             schedule=torch.profiler.schedule(wait=1, warmup=1, active=10, repeat=1),
             on_trace_ready=torch.profiler.tensorboard_trace_handler(profiler_output_dir),
-            record_shapes=True,
-            profile_memory=True,
-            with_stack=True,
-            with_modules=True,
+            record_shapes=False,
+            profile_memory=False,
+            with_stack=False,
+            with_modules=False,
         ) as prof:
 
             while True:
