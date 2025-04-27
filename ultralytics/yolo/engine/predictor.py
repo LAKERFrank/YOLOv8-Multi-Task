@@ -313,7 +313,7 @@ class BasePredictor:
         self.run_callbacks('on_predict_end')
 
     @smart_inference_mode()
-    def stream_inference_v2(self, source=None, model=None, *args, **kwargs):
+    def stream_inference(self, source=None, model=None, *args, **kwargs):
         """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
 
         if not self.model:
@@ -451,7 +451,7 @@ class BasePredictor:
             LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
     @smart_inference_mode()
-    def stream_inference(self, source=None, model=None, *args, **kwargs):
+    def stream_inference_multiple_stream(self, source=None, model=None, *args, **kwargs):
         """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
 
         if not self.model:
