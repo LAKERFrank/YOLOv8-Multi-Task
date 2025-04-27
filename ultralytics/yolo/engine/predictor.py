@@ -335,7 +335,7 @@ class BasePredictor:
             pin_memory=True,
             prefetch_factor=8,
         )
-        num_streams = 15
+        num_streams = 10
         streams = [torch.cuda.Stream() for _ in range(num_streams)]
         queue = Queue(maxsize=256)
         pending = []
