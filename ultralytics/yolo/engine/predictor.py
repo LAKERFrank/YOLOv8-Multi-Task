@@ -499,11 +499,7 @@ class BasePredictor:
 
         while True:
             while not queue.empty():
-                item = queue.get_nowait()
-                if item is None:
-                    queue.put(None)
-                    break
-                i, batch = item
+                i, batch = queue.get_nowait()
                 self.batch = batch
                 path, im0s, vid_cap, s = batch
 
