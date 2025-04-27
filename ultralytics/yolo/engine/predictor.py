@@ -411,8 +411,6 @@ class BasePredictor:
                             }
                         })
 
-                        # ✅ 每處理完一個 batch，一定要 prof.step()
-                        prof.step()
 
                 except Queue.Empty:
                     LOGGER.debug(f"Queue is empty, waiting for new batches...")
@@ -439,6 +437,7 @@ class BasePredictor:
                             }
 
                         self.run_callbacks('on_predict_batch_end')
+                        prof.step()
                         yield from p["results"]
                     else:
                         new_pending.append(p)
