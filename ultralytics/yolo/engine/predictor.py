@@ -473,9 +473,9 @@ class BasePredictor:
             pin_memory=True,
             prefetch_factor=16,
         )
-        preprocess_num_streams = 4
-        inference_num_streams = 3
-        postprocess_num_streams = 2
+        preprocess_num_streams = 2
+        inference_num_streams = 1
+        postprocess_num_streams = 1
 
         preprocess_streams = [torch.cuda.Stream() for _ in range(preprocess_num_streams)]
         inference_streams = [torch.cuda.Stream() for _ in range(inference_num_streams)]
