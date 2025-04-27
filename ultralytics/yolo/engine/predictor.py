@@ -354,52 +354,52 @@ class BasePredictor:
         self.run_callbacks('on_predict_start')
 
         while True:
-            while not queue.empty():
-                item = queue.get()
-                if item is None:
-                    queue.put(None)
-                    break
-                i, batch = item
-                self.batch = batch
-                path, im0s, vid_cap, s = batch
-                stream = streams[i % num_streams]
+            try:
+                while not queue.empty():
+                    i, batch = queue.get_nowait()
+                    self.batch = batch
+                    path, im0s, vid_cap, s = batch
+                    stream = streams[i % num_streams]
 
-                # Timing events
-                pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
-                infer_start, infer_end = torch.cuda.Event(True), torch.cuda.Event(True)
-                post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
-                end_event = torch.cuda.Event(True)
+                    # Timing events
+                    pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                    infer_start, infer_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                    post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                    end_event = torch.cuda.Event(True)
 
-                with torch.cuda.stream(stream):
-                    # LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
-                    pre_start.record(stream)
-                    im = self.preprocess(im0s)
-                    pre_end.record(stream)
+                    with torch.cuda.stream(stream):
+                        # LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
+                        pre_start.record(stream)
+                        im = self.preprocess(im0s)
+                        pre_end.record(stream)
 
-                    infer_start.record(stream)
-                    preds = self.inference(im, *args, **kwargs)
-                    infer_end.record(stream)
+                        infer_start.record(stream)
+                        preds = self.inference(im, *args, **kwargs)
+                        infer_end.record(stream)
 
-                    post_start.record(stream)
-                    results = self.postprocess(preds, im, im0s)
-                    post_end.record(stream)
+                        post_start.record(stream)
+                        results = self.postprocess(preds, im, im0s)
+                        post_end.record(stream)
 
-                    end_event.record(stream)
-                    # LOGGER.info(f"[End] Stream {i % num_streams} finished batch {i} at {time.time():.4f}")
+                        end_event.record(stream)
+                        # LOGGER.info(f"[End] Stream {i % num_streams} finished batch {i} at {time.time():.4f}")
 
-                pending.append({
-                    "event": end_event,
-                    "stream": stream,
-                    "path": path,
-                    "im0s": im0s,
-                    "vid_cap": vid_cap,
-                    "results": results,
-                    "profiling": {
-                        "pre": (pre_start, pre_end),
-                        "infer": (infer_start, infer_end),
-                        "post": (post_start, post_end)
-                    }
-                })
+                    pending.append({
+                        "event": end_event,
+                        "stream": stream,
+                        "path": path,
+                        "im0s": im0s,
+                        "vid_cap": vid_cap,
+                        "results": results,
+                        "profiling": {
+                            "pre": (pre_start, pre_end),
+                            "infer": (infer_start, infer_end),
+                            "post": (post_start, post_end)
+                        }
+                    })
+            except Queue.Empty:
+                LOGGER.debug(f"Queue is empty, waiting for new batches...")
+                pass    
 
             new_pending = []
             for p in pending:
