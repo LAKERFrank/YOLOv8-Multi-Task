@@ -371,6 +371,8 @@ class BasePredictor:
 
                 with torch.cuda.stream(stream):
                     LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
+                    time.sleep(0.1 * (i % num_streams))
+
                     pre_start.record(stream)
                     im = self.preprocess(im0s)
                     pre_end.record(stream)

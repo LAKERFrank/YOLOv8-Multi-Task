@@ -438,7 +438,7 @@ class TrackNetPredictor(BasePredictor):
         return result
     
     @smart_inference_mode()
-    def stream_inference(self, source=None, model=None, *args, **kwargs):
+    def stream_inference_(self, source=None, model=None, *args, **kwargs):
         """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
 
         if not self.model:
