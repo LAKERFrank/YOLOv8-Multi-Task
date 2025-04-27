@@ -312,8 +312,9 @@ class BasePredictor:
 
         self.run_callbacks('on_predict_end')
 
+    # stream_inference_single_stream
     @smart_inference_mode()
-    def stream_inference(self, source=None, model=None, *args, **kwargs):
+    def stream_inference_single_stream(self, source=None, model=None, *args, **kwargs):
         """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
 
         if not self.model:
@@ -450,8 +451,9 @@ class BasePredictor:
                         f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
             LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
+    # stream_inference_multiple_stream
     @smart_inference_mode()
-    def stream_inference_multiple_stream(self, source=None, model=None, *args, **kwargs):
+    def stream_inference(self, source=None, model=None, *args, **kwargs):
         """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
 
         if not self.model:
@@ -481,7 +483,7 @@ class BasePredictor:
         inference_streams = [torch.cuda.Stream() for _ in range(inference_num_streams)]
         postprocess_streams = [torch.cuda.Stream() for _ in range(postprocess_num_streams)]
 
-        queue = Queue(maxsize=128)
+        queue = Queue(maxsize=1000)
         pending = []
 
         pre_total, infer_total, post_total = 0.0, 0.0, 0.0
