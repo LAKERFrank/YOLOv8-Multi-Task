@@ -314,7 +314,7 @@ class BasePredictor:
 
     # stream_inference_single_stream
     @smart_inference_mode()
-    def stream_inference_single_stream(self, source=None, model=None, *args, **kwargs):
+    def stream_inference(self, source=None, model=None, *args, **kwargs):
         """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
 
         if not self.model:
@@ -453,7 +453,7 @@ class BasePredictor:
 
     # stream_inference_multiple_stream
     @smart_inference_mode()
-    def stream_inference(self, source=None, model=None, *args, **kwargs):
+    def stream_inference_multiple_stream(self, source=None, model=None, *args, **kwargs):
         """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
 
         if not self.model:
