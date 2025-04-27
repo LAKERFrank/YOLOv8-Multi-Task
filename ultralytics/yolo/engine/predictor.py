@@ -565,12 +565,12 @@ class BasePredictor:
                     post_total += post_e
                     total_images += n
 
-                    for j in range(n):
-                        p["results"][j].speed = {
-                            'preprocess': pre_e / n,
-                            'inference': infer_e / n,
-                            'postprocess': post_e / n
-                        }
+                    # for j in range(n):
+                    #     p["results"][j].speed = {
+                    #         'preprocess': pre_e / n,
+                    #         'inference': infer_e / n,
+                    #         'postprocess': post_e / n
+                    #     }
 
                     self.run_callbacks('on_predict_batch_end')
                     # LOGGER.info(f'{path}: {pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')

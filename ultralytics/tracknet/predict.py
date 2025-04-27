@@ -333,10 +333,6 @@ class TrackNetPredictor(BasePredictor):
         #         pred=frame_preds if use_nms else frame_preds[0],
         #         speed={'preprocess': None, 'inference': None, 'postprocess': None}
         #     ))
-        result.append(ResultItem(
-                 pred=Prediction(x=0.0, y=0.0, conf=0.0),
-                 speed={'preprocess': None, 'inference': None, 'postprocess': None}
-             ))
         return result
         ######### 輸出檔案
         # orig_images_clone = orig_imgs.transpose(2, 0, 1)
