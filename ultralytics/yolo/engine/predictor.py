@@ -357,7 +357,6 @@ class BasePredictor:
         profiler_output_dir = os.path.abspath("./profiler_output")
         os.makedirs(profiler_output_dir, exist_ok=True)
 
-        # ✅ 在這裡開一個 global profiler
         with torch.profiler.profile(
             activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
             schedule=torch.profiler.schedule(wait=1, warmup=1, active=10, repeat=1),
@@ -383,17 +382,18 @@ class BasePredictor:
                         end_event = torch.cuda.Event(True)
 
                         with torch.cuda.stream(stream):
-                            pre_start.record(stream)
-                            im = self.preprocess(im0s)
-                            pre_end.record(stream)
-
-                            infer_start.record(stream)
-                            preds = self.inference(im, *args, **kwargs)
-                            infer_end.record(stream)
-
-                            post_start.record(stream)
-                            results = self.postprocess(preds, im, im0s)
-                            post_end.record(stream)
+                            with torch.profiler.record_function("Preprocess"):
+                                pre_start.record(stream)
+                                im = self.preprocess(im0s)
+                                pre_end.record(stream)
+                            with torch.profiler.record_function("Inference"):
+                                infer_start.record(stream)
+                                preds = self.inference(im, *args, **kwargs)
+                                infer_end.record(stream)
+                            with torch.profiler.record_function("Postprocess"):
+                                post_start.record(stream)
+                                results = self.postprocess(preds, im, im0s)
+                                post_end.record(stream)
 
                             end_event.record(stream)
 
