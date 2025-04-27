@@ -465,7 +465,7 @@ class TrackNetPredictor(BasePredictor):
             shuffle=False,
             num_workers=8,
             pin_memory=True,
-            prefetch_factor=4,
+            prefetch_factor=8,
         )
 
         profiler_output_dir = os.path.abspath("./profiler_output")
@@ -480,9 +480,9 @@ class TrackNetPredictor(BasePredictor):
             with_modules=True
         ) as prof:
 
-            preprocess_streams = [torch.cuda.Stream() for _ in range(4)]
-            inference_streams = [torch.cuda.Stream() for _ in range(10)]
-            postprocess_streams = [torch.cuda.Stream() for _ in range(4)]
+            preprocess_streams = [torch.cuda.Stream() for _ in range(10)]
+            inference_streams = [torch.cuda.Stream() for _ in range(5)]
+            postprocess_streams = [torch.cuda.Stream() for _ in range(5)]
 
             task_queue = Q.Queue(maxsize=256)
             pending = []
