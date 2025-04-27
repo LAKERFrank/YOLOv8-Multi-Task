@@ -1,6 +1,8 @@
 
 from datetime import datetime
 import os
+from queue import Queue
+import threading
 from matplotlib import pyplot as plt
 import torch
 import numpy as np
@@ -9,10 +11,11 @@ from ultralytics.tracknet.utils.nms import non_max_suppression
 from ultralytics.yolo.data.build import load_inference_source
 from ultralytics.yolo.engine.predictor import STREAM_WARNING, BasePredictor
 from ultralytics.yolo.engine.results import Results
+from torch.utils.data import DataLoader
 
 from ultralytics.yolo.utils import LOGGER, ops
 from ultralytics.yolo.utils.checks import check_imgsz
-from ultralytics.yolo.utils.torch_utils import select_device
+from ultralytics.yolo.utils.torch_utils import select_device, smart_inference_mode
 from pathlib import Path
 import cv2
 from dataclasses import dataclass
@@ -71,6 +74,19 @@ class TrackNetPredictor(BasePredictor):
     #     self.args.half = True  # update half
     #     # self.args.half = self.args.half  # update half
     #     self.model.eval()
+    def cpu_preprocess(self, im0s):
+        """CPU version of preprocess"""
+        if not isinstance(im0s, torch.Tensor):
+            im = torch.from_numpy(im0s).permute(2, 0, 1).contiguous().float()  # (HWC) -> (CHW)
+        else:
+            im = im0s.float()
+
+        # 一律留在 CPU上處理
+        median = im.median(dim=0).values  # (H, W)
+        im = (im - median.unsqueeze(0)).clamp(0, 255) / 255.0
+
+        # 注意：此時 im shape = (C, H, W)
+        return im
     def preprocess(self, im):
         not_tensor = not isinstance(im, torch.Tensor)
 
@@ -176,6 +192,75 @@ class TrackNetPredictor(BasePredictor):
 
         return im
 
+    def cpu_postprocess(self, preds, im0s):
+        """CPU version of postprocess"""
+        use_nms = True
+        conf_threshold = 0.5
+        nc = 1
+        reg_max = 16
+        feat_no = 8
+        no = nc + reg_max * feat_no
+        cell_num = 80
+        stride = 8
+        proj = torch.arange(reg_max, dtype=torch.float)
+
+        # 把 preds 搬回 CPU
+        feats = preds[0].detach().cpu()
+
+        pred_distri, pred_scores = feats.view(no, -1).split((reg_max * feat_no, nc), 0)
+        pred_scores = pred_scores.permute(1, 0).contiguous()
+        pred_distri = pred_distri.permute(1, 0).contiguous()
+
+        pred_probs = torch.sigmoid(pred_scores)
+        a, c = pred_distri.shape
+
+        pred_pos = pred_distri.view(a, feat_no, c // feat_no).softmax(2).matmul(proj.type(pred_distri.dtype))
+        each_probs = pred_probs.view(10, cell_num, cell_num)
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, cell_num, cell_num, feat_no).split([2, 2, 2, 2], dim=3)
+
+        result = []
+        for frame_idx in range(10):
+            p_cell_x = each_pos_x[frame_idx]
+            p_cell_y = each_pos_y[frame_idx]
+            p_cell_nx = each_pos_nx[frame_idx]
+            p_cell_ny = each_pos_ny[frame_idx]
+            center = 0.5
+
+            p_conf = each_probs[frame_idx]
+            frame_preds = []
+
+            if use_nms:
+                nms_preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=20)
+
+                for pred in nms_preds:
+                    max_x, max_y, max_conf = pred
+                    pred_x = max_x*stride + (center*stride-p_cell_x[int(max_y)][int(max_x)][0]+p_cell_x[int(max_y)][int(max_x)][1])
+                    pred_y = max_y*stride + (center*stride-p_cell_y[int(max_y)][int(max_x)][0]+p_cell_y[int(max_y)][int(max_x)][1])
+
+                    frame_preds.append(ResultItem(
+                        pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
+                        speed={'preprocess': None, 'inference': None, 'postprocess': None}
+                    ))
+            else:
+                p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
+                max_position = torch.argmax(p_conf_masked)
+                max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
+                max_conf = p_conf[max_y, max_x].item()
+
+                pred_x = max_x*stride + (center*stride-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1])
+                pred_y = max_y*stride + (center*stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
+                frame_preds.append(ResultItem(
+                    pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
+                    speed={'preprocess': None, 'inference': None, 'postprocess': None}
+                ))
+
+            result.append(ResultItem(
+                pred=frame_preds if use_nms else frame_preds[0],
+                speed={'preprocess': None, 'inference': None, 'postprocess': None}
+            ))
+
+        return result
+
     def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
         # self.profile_resources("Postprocess (before)")
@@ -250,6 +335,7 @@ class TrackNetPredictor(BasePredictor):
                 pred=frame_preds if use_nms else frame_preds[0],
                 speed={'preprocess': None, 'inference': None, 'postprocess': None}
             ))
+        return result
         ######### 輸出檔案
         # orig_images_clone = orig_imgs.transpose(2, 0, 1)
 
@@ -350,6 +436,157 @@ class TrackNetPredictor(BasePredictor):
         # result = revert_coordinates(result, orig_imgs[0].shape[2], orig_imgs[0].shape[3], img[0].shape[2])
         # self.profile_resources("Postprocess (after)")
         return result
+    
+    @smart_inference_mode()
+    def stream_pipeline_inference(self, source=None, model=None, *args, **kwargs):
+        if not self.model:
+            self.setup_model(model)
+        self.setup_source(source if source is not None else self.args.source)
+
+        if not self.done_warmup:
+            self.model.warmup(imgsz=(1 if self.model.pt or self.model.triton else self.dataset.bs, 10, *self.imgsz))
+            self.done_warmup = True
+
+        dataloader = DataLoader(self.dataset, batch_size=1, shuffle=False, num_workers=8, pin_memory=True)
+
+        # Parameters
+        num_preprocess_workers = 4
+        num_infer_streams = 8
+        num_postprocess_workers = 2
+        queue_size = 64
+
+        preprocess_queue = Queue(maxsize=queue_size)
+        infer_queue = Queue(maxsize=queue_size)
+        postprocess_queue = Queue(maxsize=queue_size)
+
+        streams = [torch.cuda.Stream() for _ in range(num_infer_streams)]
+        feeder_finished = False
+        start_time = time.time()
+
+        total_images = 0
+        pre_total, infer_total, post_total = 0.0, 0.0, 0.0
+
+        # ======= Preprocess Stage =======
+        def preprocess_worker():
+            while True:
+                item = preprocess_queue.get()
+                if item is None:
+                    break
+                i, batch = item
+                path, im0s, vid_cap, s = batch
+
+                # CPU-side preprocess
+                im = self.cpu_preprocess(im0s)  # 自己寫一個純CPU版本
+                infer_queue.put((i, path, im, im0s, vid_cap, s))
+                preprocess_queue.task_done()
+
+        # ======= Inference Stage =======
+        def inference_worker(i, stream):
+            while True:
+                item = infer_queue.get()
+                if item is None:
+                    break
+                idx, path, im, im0s, vid_cap, s = item
+
+                with torch.cuda.stream(stream):
+                    pre_start = torch.cuda.Event(True)
+                    infer_start = torch.cuda.Event(True)
+                    infer_end = torch.cuda.Event(True)
+                    pre_start.record(stream)
+
+                    im = im.to(self.device, dtype=torch.float32, non_blocking=True)
+                    if self.model.fp16:
+                        im = im.half()
+
+                    infer_start.record(stream)
+                    preds = self.inference(im, *args, **kwargs)
+                    infer_end.record(stream)
+
+                    torch.cuda.current_stream().synchronize()
+
+                    elapsed_infer = infer_start.elapsed_time(infer_end)
+
+                    postprocess_queue.put((idx, path, preds, im0s, vid_cap, s, elapsed_infer))
+                infer_queue.task_done()
+
+        # ======= Postprocess Stage =======
+        def postprocess_worker():
+            nonlocal total_images, pre_total, infer_total, post_total
+
+            while True:
+                item = postprocess_queue.get()
+                if item is None:
+                    break
+                idx, path, preds, im0s, vid_cap, s, infer_time = item
+
+                post_start_cpu = time.time()
+                results = self.cpu_postprocess(preds, im0s)
+                post_end_cpu = time.time()
+
+                postprocess_time = (post_end_cpu - post_start_cpu) * 1000  # ms
+
+                n = im0s.shape[2]  # number of frames
+                infer_total += infer_time
+                post_total += postprocess_time
+                total_images += n
+
+                for j in range(n):
+                    results[j].speed = {
+                        'preprocess': 0.0,  # 暫時沒有單獨算
+                        'inference': infer_time / n,
+                        'postprocess': postprocess_time / n
+                    }
+
+                self.run_callbacks('on_predict_batch_end')
+                yield from results
+                postprocess_queue.task_done()
+
+        # ======= Feeder =======
+        def batch_feeder():
+            nonlocal feeder_finished
+            for i, batch in enumerate(dataloader):
+                preprocess_queue.put((i, batch))
+            feeder_finished = True
+
+        # ======= Start Workers =======
+        preprocess_workers = [threading.Thread(target=preprocess_worker, daemon=True) for _ in range(num_preprocess_workers)]
+        infer_workers = [threading.Thread(target=inference_worker, args=(i, streams[i % num_infer_streams]), daemon=True) for i in range(num_infer_streams)]
+        postprocess_workers = [threading.Thread(target=postprocess_worker, daemon=True) for _ in range(num_postprocess_workers)]
+
+        for w in preprocess_workers + infer_workers + postprocess_workers:
+            w.start()
+
+        threading.Thread(target=batch_feeder, daemon=True).start()
+
+        self.run_callbacks('on_predict_start')
+
+        while True:
+            if feeder_finished and preprocess_queue.empty() and infer_queue.empty() and postprocess_queue.empty():
+                break
+            time.sleep(0.01)  # 避免busy loop
+
+        # ======= Cleanup =======
+        for _ in preprocess_workers:
+            preprocess_queue.put(None)
+        for _ in infer_workers:
+            infer_queue.put(None)
+        for _ in postprocess_workers:
+            postprocess_queue.put(None)
+
+        for w in preprocess_workers + infer_workers + postprocess_workers:
+            w.join()
+
+        self.run_callbacks('on_predict_end')
+
+        torch.cuda.synchronize()
+
+        elapsed_time = time.time() - start_time
+        fps = total_images / elapsed_time
+        LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
+        LOGGER.info(f'Average Inference Time: {infer_total/total_images:.2f} ms')
+
+    
+
     def write_results(self, idx, results, batch):
         return "todo"
     def show(self, p):
