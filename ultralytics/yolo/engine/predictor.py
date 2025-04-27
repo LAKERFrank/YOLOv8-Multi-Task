@@ -333,10 +333,11 @@ class BasePredictor:
             shuffle=False,
             num_workers=8,
             pin_memory=True,
+            prefetch_factor=4,
         )
         num_streams = 10
         streams = [torch.cuda.Stream() for _ in range(num_streams)]
-        queue = Queue(maxsize=32)
+        queue = Queue(maxsize=128)
         pending = []
 
         pre_total, infer_total, post_total = 0.0, 0.0, 0.0
@@ -364,24 +365,24 @@ class BasePredictor:
                 stream = streams[i % num_streams]
 
                 # Timing events
-                pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
-                infer_start, infer_end = torch.cuda.Event(True), torch.cuda.Event(True)
-                post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                # pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                # infer_start, infer_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                # post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
                 end_event = torch.cuda.Event(True)
 
                 with torch.cuda.stream(stream):
                     LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
-                    pre_start.record(stream)
+                    # pre_start.record(stream)
                     im = self.preprocess(im0s)
-                    pre_end.record(stream)
+                    # pre_end.record(stream)
 
-                    infer_start.record(stream)
+                    # infer_start.record(stream)
                     preds = self.inference(im, *args, **kwargs)
-                    infer_end.record(stream)
+                    # infer_end.record(stream)
 
-                    post_start.record(stream)
+                    # post_start.record(stream)
                     results = self.postprocess(preds, im, im0s)
-                    post_end.record(stream)
+                    # post_end.record(stream)
 
                     end_event.record(stream)
                     LOGGER.info(f"[End] Stream {i % num_streams} finished batch {i} at {time.time():.4f}")
@@ -393,11 +394,11 @@ class BasePredictor:
                     "im0s": im0s,
                     "vid_cap": vid_cap,
                     "results": results,
-                    "profiling": {
-                        "pre": (pre_start, pre_end),
-                        "infer": (infer_start, infer_end),
-                        "post": (post_start, post_end)
-                    }
+                    # "profiling": {
+                    #     "pre": (pre_start, pre_end),
+                    #     "infer": (infer_start, infer_end),
+                    #     "post": (post_start, post_end)
+                    # }
                 })
 
             new_pending = []
@@ -415,9 +416,12 @@ class BasePredictor:
 
                     for j in range(n):
                         p["results"][j].speed = {
-                            'preprocess': pre_e / n,
-                            'inference': infer_e / n,
-                            'postprocess': post_e / n
+                            # 'preprocess': pre_e / n,
+                            # 'inference': infer_e / n,
+                            # 'postprocess': post_e / n,
+                            'preprocess': 0.0,
+                            'inference': 0.0,
+                            'postprocess': 0.0
                         }
                         # pj = Path(p["path"][j])
                         # im0 = None if self.source_type.tensor else p["im0s"][j].copy()
@@ -432,7 +436,8 @@ class BasePredictor:
                         #     self.save_preds(p["vid_cap"], j, str(self.save_dir / pj.name))
 
                     self.run_callbacks('on_predict_batch_end')
-                    LOGGER.info(f'{pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
+                    # LOGGER.info(f'{pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
+                    LOGGER.info(f'finished batch {i} at {time.time():.4f} ')
                     yield from p["results"]
                 else:
                     new_pending.append(p)
@@ -445,8 +450,8 @@ class BasePredictor:
         if total_images:
             elapsed_time = time.time() - start_time  # 單位：秒
             fps = total_images / elapsed_time
-            LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
-                        f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
+            # LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
+            #             f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
             LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
 
