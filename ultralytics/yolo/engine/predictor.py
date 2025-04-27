@@ -331,19 +331,13 @@ class BasePredictor:
             self.dataset,
             batch_size=1,
             shuffle=False,
-            num_workers=16,
+            num_workers=8,
             pin_memory=True,
             prefetch_factor=8,
         )
-        preprocess_num_streams = 1
-        inference_num_streams = 1
-        postprocess_num_streams = 1
-
-        preprocess_streams = [torch.cuda.Stream() for _ in range(preprocess_num_streams)]
-        inference_streams = [torch.cuda.Stream() for _ in range(inference_num_streams)]
-        postprocess_streams = [torch.cuda.Stream() for _ in range(postprocess_num_streams)]
-
-        queue = Queue(maxsize=128)
+        num_streams = 15
+        streams = [torch.cuda.Stream() for _ in range(num_streams)]
+        queue = Queue(maxsize=256)
         pending = []
 
         pre_total, infer_total, post_total = 0.0, 0.0, 0.0
@@ -361,49 +355,41 @@ class BasePredictor:
 
         while True:
             while not queue.empty():
-                item = queue.get_nowait()
+                item = queue.get()
                 if item is None:
                     queue.put(None)
                     break
                 i, batch = item
                 self.batch = batch
                 path, im0s, vid_cap, s = batch
+                stream = streams[i % num_streams]
 
-                preprocess_stream = preprocess_streams[i % preprocess_num_streams]
-                inference_stream = inference_streams[i % inference_num_streams]
-                postprocess_stream = postprocess_streams[i % postprocess_num_streams]
-
-                # CUDA Events
+                # Timing events
                 pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
                 infer_start, infer_end = torch.cuda.Event(True), torch.cuda.Event(True)
                 post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
                 end_event = torch.cuda.Event(True)
 
-                # Step 1: Preprocess
-                with torch.cuda.stream(preprocess_stream):
-                    pre_start.record(preprocess_stream)
+                with torch.cuda.stream(stream):
+                    # LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
+                    pre_start.record(stream)
                     im = self.preprocess(im0s)
-                    pre_end.record(preprocess_stream)
+                    pre_end.record(stream)
 
-                # Step 2: Inference (必須等待 preprocess 完成)
-                with torch.cuda.stream(inference_stream):
-                    inference_stream.wait_event(pre_end)
-                    infer_start.record(inference_stream)
+                    infer_start.record(stream)
                     preds = self.inference(im, *args, **kwargs)
-                    infer_end.record(inference_stream)
+                    infer_end.record(stream)
 
-                # Step 3: Postprocess (必須等待 inference 完成)
-                with torch.cuda.stream(postprocess_stream):
-                    postprocess_stream.wait_event(infer_end)
-                    post_start.record(postprocess_stream)
+                    post_start.record(stream)
                     results = self.postprocess(preds, im, im0s)
-                    post_end.record(postprocess_stream)
+                    post_end.record(stream)
 
-                    end_event.record(postprocess_stream)
+                    end_event.record(stream)
+                    # LOGGER.info(f"[End] Stream {i % num_streams} finished batch {i} at {time.time():.4f}")
 
                 pending.append({
                     "event": end_event,
-                    "stream": postprocess_stream,
+                    "stream": stream,
                     "path": path,
                     "im0s": im0s,
                     "vid_cap": vid_cap,
@@ -419,7 +405,6 @@ class BasePredictor:
             for p in pending:
                 if p["event"].query():
                     n = p["im0s"].shape[1]
-                    path = p["path"]
                     pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
                     infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
                     post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
@@ -435,9 +420,20 @@ class BasePredictor:
                             'inference': infer_e / n,
                             'postprocess': post_e / n
                         }
+                        # pj = Path(p["path"][j])
+                        # im0 = None if self.source_type.tensor else p["im0s"][j].copy()
+
+                        # if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
+                        #     _ = self.write_results(j, p["results"], (pj, im, im0))
+                        # if self.args.save or self.args.save_txt:
+                        #     p["results"][j].save_dir = str(self.save_dir)
+                        # if self.args.show and self.plotted_img is not None:
+                        #     self.show(pj)
+                        # if self.args.save and self.plotted_img is not None:
+                        #     self.save_preds(p["vid_cap"], j, str(self.save_dir / pj.name))
 
                     self.run_callbacks('on_predict_batch_end')
-                    # LOGGER.info(f'{path}: {pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
+                    # LOGGER.info(f'{pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
                     yield from p["results"]
                 else:
                     new_pending.append(p)
@@ -448,7 +444,7 @@ class BasePredictor:
 
         self.run_callbacks('on_predict_end')
         if total_images:
-            elapsed_time = time.time() - start_time
+            elapsed_time = time.time() - start_time  # 單位：秒
             fps = total_images / elapsed_time
             LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
                         f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
