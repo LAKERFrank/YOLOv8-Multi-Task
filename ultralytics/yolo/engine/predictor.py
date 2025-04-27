@@ -27,6 +27,7 @@ Usage - formats:
                               yolov8n_edgetpu.tflite     # TensorFlow Edge TPU
                               yolov8n_paddle_model       # PaddlePaddle
 """
+import os
 import platform
 from pathlib import Path
 from threading import Thread
@@ -353,6 +354,7 @@ class BasePredictor:
 
         Thread(target=batch_feeder, daemon=True).start()
         self.run_callbacks('on_predict_start')
+        profiler_output_dir = os.path.abspath("./profiler_output")
 
         while True:
             try:
@@ -369,21 +371,35 @@ class BasePredictor:
                     end_event = torch.cuda.Event(True)
 
                     with torch.cuda.stream(stream):
-                        # LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
-                        pre_start.record(stream)
-                        im = self.preprocess(im0s)
-                        pre_end.record(stream)
+                        with torch.profiler.profile(
+                            activities=[
+                                torch.profiler.ProfilerActivity.CPU,
+                                torch.profiler.ProfilerActivity.CUDA,
+                            ],
+                            # schedule=torch.profiler.schedule(wait=1, warmup=1, active=10, repeat=1),
+                            on_trace_ready=torch.profiler.tensorboard_trace_handler(profiler_output_dir),
+                            record_shapes=True,
+                            profile_memory=True,
+                            with_stack=True,
+                            with_flops=True,
+                            use_cuda=True,
+                            experimental_config=torch.profiler._ExperimentalConfig(verbose=True),
+                        ) as prof:
+                            # LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
+                            pre_start.record(stream)
+                            im = self.preprocess(im0s)
+                            pre_end.record(stream)
 
-                        infer_start.record(stream)
-                        preds = self.inference(im, *args, **kwargs)
-                        infer_end.record(stream)
+                            infer_start.record(stream)
+                            preds = self.inference(im, *args, **kwargs)
+                            infer_end.record(stream)
 
-                        post_start.record(stream)
-                        results = self.postprocess(preds, im, im0s)
-                        post_end.record(stream)
+                            post_start.record(stream)
+                            results = self.postprocess(preds, im, im0s)
+                            post_end.record(stream)
 
-                        end_event.record(stream)
-                        # LOGGER.info(f"[End] Stream {i % num_streams} finished batch {i} at {time.time():.4f}")
+                            end_event.record(stream)
+                            # LOGGER.info(f"[End] Stream {i % num_streams} finished batch {i} at {time.time():.4f}")
 
                     pending.append({
                         "event": end_event,
@@ -405,6 +421,7 @@ class BasePredictor:
             new_pending = []
             for p in pending:
                 if p["event"].query():
+                    prof.step()
                     n = p["im0s"].shape[1]
                     pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
                     infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
