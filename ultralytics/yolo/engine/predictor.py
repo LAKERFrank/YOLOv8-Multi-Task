@@ -336,7 +336,10 @@ class BasePredictor:
             prefetch_factor=4,
         )
         num_streams = 10
-        streams = [torch.cuda.Stream() for _ in range(num_streams)]
+        preprocess_num_streams = 4  # 自訂 Preprocess Stream 數量，可根據經驗調整
+        preprocess_streams = [torch.cuda.Stream() for _ in range(preprocess_num_streams)]
+        inference_streams = [torch.cuda.Stream() for _ in range(num_streams)]
+
         queue = Queue(maxsize=128)
         pending = []
 
@@ -362,34 +365,39 @@ class BasePredictor:
                 i, batch = item
                 self.batch = batch
                 path, im0s, vid_cap, s = batch
-                stream = streams[i % num_streams]
 
-                # Timing events
+                preprocess_stream = preprocess_streams[i % preprocess_num_streams]
+                inference_stream = inference_streams[i % num_streams]
+
+                # CUDA Events
                 pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
                 infer_start, infer_end = torch.cuda.Event(True), torch.cuda.Event(True)
                 post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
                 end_event = torch.cuda.Event(True)
 
-                with torch.cuda.stream(stream):
-                    LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
-                    pre_start.record(stream)
-                    im = self.preprocess(im0s)
-                    pre_end.record(stream)
+                # Step 1: Preprocess 在 preprocess_stream 上執行
+                with torch.cuda.stream(preprocess_stream):
+                    pre_start.record(preprocess_stream)
+                    im = self.preprocess(im0s)  # 可能會有 to(device)、normalize 等
+                    pre_end.record(preprocess_stream)
 
-                    infer_start.record(stream)
+                # Step 2: Inference + Postprocess 在 inference_stream 上執行
+                with torch.cuda.stream(inference_stream):
+                    inference_stream.wait_event(pre_end)  # 確保 Preprocess 完成
+
+                    infer_start.record(inference_stream)
                     preds = self.inference(im, *args, **kwargs)
-                    infer_end.record(stream)
+                    infer_end.record(inference_stream)
 
-                    post_start.record(stream)
+                    post_start.record(inference_stream)
                     results = self.postprocess(preds, im, im0s)
-                    post_end.record(stream)
+                    post_end.record(inference_stream)
 
-                    end_event.record(stream)
-                    LOGGER.info(f"[End] Stream {i % num_streams} finished batch {i} at {time.time():.4f}")
+                    end_event.record(inference_stream)
 
                 pending.append({
                     "event": end_event,
-                    "stream": stream,
+                    "stream": inference_stream,
                     "path": path,
                     "im0s": im0s,
                     "vid_cap": vid_cap,
@@ -420,17 +428,6 @@ class BasePredictor:
                             'inference': infer_e / n,
                             'postprocess': post_e / n
                         }
-                        # pj = Path(p["path"][j])
-                        # im0 = None if self.source_type.tensor else p["im0s"][j].copy()
-
-                        # if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
-                        #     _ = self.write_results(j, p["results"], (pj, im, im0))
-                        # if self.args.save or self.args.save_txt:
-                        #     p["results"][j].save_dir = str(self.save_dir)
-                        # if self.args.show and self.plotted_img is not None:
-                        #     self.show(pj)
-                        # if self.args.save and self.plotted_img is not None:
-                        #     self.save_preds(p["vid_cap"], j, str(self.save_dir / pj.name))
 
                     self.run_callbacks('on_predict_batch_end')
                     LOGGER.info(f'{pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
@@ -444,11 +441,12 @@ class BasePredictor:
 
         self.run_callbacks('on_predict_end')
         if total_images:
-            elapsed_time = time.time() - start_time  # 單位：秒
+            elapsed_time = time.time() - start_time
             fps = total_images / elapsed_time
             LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
                         f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
             LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
+
 
 
     def setup_model(self, model, verbose=True):
