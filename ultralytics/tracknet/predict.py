@@ -580,7 +580,7 @@ class TrackNetPredictor(BasePredictor):
                             }
 
                         self.run_callbacks('on_predict_batch_end')
-                        LOGGER.info(f'{pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
+                        # LOGGER.info(f'{pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
                         yield from p["results"]
                     else:
                         new_pending.append(p)
