@@ -20,6 +20,7 @@ from pathlib import Path
 import cv2
 from dataclasses import dataclass
 import time
+import torch.profiler
 
 
 @dataclass
@@ -437,6 +438,168 @@ class TrackNetPredictor(BasePredictor):
         # self.profile_resources("Postprocess (after)")
         return result
     
+    import torch
+
+@smart_inference_mode()
+def stream_inference(self, source=None, model=None, *args, **kwargs):
+    """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
+
+    if not self.model:
+        self.setup_model(model)
+    self.setup_source(source if source is not None else self.args.source)
+
+    if self.args.save or self.args.save_txt:
+        (self.save_dir / 'labels' if self.args.save_txt else self.save_dir).mkdir(parents=True, exist_ok=True)
+
+    if not self.done_warmup:
+        self.model.warmup(imgsz=(1 if self.model.pt or self.model.triton else self.dataset.bs, 10, *self.imgsz))
+        self.done_warmup = True
+
+    start_time = time.time()
+    dataloader = DataLoader(
+        self.dataset,
+        batch_size=1,
+        shuffle=False,
+        num_workers=8,
+        pin_memory=True,
+        prefetch_factor=4,
+    )
+
+    # 加入 profiler
+    with torch.profiler.profile(
+        schedule=torch.profiler.schedule(wait=1, warmup=1, active=10, repeat=1),
+        on_trace_ready=torch.profiler.tensorboard_trace_handler('./profiler_output'),
+        record_shapes=True,
+        profile_memory=True,
+        with_stack=True,
+        with_modules=True
+    ) as prof:
+
+        num_streams = 10
+        preprocess_num_streams = 4
+        postprocess_num_streams = 4
+
+        preprocess_streams = [torch.cuda.Stream() for _ in range(preprocess_num_streams)]
+        inference_streams = [torch.cuda.Stream() for _ in range(num_streams)]
+        postprocess_streams = [torch.cuda.Stream() for _ in range(postprocess_num_streams)]
+
+        queue = Queue(maxsize=128)
+        pending = []
+
+        pre_total, infer_total, post_total = 0.0, 0.0, 0.0
+        total_images = 0
+        feeder_finished = False
+
+        def batch_feeder():
+            nonlocal feeder_finished
+            for i, batch in enumerate(dataloader):
+                queue.put((i, batch))
+            feeder_finished = True
+
+        threading.Thread(target=batch_feeder, daemon=True).start()
+        self.run_callbacks('on_predict_start')
+
+        while True:
+            while not queue.empty():
+                item = queue.get()
+                if item is None:
+                    queue.put(None)
+                    break
+                i, batch = item
+                self.batch = batch
+                path, im0s, vid_cap, s = batch
+
+                preprocess_stream = preprocess_streams[i % preprocess_num_streams]
+                inference_stream = inference_streams[i % num_streams]
+                postprocess_stream = postprocess_streams[i % postprocess_num_streams]
+
+                pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                infer_start, infer_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                end_event = torch.cuda.Event(True)
+
+                # Preprocess
+                with torch.cuda.stream(preprocess_stream):
+                    with torch.profiler.record_function("Preprocess"):
+                        pre_start.record(preprocess_stream)
+                        im = self.preprocess(im0s)
+                        pre_end.record(preprocess_stream)
+
+                # Inference
+                with torch.cuda.stream(inference_stream):
+                    inference_stream.wait_event(pre_end)
+                    with torch.profiler.record_function("Inference"):
+                        infer_start.record(inference_stream)
+                        preds = self.inference(im, *args, **kwargs)
+                        infer_end.record(inference_stream)
+
+                # Postprocess
+                with torch.cuda.stream(postprocess_stream):
+                    postprocess_stream.wait_event(infer_end)
+                    with torch.profiler.record_function("Postprocess"):
+                        post_start.record(postprocess_stream)
+                        results = self.postprocess(preds, im, im0s)
+                        post_end.record(postprocess_stream)
+
+                    end_event.record(postprocess_stream)
+
+                pending.append({
+                    "event": end_event,
+                    "stream": postprocess_stream,
+                    "path": path,
+                    "im0s": im0s,
+                    "vid_cap": vid_cap,
+                    "results": results,
+                    "profiling": {
+                        "pre": (pre_start, pre_end),
+                        "infer": (infer_start, infer_end),
+                        "post": (post_start, post_end)
+                    }
+                })
+
+            new_pending = []
+            for p in pending:
+                if p["event"].query():
+                    n = p["im0s"].shape[1]
+                    pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
+                    infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
+                    post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
+
+                    pre_total += pre_e
+                    infer_total += infer_e
+                    post_total += post_e
+                    total_images += n
+
+                    for j in range(n):
+                        p["results"][j].speed = {
+                            'preprocess': pre_e / n,
+                            'inference': infer_e / n,
+                            'postprocess': post_e / n
+                        }
+
+                    self.run_callbacks('on_predict_batch_end')
+                    LOGGER.info(f'{pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
+                    yield from p["results"]
+                else:
+                    new_pending.append(p)
+            pending = new_pending
+
+            if feeder_finished and queue.empty() and not pending:
+                break
+
+            # 更新 profiler 記錄
+            prof.step()
+
+        self.run_callbacks('on_predict_end')
+
+    if total_images:
+        elapsed_time = time.time() - start_time
+        fps = total_images / elapsed_time
+        LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
+                    f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
+        LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
+
+
     @smart_inference_mode()
     def stream_inference_(self, source=None, model=None, *args, **kwargs):
         """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
