@@ -463,6 +463,7 @@ class TrackNetPredictor(BasePredictor):
         streams = [torch.cuda.Stream() for _ in range(num_streams)]
         queue = Queue(maxsize=32)
         infer_queue = Queue(maxsize=32)
+        postprocess_queue = Queue(maxsize=32)
         pending = []
 
         pre_total, infer_total, post_total = 0.0, 0.0, 0.0
@@ -487,99 +488,70 @@ class TrackNetPredictor(BasePredictor):
                 infer_queue.put((i, path, im, im0s, vid_cap, s))
                 queue.task_done()
                 LOGGER.info(f"[Preprocess] {i} done, queue size: {queue.qsize()}")
+        def inference_worker(i, stream):
+            try:
+                while True:
+                    item = infer_queue.get()
+                    if item is None:
+                        LOGGER.info(f"[inference_worker-{i}] Received shutdown signal.")
+                        break
+
+                    idx, path, im, im0s, vid_cap, s = item
+
+                    try:
+                        with torch.cuda.stream(stream):
+                            # Input sanity check
+                            if not torch.is_tensor(im):
+                                raise ValueError(f"[inference_worker-{i}] Input is not a tensor")
+                            if not torch.isfinite(im).all():
+                                raise ValueError(f"[inference_worker-{i}] Input tensor contains NaN or Inf")
+                            if im.dim() != 4:
+                                raise ValueError(f"[inference_worker-{i}] Input tensor should be 3D (C, H, W), got {im.shape}")
+
+                            # Send to device
+                            pre_start = torch.cuda.Event(enable_timing=True)
+                            infer_start = torch.cuda.Event(enable_timing=True)
+                            infer_end = torch.cuda.Event(enable_timing=True)
+
+                            pre_start.record()
+                            im = im.to(self.device, dtype=torch.float32, non_blocking=True)
+                            if self.model.fp16:
+                                im = im.half()
+
+                            # Inference
+                            infer_start.record()
+                            preds = self.inference(im, *args, **kwargs)
+                            infer_end.record()
+
+                            # Strong sync to catch CUDA error
+                            torch.cuda.current_stream().synchronize()
+
+                            # Sanity check output
+                            if preds is None:
+                                raise ValueError(f"[inference_worker-{i}] Inference output is None")
+                            if not isinstance(preds, (list, tuple)) or len(preds) == 0:
+                                raise ValueError(f"[inference_worker-{i}] Inference output invalid format: {type(preds)}")
+                            
+                            postprocess_queue.put((idx, path, preds, im0s, vid_cap, s, infer_start, infer_end))
+                            LOGGER.info(f"[inference_worker-{i}] Finished batch {idx}")
+                    except Exception as batch_e:
+                        LOGGER.error(f"[inference_worker-{i}] Skipping batch {idx} due to error: {batch_e}")
+                        # Don't crash entire worker, just skip this batch
+                    finally:
+                        infer_queue.task_done()
+
+            except Exception as e:
+                LOGGER.critical(f"[inference_worker-{i}] Fatal crash: {e}")
+                raise e
 
         threading.Thread(target=batch_feeder, daemon=True).start()
         threading.Thread(target=preprocess_worker, daemon=True).start()
+        num_infer_streams = 8
+        infer_workers = [threading.Thread(target=inference_worker, args=(i, streams[i % num_infer_streams]), daemon=True) for i in range(num_infer_streams)]
+        
         self.run_callbacks('on_predict_start')
-
-        while True:
-            while not infer_queue.empty():
-                item = infer_queue.get()
-                if item is None:
-                    infer_queue.put(None)
-                    break
-                i, path, im, im0s, vid_cap, s = item
-                stream = streams[i % num_streams]
-
-                # Timing events
-                pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
-                infer_start, infer_end = torch.cuda.Event(True), torch.cuda.Event(True)
-                post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
-                end_event = torch.cuda.Event(True)
-
-                with torch.cuda.stream(stream):
-                    LOGGER.info(f"[Start] Stream {i % num_streams} processing batch {i} at {time.time():.4f}")
-                    pre_start.record(stream)
-                    im = im0s.to(self.device, dtype=torch.float32, non_blocking=True)
-                    if self.model.fp16:
-                        im = im.half()
-                    pre_end.record(stream)
-
-                    infer_start.record(stream)
-                    preds = self.inference(im, *args, **kwargs)
-                    infer_end.record(stream)
-
-                    post_start.record(stream)
-                    results = self.postprocess(preds, im, im0s)
-                    post_end.record(stream)
-
-                    end_event.record(stream)
-                    LOGGER.info(f"[End] Stream {i % num_streams} finished batch {i} at {time.time():.4f}")
-
-                pending.append({
-                    "event": end_event,
-                    "stream": stream,
-                    "path": path,
-                    "im0s": im0s,
-                    "vid_cap": vid_cap,
-                    "results": results,
-                    "profiling": {
-                        "pre": (pre_start, pre_end),
-                        "infer": (infer_start, infer_end),
-                        "post": (post_start, post_end)
-                    }
-                })
-
-            new_pending = []
-            for p in pending:
-                if p["event"].query():
-                    n = p["im0s"].shape[1]
-                    pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
-                    infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
-                    post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
-
-                    pre_total += pre_e
-                    infer_total += infer_e
-                    post_total += post_e
-                    total_images += n
-
-                    for j in range(n):
-                        p["results"][j].speed = {
-                            'preprocess': pre_e / n,
-                            'inference': infer_e / n,
-                            'postprocess': post_e / n
-                        }
-                        # pj = Path(p["path"][j])
-                        # im0 = None if self.source_type.tensor else p["im0s"][j].copy()
-
-                        # if self.args.verbose or self.args.save or self.args.save_txt or self.args.show:
-                        #     _ = self.write_results(j, p["results"], (pj, im, im0))
-                        # if self.args.save or self.args.save_txt:
-                        #     p["results"][j].save_dir = str(self.save_dir)
-                        # if self.args.show and self.plotted_img is not None:
-                        #     self.show(pj)
-                        # if self.args.save and self.plotted_img is not None:
-                        #     self.save_preds(p["vid_cap"], j, str(self.save_dir / pj.name))
-
-                    self.run_callbacks('on_predict_batch_end')
-                    LOGGER.info(f'{pre_e:.1f}ms {infer_e:.1f}ms {post_e:.1f}ms')
-                    yield from p["results"]
-                else:
-                    new_pending.append(p)
-            pending = new_pending
-
-            if feeder_finished and infer_queue.empty() and not pending:
-                break
+        for w in infer_workers:
+            w.start()
 
         self.run_callbacks('on_predict_end')
         if total_images:
