@@ -489,7 +489,6 @@ class TrackNetPredictor(BasePredictor):
                 idx, path, im, im0s, vid_cap, s = item
 
                 with torch.cuda.stream(stream):
-                    # 必須在 stream context 內建新的 event
                     pre_start = torch.cuda.Event(enable_timing=True)
                     infer_start = torch.cuda.Event(enable_timing=True)
                     infer_end = torch.cuda.Event(enable_timing=True)
@@ -503,45 +502,64 @@ class TrackNetPredictor(BasePredictor):
                     preds = self.inference(im, *args, **kwargs)
                     infer_end.record()
 
-                    torch.cuda.current_stream().synchronize()
+                    # 不要馬上 synchronize
+                    # 把 event一起丟到 postprocess queue
 
-                    elapsed_infer = infer_start.elapsed_time(infer_end)
-
-                    postprocess_queue.put((idx, path, preds, im0s, vid_cap, s, elapsed_infer))
+                    postprocess_queue.put((idx, path, preds, im0s, vid_cap, s, infer_start, infer_end))
                 infer_queue.task_done()
+
 
 
         # ======= Postprocess Stage =======
         def postprocess_worker():
             nonlocal total_images, pre_total, infer_total, post_total
+            pending = []
 
             while True:
-                item = postprocess_queue.get()
-                if item is None:
-                    break
-                idx, path, preds, im0s, vid_cap, s, infer_time = item
+                # 先拉新的資料
+                try:
+                    item = postprocess_queue.get(timeout=0.01)
+                    if item is None:
+                        break
+                    pending.append(item)
+                    postprocess_queue.task_done()
+                except:
+                    pass  # queue空就算了
 
-                post_start_cpu = time.time()
-                results = self.cpu_postprocess(preds, im0s)
-                post_end_cpu = time.time()
+                # 檢查 pending 裡面有沒有完成的
+                new_pending = []
+                for item in pending:
+                    idx, path, preds, im0s, vid_cap, s, infer_start, infer_end = item
 
-                postprocess_time = (post_end_cpu - post_start_cpu) * 1000  # ms
+                    if infer_end.query():  # 這個 batch 推論完成了
+                        elapsed_infer = infer_start.elapsed_time(infer_end)
 
-                n = im0s.shape[2]  # number of frames
-                infer_total += infer_time
-                post_total += postprocess_time
-                total_images += n
+                        post_start_cpu = time.time()
+                        results = self.cpu_postprocess(preds, im0s)
+                        post_end_cpu = time.time()
 
-                for j in range(n):
-                    results[j].speed = {
-                        'preprocess': 0.0,  # 暫時沒有單獨算
-                        'inference': infer_time / n,
-                        'postprocess': postprocess_time / n
-                    }
+                        postprocess_time = (post_end_cpu - post_start_cpu) * 1000  # ms
 
-                self.run_callbacks('on_predict_batch_end')
-                yield from results
-                postprocess_queue.task_done()
+                        n = im0s.shape[2]
+                        infer_total += elapsed_infer
+                        post_total += postprocess_time
+                        total_images += n
+
+                        for j in range(n):
+                            results[j].speed = {
+                                'preprocess': 0.0,
+                                'inference': elapsed_infer / n,
+                                'postprocess': postprocess_time / n
+                            }
+
+                        self.run_callbacks('on_predict_batch_end')
+                        yield from results
+                    else:
+                        # 還沒好，留著下一輪再檢查
+                        new_pending.append(item)
+
+                pending = new_pending
+
 
         # ======= Feeder =======
         def batch_feeder():
