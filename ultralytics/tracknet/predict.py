@@ -479,6 +479,7 @@ class TrackNetPredictor(BasePredictor):
                 im = self.cpu_preprocess(im0s)  # 自己寫一個純CPU版本
                 infer_queue.put((i, path, im, im0s, vid_cap, s))
                 preprocess_queue.task_done()
+                LOGGER.info(f"[Preprocess] {i} done, queue size: {preprocess_queue.qsize()}")
 
         # ======= Inference Stage =======
         def inference_worker(i, stream):
@@ -486,6 +487,7 @@ class TrackNetPredictor(BasePredictor):
                 while True:
                     item = infer_queue.get()
                     if item is None:
+                        LOGGER.info(f"[inference_worker-{i}] finished")
                         break
                     idx, path, im, im0s, vid_cap, s = item
 
@@ -502,16 +504,13 @@ class TrackNetPredictor(BasePredictor):
                         infer_start.record()
                         preds = self.inference(im, *args, **kwargs)
                         infer_end.record()
-                        torch.cuda.current_stream().synchronize()
                         # 不要馬上sync了，要用 event-based query
                         postprocess_queue.put((idx, path, preds, im0s, vid_cap, s, infer_start, infer_end))
+                        LOGGER.info(f"[inference_worker-{i}] {idx} done, queue size: {infer_queue.qsize()}")
                     infer_queue.task_done()
             except Exception as e:
                 LOGGER.error(f"[inference_worker-{i}] crashed with exception: {e}")
                 raise e
-
-
-
 
         # ======= Postprocess Stage =======
         def postprocess_worker():
@@ -526,7 +525,8 @@ class TrackNetPredictor(BasePredictor):
                         break
                     pending.append(item)
                     postprocess_queue.task_done()
-                except:
+                except Exception as e:
+                    LOGGER.debug(f"[postprocess_worker] queue empty: {e}")
                     pass  # queue空就算了
 
                 # 檢查 pending 裡面有沒有完成的
