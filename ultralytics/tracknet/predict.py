@@ -500,6 +500,7 @@ class TrackNetPredictor(BasePredictor):
 
                     try:
                         with torch.cuda.stream(stream):
+                            LOGGER.info(f"start {idx}")
                             # Input sanity check
                             if not torch.is_tensor(im):
                                 raise ValueError(f"[inference_worker-{i}] Input is not a tensor")
@@ -525,7 +526,8 @@ class TrackNetPredictor(BasePredictor):
 
                             # Strong sync to catch CUDA error
                             torch.cuda.current_stream().synchronize()
-
+                            LOGGER.info(f"end {idx}")
+                            
                             # Sanity check output
                             if preds is None:
                                 raise ValueError(f"[inference_worker-{i}] Inference output is None")
