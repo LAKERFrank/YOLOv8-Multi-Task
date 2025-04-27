@@ -489,18 +489,19 @@ class TrackNetPredictor(BasePredictor):
                 idx, path, im, im0s, vid_cap, s = item
 
                 with torch.cuda.stream(stream):
-                    pre_start = torch.cuda.Event(True)
-                    infer_start = torch.cuda.Event(True)
-                    infer_end = torch.cuda.Event(True)
-                    pre_start.record(stream)
+                    # 必須在 stream context 內建新的 event
+                    pre_start = torch.cuda.Event(enable_timing=True)
+                    infer_start = torch.cuda.Event(enable_timing=True)
+                    infer_end = torch.cuda.Event(enable_timing=True)
 
+                    pre_start.record()
                     im = im.to(self.device, dtype=torch.float32, non_blocking=True)
                     if self.model.fp16:
                         im = im.half()
 
-                    infer_start.record(stream)
+                    infer_start.record()
                     preds = self.inference(im, *args, **kwargs)
-                    infer_end.record(stream)
+                    infer_end.record()
 
                     torch.cuda.current_stream().synchronize()
 
@@ -508,6 +509,7 @@ class TrackNetPredictor(BasePredictor):
 
                     postprocess_queue.put((idx, path, preds, im0s, vid_cap, s, elapsed_infer))
                 infer_queue.task_done()
+
 
         # ======= Postprocess Stage =======
         def postprocess_worker():
