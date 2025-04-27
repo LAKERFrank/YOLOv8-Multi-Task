@@ -358,7 +358,7 @@ class BasePredictor:
         os.makedirs(profiler_output_dir, exist_ok=True)
 
         with torch.profiler.profile(
-            activities=[torch.profiler.ProfilerActivity.CPU, torch.profiler.ProfilerActivity.CUDA],
+            activities=[torch.profiler.ProfilerActivity.CUDA],
             schedule=torch.profiler.schedule(wait=1, warmup=1, active=10, repeat=1),
             on_trace_ready=torch.profiler.tensorboard_trace_handler(profiler_output_dir),
             record_shapes=True,
