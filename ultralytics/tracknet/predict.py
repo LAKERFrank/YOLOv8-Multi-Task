@@ -502,7 +502,7 @@ class TrackNetPredictor(BasePredictor):
                         infer_start.record()
                         preds = self.inference(im, *args, **kwargs)
                         infer_end.record()
-
+                        torch.cuda.current_stream().synchronize()
                         # 不要馬上sync了，要用 event-based query
                         postprocess_queue.put((idx, path, preds, im0s, vid_cap, s, infer_start, infer_end))
                     infer_queue.task_done()
