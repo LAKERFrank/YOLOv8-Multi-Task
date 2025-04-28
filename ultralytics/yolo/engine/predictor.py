@@ -816,9 +816,11 @@ class BasePredictor:
                     pending.append({
                         "event": end_event,
                         "stream": stream,
+                        "stream_idx": stream_idx,
                         "path": path,
                         "im0s": im0s,
                         "vid_cap": vid_cap,
+                        "batch_idx": i,
                         "results": results,
                         "profiling": {
                             "pre": (pre_start, pre_end),
@@ -843,7 +845,7 @@ class BasePredictor:
                     infer_total += infer_e
                     post_total += post_e
                     total_images += n
-                    
+
                     LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} done. "
                             f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms, at {time.time():.6f}")
 
