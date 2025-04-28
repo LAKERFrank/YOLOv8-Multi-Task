@@ -872,11 +872,6 @@ class BasePredictor:
                     #     }
                     yield from p["results"]
 
-                    # 🧹 Optional: 回收 event (進階)
-                    for e in p["profiling"]["pre"] + p["profiling"]["infer"]: # + p["profiling"]["post"]:
-                        del e
-                    del p["event"]
-
                 else:
                     new_pending.append(p)
             pending = new_pending
