@@ -781,7 +781,7 @@ class BasePredictor:
         LOGGER.info(f"[CAPTURE] Preparing CUDA Graph for shape {input_shape}...")
         torch.cuda.synchronize()
 
-        static_im0s = im0s.clone()  # keep original image CPU copy
+        static_im0s = im0s.to(self.device, non_blocking=True)
         static_input = im.clone().to(im.device)
         static_output = None
         static_results = None
