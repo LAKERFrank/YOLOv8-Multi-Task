@@ -787,7 +787,10 @@ class BasePredictor:
                     i, batch = queue.get_nowait()
                     self.batch = batch
                     path, im0s, vid_cap, s = batch
-                    stream = streams[i % num_streams]
+                    stream_idx = i % num_streams
+                    stream = streams[stream_idx]
+
+                    LOGGER.info(f"[SCHEDULER] Assign batch {i} to Stream-{stream_idx} at {time.time():.6f}")
 
                     # Timing events
                     pre_start, pre_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
@@ -840,6 +843,9 @@ class BasePredictor:
                     infer_total += infer_e
                     post_total += post_e
                     total_images += n
+                    
+                    LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} done. "
+                            f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms, at {time.time():.6f}")
 
                     for j in range(n):
                         p["results"][j].speed = {
