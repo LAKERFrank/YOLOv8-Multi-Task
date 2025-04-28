@@ -784,7 +784,7 @@ class BasePredictor:
                 if feeder_finished and queue.empty():
                     break
                 try:
-                    i, batch = queue.get_nowait(timeout=0.1)
+                    i, batch = queue.get_nowait()
                 except Empty:
                     continue
 
