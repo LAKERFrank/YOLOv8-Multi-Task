@@ -738,7 +738,7 @@ class BasePredictor:
 
     @smart_inference_mode()
     def stream_inference(self, source=None, model=None, *args, **kwargs):
-        """Streamed Inference with CUDA Graph capture (preprocess + inference + postprocess) and Background Median Precomputed."""
+        """Streamed Inference with CUDA Graph capture (preprocess + inference + postprocess) Full GPU Pipeline."""
 
         if not self.model:
             self.setup_model(model)
@@ -775,19 +775,13 @@ class BasePredictor:
         first_batch = next(feeder_iter)
         path, im0s, vid_cap, s = first_batch
 
-        # 提前搬到GPU
+        # ⚡ 重要：提前搬到GPU，防止capture時發生CPU memory activity
         static_im0s = im0s.to(self.device, non_blocking=True)
 
         torch.cuda.synchronize()
 
         input_shape = tuple(static_im0s.shape)
         LOGGER.info(f"[CAPTURE] Capturing CUDA Graph for shape {input_shape}...")
-
-        # --- Step 2: 預先計算 background median ---
-        with torch.no_grad():
-            background_median = static_im0s.median(dim=0).values.to(self.device)
-
-        torch.cuda.synchronize()
 
         g = torch.cuda.CUDAGraph()
 
@@ -796,20 +790,20 @@ class BasePredictor:
         static_preds = None
         static_results = None
 
-        # --- Step 3: Capture CUDA Graph ---
+        # --- Step 2: Capture CUDA Graph ---
         torch.cuda.synchronize()
 
         with torch.cuda.graph(g):
-            static_preprocessed = self.preprocess_with_background(static_im0s, background_median)
+            static_preprocessed = self.preprocess(static_im0s)
             static_preds = self.inference(static_preprocessed, *args, **kwargs)
             static_results = self.postprocess(static_preds, static_preprocessed, static_im0s)
 
         torch.cuda.synchronize()
         LOGGER.info(f"[CAPTURE] Done capturing CUDA Graph for shape {input_shape}.")
 
-        captured_graphs[input_shape] = (g, static_im0s, background_median, static_preprocessed, static_preds, static_results)
+        captured_graphs[input_shape] = (g, static_im0s, static_preprocessed, static_preds, static_results)
 
-        # --- Step 4: 啟動 feeder ---
+        # --- Step 3: 啟動 feeder ---
         def batch_feeder():
             nonlocal feeder_finished
             for i, batch in enumerate(feeder_iter, start=1):
@@ -818,7 +812,7 @@ class BasePredictor:
 
         threading.Thread(target=batch_feeder, daemon=True).start()
 
-        # --- Step 5: 推理主循環 ---
+        # --- Step 4: 推理主循環 ---
         self.run_callbacks('on_predict_start')
         start_time = time.time()
 
@@ -834,8 +828,8 @@ class BasePredictor:
                     LOGGER.info(f"[SCHEDULER] Assign batch {i} to Stream-{stream_idx} at {schedule_time:.6f}s")
 
                     with torch.cuda.stream(stream):
-                        # 複製新 input
-                        _, static_im0s, _, static_preprocessed, static_preds, static_results = captured_graphs[input_shape]
+                        # 將新的im0s複製到 Graph input
+                        _, static_im0s, static_preprocessed, static_preds, static_results = captured_graphs[input_shape]
                         static_im0s.copy_(im0s.to(self.device, non_blocking=True))
 
                         # Replay Graph
@@ -857,7 +851,7 @@ class BasePredictor:
             except Empty:
                 pass
 
-            # --- Step 6: 完成pending處理 ---
+            # --- Step 5: 完成pending處理 ---
             for p in pending:
                 complete_time = p["complete_time"]
                 timeline_records.append({
@@ -883,12 +877,7 @@ class BasePredictor:
         LOGGER.info(f'[SUMMARY] Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
         self.plot_timeline(timeline_records)
-
-
-    def preprocess_with_background(self, im, background_median):
-        """Preprocess image using precomputed background median."""
-        im.sub_(background_median).clamp_(0, 255).div_(255.0)
-        return im    
+        
     def plot_timeline(self, timeline_records):
         output_dir = './profiler_output'
         os.makedirs(output_dir, exist_ok=True)
