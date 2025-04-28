@@ -794,7 +794,7 @@ class BasePredictor:
                 # CUDA Events
                 pre_start, pre_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                 infer_start, infer_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-                post_start, post_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                # post_start, post_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                 end_event = torch.cuda.Event(enable_timing=True)
 
                 # Step 1: Preprocess + Inference + Postprocess
@@ -811,24 +811,23 @@ class BasePredictor:
                     infer_end.record()
 
                     stream.wait_event(infer_end)
-                    post_start.record()
-                    results = self.postprocess(preds, im, im0s)
-                    post_end.record()
+                    # post_start.record()
+                    # results = self.postprocess(preds, im, im0s)
+                    # post_end.record()
 
                     end_event.record()
                     LOGGER.info(f"[End] Stream {stream_id} finished batch {i} at {time.time():.4f}")
 
-                # 🛠 修正：丟到 result_queue，而不是 pending.append
                 result_queue.put({
                     "event": end_event,
                     "path": path,
                     "im0s": im0s,
                     "vid_cap": vid_cap,
-                    "results": results,
+                    "results": preds,
                     "profiling": {
                         "pre": (pre_start, pre_end),
                         "infer": (infer_start, infer_end),
-                        "post": (post_start, post_end)
+                        # "post": (post_start, post_end)
                     }
                 })
 
@@ -860,19 +859,19 @@ class BasePredictor:
                     path = p["path"]
                     pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
                     infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
-                    post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
+                    # post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
 
                     pre_total += pre_e
                     infer_total += infer_e
-                    post_total += post_e
+                    # post_total += post_e
                     total_images += n
 
-                    for j in range(n):
-                        p["results"][j].speed = {
-                            'preprocess': pre_e / n,
-                            'inference': infer_e / n,
-                            'postprocess': post_e / n
-                        }
+                    # for j in range(n):
+                    #     p["results"][j].speed = {
+                    #         'preprocess': pre_e / n,
+                    #         'inference': infer_e / n,
+                    #         'postprocess': post_e / n
+                    #     }
                     yield from p["results"]
 
                     # 🧹 Optional: 回收 event (進階)
