@@ -32,6 +32,7 @@ import platform
 from pathlib import Path
 from threading import Thread
 from queue import Empty, Queue
+import threading
 import time
 
 import cv2
@@ -735,7 +736,7 @@ class BasePredictor:
 
     @smart_inference_mode()
     def stream_inference(self, source=None, model=None, *args, **kwargs):
-        """Asynchronous GPU batch-streamed inference with maximal throughput (FPS) using CUDA Streams and Events."""
+        """Optimized Asynchronous GPU Streamed Inference with maximal throughput and minimal latency."""
 
         if not self.model:
             self.setup_model(model)
@@ -748,24 +749,21 @@ class BasePredictor:
             self.model.warmup(imgsz=(1 if self.model.pt or self.model.triton else self.dataset.bs, 10, *self.imgsz))
             self.done_warmup = True
 
-        start_time = time.time()
-
         dataloader = DataLoader(
             self.dataset,
             batch_size=1,
             shuffle=False,
-            num_workers=16,
+            num_workers=4,  # 太多反而壓 CPU
             pin_memory=True,
-            prefetch_factor=16,
+            prefetch_factor=2,
+            persistent_workers=True,
         )
 
-        preprocess_num_streams = 2
-        inference_num_streams = 1
-        total_streams = 10
+        num_streams = 6  # 適合 3090 / 4090 或更高端
+        streams = [torch.cuda.Stream(priority=0) for _ in range(num_streams)]
 
-        streams = [torch.cuda.Stream() for _ in range(total_streams)]
-        queue = Queue(maxsize=1000)
-        result_queue = Queue()
+        queue = Queue(maxsize=64)  # 小 queue，加速推進
+        pending = []
 
         pre_total, infer_total, post_total = 0.0, 0.0, 0.0
         total_images = 0
@@ -777,105 +775,88 @@ class BasePredictor:
                 queue.put((i, batch))
             feeder_finished = True
 
-        def worker(stream_id):
-            """每個 stream 對應一個 thread，獨立處理"""
-            stream = streams[stream_id]
-            while True:
-                if feeder_finished and queue.empty():
-                    break
-                try:
-                    i, batch = queue.get_nowait()
-                except Empty:
-                    continue
+        threading.Thread(target=batch_feeder, daemon=True).start()
 
-                self.batch = batch
-                path, im0s, vid_cap, s = batch
-
-                # CUDA Events
-                pre_start, pre_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-                infer_start, infer_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-                # post_start, post_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-                end_event = torch.cuda.Event(enable_timing=True)
-
-                # Step 1: Preprocess + Inference + Postprocess
-                with torch.cuda.stream(stream):
-                    LOGGER.info(f"[Start] Stream {stream_id} processing batch {i} at {time.time():.4f}")
-
-                    pre_start.record()
-                    im = self.preprocess(im0s)
-                    pre_end.record()
-
-                    infer_start.record()
-                    preds = self.inference(im, *args, **kwargs)
-                    infer_end.record()
-
-                    # post_start.record()
-                    # results = self.postprocess(preds, im, im0s)
-                    # post_end.record()
-
-                    end_event.record()
-                    LOGGER.info(f"[End] Stream {stream_id} finished batch {i} at {time.time():.4f}")
-
-                result_queue.put({
-                    "event": end_event,
-                    "path": path,
-                    "im0s": im0s,
-                    "vid_cap": vid_cap,
-                    "results": preds,
-                    "profiling": {
-                        "pre": (pre_start, pre_end),
-                        "infer": (infer_start, infer_end),
-                        # "post": (post_start, post_end)
-                    }
-                })
-
-        # 啟動 Feeder
-        Thread(target=batch_feeder, daemon=True).start()
-
-        # 啟動每個 Stream 對應的 Thread
-        threads = [Thread(target=worker, args=(i,), daemon=True) for i in range(total_streams)]
-        for t in threads:
-            t.start()
-
-        pending = []
         self.run_callbacks('on_predict_start')
+        start_time = time.time()
 
         while True:
-            # 拉結果
+            # 嘗試拿新 batch 來跑
             try:
-                while True:
-                    p = result_queue.get_nowait()
-                    pending.append(p)
+                while not queue.empty():
+                    i, batch = queue.get_nowait()
+                    self.batch = batch
+                    path, im0s, vid_cap, s = batch
+                    stream = streams[i % num_streams]
+
+                    # Timing events
+                    pre_start, pre_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                    infer_start, infer_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                    post_start, post_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                    end_event = torch.cuda.Event(enable_timing=True)
+
+                    with torch.cuda.stream(stream):
+                        pre_start.record()
+                        im = self.preprocess(im0s)  # 自己要注意這裡是否支援 non_blocking pinned memory
+                        pre_end.record()
+
+                        infer_start.record()
+                        preds = self.inference(im, *args, **kwargs)
+                        infer_end.record()
+
+                        post_start.record()
+                        results = self.postprocess(preds, im, im0s)
+                        post_end.record()
+
+                        end_event.record()
+
+                    pending.append({
+                        "event": end_event,
+                        "stream": stream,
+                        "path": path,
+                        "im0s": im0s,
+                        "vid_cap": vid_cap,
+                        "results": results,
+                        "profiling": {
+                            "pre": (pre_start, pre_end),
+                            "infer": (infer_start, infer_end),
+                            "post": (post_start, post_end)
+                        }
+                    })
+
             except Empty:
-                pass
+                pass  # 沒拿到，進入 pending 處理
 
             # 處理完成的
-            new_pending = []
+            next_pending = []
             for p in pending:
                 if p["event"].query():
                     n = p["im0s"].shape[1]
-                    path = p["path"]
                     pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
                     infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
-                    # post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
+                    post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
 
                     pre_total += pre_e
                     infer_total += infer_e
-                    # post_total += post_e
+                    post_total += post_e
                     total_images += n
 
-                    # for j in range(n):
-                    #     p["results"][j].speed = {
-                    #         'preprocess': pre_e / n,
-                    #         'inference': infer_e / n,
-                    #         'postprocess': post_e / n
-                    #     }
-                    yield from p["results"]
+                    for j in range(n):
+                        p["results"][j].speed = {
+                            'preprocess': pre_e / n,
+                            'inference': infer_e / n,
+                            'postprocess': post_e / n
+                        }
+                        # yield per result
+                        yield p["results"][j]
 
+                    self.run_callbacks('on_predict_batch_end')
                 else:
-                    new_pending.append(p)
-            pending = new_pending
+                    next_pending.append(p)
 
+            pending = next_pending
+
+            # 條件結束
             if feeder_finished and queue.empty() and not pending:
                 break
 
@@ -884,10 +865,9 @@ class BasePredictor:
         if total_images:
             elapsed_time = time.time() - start_time
             fps = total_images / elapsed_time
-            LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference per image at shape '
-                        % (pre_total / total_images, infer_total / total_images))
-            LOGGER.info(f'Total elapsed time: %.2f s, Total images: %d, Overall FPS: %.2f' %
-                        (elapsed_time, total_images, fps))
+            LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image' %
+                        (pre_total / total_images, infer_total / total_images, post_total / total_images))
+            LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
 
     def setup_model(self, model, verbose=True):
