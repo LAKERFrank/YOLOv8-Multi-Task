@@ -738,7 +738,7 @@ class BasePredictor:
 
     @smart_inference_mode()
     def stream_inference(self, source=None, model=None, *args, **kwargs):
-        """Streamed Inference with CUDA Graph capture (preprocess + inference + postprocess) Full GPU Pipeline."""
+        """Streamed Inference with CUDA Graph capture of preprocess + inference + postprocess together."""
 
         if not self.model:
             self.setup_model(model)
@@ -768,42 +768,39 @@ class BasePredictor:
         total_images = 0
         feeder_finished = False
 
-        captured_graphs = {}
+        captured_graphs = {}  # {(input_shape): (graph, static_input, static_output)}
 
-        # --- Step 1: 提前拉第一個 batch，準備 capture ---
+        # --- 提前拉一個 batch，確保安全 capture ---
         feeder_iter = iter(dataloader)
         first_batch = next(feeder_iter)
         path, im0s, vid_cap, s = first_batch
+        im = self.preprocess(im0s)
 
-        # ⚡ 重要：提前搬到GPU，防止capture時發生CPU memory activity
-        static_im0s = im0s.to(self.device, non_blocking=True)
+        input_shape = tuple(im.shape)
 
+        LOGGER.info(f"[CAPTURE] Preparing CUDA Graph for shape {input_shape}...")
         torch.cuda.synchronize()
 
-        input_shape = tuple(static_im0s.shape)
-        LOGGER.info(f"[CAPTURE] Capturing CUDA Graph for shape {input_shape}...")
-
-        g = torch.cuda.CUDAGraph()
-
-        # 預設空
-        static_preprocessed = None
-        static_preds = None
+        static_im0s = im0s.to(self.device, non_blocking=True)
+        static_input = im.clone().to(im.device)
+        static_output = None
         static_results = None
 
-        # --- Step 2: Capture CUDA Graph ---
+        g = torch.cuda.CUDAGraph()
         torch.cuda.synchronize()
 
         with torch.cuda.graph(g):
-            static_preprocessed = self.preprocess(static_im0s)
-            static_preds = self.inference(static_preprocessed, *args, **kwargs)
-            static_results = self.postprocess(static_preds, static_preprocessed, static_im0s)
+            # 在Graph內，一次 capture preprocess → inference → postprocess
+            preprocessed = self.preprocess(static_im0s)
+            preds = self.inference(preprocessed, *args, **kwargs)
+            static_results = self.postprocess(preds, preprocessed, static_im0s)
+
+        captured_graphs[input_shape] = (g, static_im0s, static_input, static_results)
 
         torch.cuda.synchronize()
-        LOGGER.info(f"[CAPTURE] Done capturing CUDA Graph for shape {input_shape}.")
+        LOGGER.info(f"[CAPTURE] Graph captured for shape {input_shape}.")
 
-        captured_graphs[input_shape] = (g, static_im0s, static_preprocessed, static_preds, static_results)
-
-        # --- Step 3: 啟動 feeder ---
+        # --- 啟動 feeder ---
         def batch_feeder():
             nonlocal feeder_finished
             for i, batch in enumerate(feeder_iter, start=1):
@@ -812,7 +809,7 @@ class BasePredictor:
 
         threading.Thread(target=batch_feeder, daemon=True).start()
 
-        # --- Step 4: 推理主循環 ---
+        # --- Inference loop ---
         self.run_callbacks('on_predict_start')
         start_time = time.time()
 
@@ -828,12 +825,12 @@ class BasePredictor:
                     LOGGER.info(f"[SCHEDULER] Assign batch {i} to Stream-{stream_idx} at {schedule_time:.6f}s")
 
                     with torch.cuda.stream(stream):
-                        # 將新的im0s複製到 Graph input
-                        _, static_im0s, static_preprocessed, static_preds, static_results = captured_graphs[input_shape]
-                        static_im0s.copy_(im0s.to(self.device, non_blocking=True))
+                        # Prepare new input
+                        static_im0s.copy_(im0s)
 
                         # Replay Graph
-                        g.replay()
+                        graph, static_im0s, static_input, static_results = captured_graphs[input_shape]
+                        graph.replay()
 
                     end_time = time.time() - start_time
 
@@ -851,7 +848,7 @@ class BasePredictor:
             except Empty:
                 pass
 
-            # --- Step 5: 完成pending處理 ---
+            # 處理 pending
             for p in pending:
                 complete_time = p["complete_time"]
                 timeline_records.append({
@@ -877,7 +874,7 @@ class BasePredictor:
         LOGGER.info(f'[SUMMARY] Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
         self.plot_timeline(timeline_records)
-        
+
     def plot_timeline(self, timeline_records):
         output_dir = './profiler_output'
         os.makedirs(output_dir, exist_ok=True)
