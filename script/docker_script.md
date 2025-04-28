@@ -231,7 +231,7 @@ docker run --gpus all --ipc=host \
 
 python tracknet.py --model_path /usr/src/ultralytics/ultralytics/models/v8/tracknetv4.yaml --epoch 200
 
-python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/ultralytics/models/v8/tracknetv4.yaml --epoch 200
+python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/ultralytics/models/v8/tracknetv4.yaml --epoch 20 &
 
 python tracknet.py --mode predict --batch 1 --model_path /usr/src/ultralytics/runs/detect/train238/weights/best.pt --source /usr/src/datasets/tracknet/train_data
 
@@ -267,9 +267,14 @@ python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/run
 
 python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train475/weights/best.pt --source /usr/src/datasets/tracknet/val_data
 
-python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train536/weights/last.pt --source /usr/src/datasets/tracknet/val_data
+python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train618/weights/last.pt --source /usr/src/datasets/tracknet/val_data
 
-python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/runs/detect/train525/weights/last.pt --epoch 200 &
+python tracknet.py --mode predict_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train618/weights/best.pt --source /usr/src/datasets/tracknet/val_data/profession_match_1_test/frame/1_06_09/
+
+python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/runs/detect/train603/weights/last.pt --epoch 200 &
+python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/runs/detect/train540/weights/last.pt --epoch 200 &
+python tracknet.py --mode train_v3 --model_path /usr/src/ultralytics/runs/detect/train618/weights/best.pt --epoch 50 &
+python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/runs/detect/train630/weights/last.pt --epoch 20 &
 
 /hdd/dataset/alex_tracknet/frame/1_05_07/
 192
