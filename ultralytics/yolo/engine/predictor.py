@@ -739,7 +739,7 @@ class BasePredictor:
 
     # stream_inference_single_stream_v2 6xxFPS
     @smart_inference_mode()
-    def stream_inference_single_stream_v2(self, source=None, model=None, *args, **kwargs):
+    def stream_inference(self, source=None, model=None, *args, **kwargs):
         """Optimized Asynchronous GPU Streamed Inference with timeline recording and visualization."""
 
         if not self.model:
@@ -796,7 +796,7 @@ class BasePredictor:
 
                     schedule_time = time.time() - start_time
 
-                    LOGGER.info(f"[SCHEDULER] Assign batch {i} to Stream-{stream_idx} at {schedule_time:.6f}s")
+                    # LOGGER.info(f"[SCHEDULER] Assign batch {i} to Stream-{stream_idx} at {schedule_time:.6f}s")
 
                     pre_start, pre_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                     infer_start, infer_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
@@ -860,9 +860,9 @@ class BasePredictor:
                     post_total += post_e
                     total_images += n
 
-                    LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "
-                                f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms, "
-                                f"Finished at {complete_time:.6f}s")
+                    # LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "
+                    #             f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms, "
+                    #             f"Finished at {complete_time:.6f}s")
 
                     for j in range(n):
                         p["results"][j].speed = {
@@ -894,7 +894,7 @@ class BasePredictor:
         self.plot_timeline(timeline_records)
 
     @smart_inference_mode()
-    def stream_inference(self, source=None, model=None, *args, **kwargs):
+    def stream_inference_single_stream_v2_with_gpu_plot(self, source=None, model=None, *args, **kwargs):
         """Optimized Asynchronous GPU Streamed Inference with Timeline and GPU/CPU Memory Monitoring."""
 
         if not self.model:
