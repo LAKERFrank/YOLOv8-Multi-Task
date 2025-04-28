@@ -738,7 +738,7 @@ class BasePredictor:
 
     @smart_inference_mode()
     def stream_inference(self, source=None, model=None, *args, **kwargs):
-        """Streamed Inference with CUDA Graph optimization and Timeline Recording."""
+        """Streamed Inference with CUDA Graph capture of preprocess + inference + postprocess together."""
 
         if not self.model:
             self.setup_model(model)
@@ -765,20 +765,51 @@ class BasePredictor:
         pending = []
         timeline_records = []
 
-        pre_total, infer_total, post_total = 0.0, 0.0, 0.0
         total_images = 0
         feeder_finished = False
 
-        captured_graphs = {}  # {(input_shape): (graph, static_input)}
+        captured_graphs = {}  # {(input_shape): (graph, static_input, static_output)}
 
+        # --- 提前拉一個 batch，確保安全 capture ---
+        feeder_iter = iter(dataloader)
+        first_batch = next(feeder_iter)
+        path, im0s, vid_cap, s = first_batch
+        im = self.preprocess(im0s)
+
+        input_shape = tuple(im.shape)
+
+        LOGGER.info(f"[CAPTURE] Preparing CUDA Graph for shape {input_shape}...")
+        torch.cuda.synchronize()
+
+        static_im0s = im0s.clone()  # keep original image CPU copy
+        static_input = im.clone().to(im.device)
+        static_output = None
+        static_results = None
+
+        g = torch.cuda.CUDAGraph()
+        torch.cuda.synchronize()
+
+        with torch.cuda.graph(g):
+            # 在Graph內，一次 capture preprocess → inference → postprocess
+            preprocessed = self.preprocess(static_im0s)
+            preds = self.inference(preprocessed, *args, **kwargs)
+            static_results = self.postprocess(preds, preprocessed, static_im0s)
+
+        captured_graphs[input_shape] = (g, static_im0s, static_input, static_results)
+
+        torch.cuda.synchronize()
+        LOGGER.info(f"[CAPTURE] Graph captured for shape {input_shape}.")
+
+        # --- 啟動 feeder ---
         def batch_feeder():
             nonlocal feeder_finished
-            for i, batch in enumerate(dataloader):
+            for i, batch in enumerate(feeder_iter, start=1):
                 queue.put((i, batch))
             feeder_finished = True
 
         threading.Thread(target=batch_feeder, daemon=True).start()
 
+        # --- Inference loop ---
         self.run_callbacks('on_predict_start')
         start_time = time.time()
 
@@ -786,53 +817,29 @@ class BasePredictor:
             try:
                 while not queue.empty():
                     i, batch = queue.get_nowait()
-                    self.batch = batch
                     path, im0s, vid_cap, s = batch
                     stream_idx = i % num_streams
                     stream = streams[stream_idx]
 
                     schedule_time = time.time() - start_time
-
                     LOGGER.info(f"[SCHEDULER] Assign batch {i} to Stream-{stream_idx} at {schedule_time:.6f}s")
 
                     with torch.cuda.stream(stream):
-                        im = self.preprocess(im0s)
+                        # Prepare new input
+                        static_im0s.copy_(im0s)
 
-                        # 用 input tensor 的 shape 當 key
-                        input_shape = tuple(im.shape)
-
-                        if input_shape not in captured_graphs:
-                            LOGGER.info(f"[CAPTURE] Capturing CUDA Graph for shape {input_shape}...")
-                            static_input = im.clone()
-                            static_output = None
-
-                            # Start graph capture
-                            g = torch.cuda.CUDAGraph()
-                            static_input = static_input.to(im.device)
-
-                            torch.cuda.synchronize()
-                            g.capture_begin()
-                            static_output = self.inference(static_input)
-                            g.capture_end()
-                            torch.cuda.synchronize()
-
-                            captured_graphs[input_shape] = (g, static_input, static_output)
-
-                        # replay
-                        graph, static_input, static_output = captured_graphs[input_shape]
-                        static_input.copy_(im)  # 複製新的input
+                        # Replay Graph
+                        graph, static_im0s, static_input, static_results = captured_graphs[input_shape]
                         graph.replay()
-                        preds = static_output
-
-                        results = self.postprocess(preds, im, im0s)
 
                     end_time = time.time() - start_time
+
                     pending.append({
                         "batch_idx": i,
                         "stream_idx": stream_idx,
                         "schedule_time": schedule_time,
                         "complete_time": end_time,
-                        "results": results,
+                        "results": static_results,
                         "path": path,
                         "im0s": im0s,
                         "vid_cap": vid_cap,
@@ -841,25 +848,21 @@ class BasePredictor:
             except Empty:
                 pass
 
-            next_pending = []
+            # 處理 pending
             for p in pending:
-                if True:  # 已經在 CUDA Graph內，所以不需要 event query
-                    complete_time = p["complete_time"]
-                    timeline_records.append({
-                        "batch_idx": p["batch_idx"],
-                        "stream_idx": p["stream_idx"],
-                        "schedule_time": p["schedule_time"],
-                        "complete_time": complete_time,
-                    })
+                complete_time = p["complete_time"]
+                timeline_records.append({
+                    "batch_idx": p["batch_idx"],
+                    "stream_idx": p["stream_idx"],
+                    "schedule_time": p["schedule_time"],
+                    "complete_time": complete_time,
+                })
 
-                    total_images += 1
+                total_images += 1
+                yield from p["results"]
+                self.run_callbacks('on_predict_batch_end')
 
-                    yield from p["results"]
-                    self.run_callbacks('on_predict_batch_end')
-                else:
-                    next_pending.append(p)
-
-            pending = next_pending
+            pending.clear()
 
             if feeder_finished and queue.empty() and not pending:
                 break
