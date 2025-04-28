@@ -883,7 +883,7 @@ class BasePredictor:
             elapsed_time = time.time() - start_time
             fps = total_images / elapsed_time
             LOGGER.info(f'[SUMMARY] Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image'
-                        % (pre_total / total_images, infer_total / total_images))
+                        % (pre_total / total_images, infer_total / total_images, post_total / total_images))
             LOGGER.info(f'[SUMMARY] Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
         # 畫 timeline
