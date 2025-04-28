@@ -761,7 +761,7 @@ class BasePredictor:
 
         preprocess_num_streams = 2
         inference_num_streams = 1
-        total_streams = 1
+        total_streams = 10
 
         streams = [torch.cuda.Stream() for _ in range(total_streams)]
         queue = Queue(maxsize=1000)
