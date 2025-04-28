@@ -805,12 +805,10 @@ class BasePredictor:
                     im = self.preprocess(im0s)
                     pre_end.record()
 
-                    stream.wait_event(pre_end)
                     infer_start.record()
                     preds = self.inference(im, *args, **kwargs)
                     infer_end.record()
 
-                    stream.wait_event(infer_end)
                     # post_start.record()
                     # results = self.postprocess(preds, im, im0s)
                     # post_end.record()
