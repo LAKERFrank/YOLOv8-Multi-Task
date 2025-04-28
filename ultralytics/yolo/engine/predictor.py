@@ -875,7 +875,7 @@ class BasePredictor:
                     yield from p["results"]
 
                     # 🧹 Optional: 回收 event (進階)
-                    for e in p["profiling"]["pre"] + p["profiling"]["infer"] + p["profiling"]["post"]:
+                    for e in p["profiling"]["pre"] + p["profiling"]["infer"]: # + p["profiling"]["post"]:
                         del e
                     del p["event"]
 
@@ -891,8 +891,8 @@ class BasePredictor:
         if total_images:
             elapsed_time = time.time() - start_time
             fps = total_images / elapsed_time
-            LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
-                        % (pre_total / total_images, infer_total / total_images, post_total / total_images))
+            LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference per image at shape '
+                        % (pre_total / total_images, infer_total / total_images))
             LOGGER.info(f'Total elapsed time: %.2f s, Total images: %d, Overall FPS: %.2f' %
                         (elapsed_time, total_images, fps))
 
