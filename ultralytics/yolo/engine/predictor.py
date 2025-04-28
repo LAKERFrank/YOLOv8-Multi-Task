@@ -844,6 +844,7 @@ class BasePredictor:
             for p in pending:
                 if p["event"].query():
                     n = p["im0s"].shape[1]
+                    im0s = p["im0s"]
                     path = p["path"]
                     pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
                     infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
@@ -851,7 +852,7 @@ class BasePredictor:
                     pre_total += pre_e
                     infer_total += infer_e
                     total_images += n
-                    result = self.cpu_postprocess(p["results"])
+                    result = self.cpu_postprocess(p["results"], im0s)
 
                     for j in range(n):
                         result[j].speed = {
