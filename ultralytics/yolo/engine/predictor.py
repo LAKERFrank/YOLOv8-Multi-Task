@@ -736,7 +736,7 @@ class BasePredictor:
 
     @smart_inference_mode()
     def stream_inference(self, source=None, model=None, *args, **kwargs):
-        """Optimized Asynchronous GPU Streamed Inference with maximal throughput and minimal latency."""
+        """Optimized Asynchronous GPU Streamed Inference with timeline recording and visualization."""
 
         if not self.model:
             self.setup_model(model)
@@ -753,17 +753,18 @@ class BasePredictor:
             self.dataset,
             batch_size=1,
             shuffle=False,
-            num_workers=4,  # 太多反而壓 CPU
+            num_workers=4,
             pin_memory=True,
             prefetch_factor=2,
             persistent_workers=True,
         )
 
-        num_streams = 6  # 適合 3090 / 4090 或更高端
+        num_streams = 6
         streams = [torch.cuda.Stream(priority=0) for _ in range(num_streams)]
 
-        queue = Queue(maxsize=64)  # 小 queue，加速推進
+        queue = Queue(maxsize=64)
         pending = []
+        timeline_records = []  # <<< 新增收集timeline
 
         pre_total, infer_total, post_total = 0.0, 0.0, 0.0
         total_images = 0
@@ -781,7 +782,6 @@ class BasePredictor:
         start_time = time.time()
 
         while True:
-            # 嘗試拿新 batch 來跑
             try:
                 while not queue.empty():
                     i, batch = queue.get_nowait()
@@ -790,9 +790,10 @@ class BasePredictor:
                     stream_idx = i % num_streams
                     stream = streams[stream_idx]
 
-                    LOGGER.info(f"[SCHEDULER] Assign batch {i} to Stream-{stream_idx} at {time.time():.6f}")
+                    schedule_time = time.time() - start_time
 
-                    # Timing events
+                    LOGGER.info(f"[SCHEDULER] Assign batch {i} to Stream-{stream_idx} at {schedule_time:.6f}s")
+
                     pre_start, pre_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                     infer_start, infer_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                     post_start, post_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
@@ -800,7 +801,7 @@ class BasePredictor:
 
                     with torch.cuda.stream(stream):
                         pre_start.record()
-                        im = self.preprocess(im0s)  # 自己要注意這裡是否支援 non_blocking pinned memory
+                        im = self.preprocess(im0s)
                         pre_end.record()
 
                         infer_start.record()
@@ -815,12 +816,12 @@ class BasePredictor:
 
                     pending.append({
                         "event": end_event,
-                        "stream": stream,
                         "stream_idx": stream_idx,
                         "path": path,
                         "im0s": im0s,
                         "vid_cap": vid_cap,
                         "batch_idx": i,
+                        "schedule_time": schedule_time,   # <<< 記錄
                         "results": results,
                         "profiling": {
                             "pre": (pre_start, pre_end),
@@ -830,12 +831,21 @@ class BasePredictor:
                     })
 
             except Empty:
-                pass  # 沒拿到，進入 pending 處理
+                pass
 
-            # 處理完成的
             next_pending = []
             for p in pending:
                 if p["event"].query():
+                    complete_time = time.time() - start_time
+
+                    # 記錄 timeline
+                    timeline_records.append({
+                        "batch_idx": p["batch_idx"],
+                        "stream_idx": p["stream_idx"],
+                        "schedule_time": p["schedule_time"],
+                        "complete_time": complete_time,
+                    })
+
                     n = p["im0s"].shape[1]
                     pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
                     infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
@@ -846,8 +856,9 @@ class BasePredictor:
                     post_total += post_e
                     total_images += n
 
-                    LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} done. "
-                            f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms, at {time.time():.6f}")
+                    LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "
+                                f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms, "
+                                f"Finished at {complete_time:.6f}s")
 
                     for j in range(n):
                         p["results"][j].speed = {
@@ -855,7 +866,6 @@ class BasePredictor:
                             'inference': infer_e / n,
                             'postprocess': post_e / n
                         }
-                        # yield per result
                         yield p["results"][j]
 
                     self.run_callbacks('on_predict_batch_end')
@@ -864,7 +874,6 @@ class BasePredictor:
 
             pending = next_pending
 
-            # 條件結束
             if feeder_finished and queue.empty() and not pending:
                 break
 
@@ -873,9 +882,43 @@ class BasePredictor:
         if total_images:
             elapsed_time = time.time() - start_time
             fps = total_images / elapsed_time
-            LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image' %
-                        (pre_total / total_images, infer_total / total_images, post_total / total_images))
-            LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
+            LOGGER.info(f'[SUMMARY] Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image'
+                        % (pre_total / total_images, infer_total / total_images))
+            LOGGER.info(f'[SUMMARY] Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
+
+        # 畫 timeline
+        self.plot_timeline(timeline_records)
+
+
+    def plot_timeline(self, timeline_records):
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots(figsize=(16, 8))
+
+        colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
+
+        for record in timeline_records:
+            stream = record['stream_idx']
+            batch = record['batch_idx']
+            start = record['schedule_time']
+            end = record['complete_time']
+
+            ax.barh(
+                y=f"Stream-{stream}",
+                width=end - start,
+                left=start,
+                height=0.4,
+                color=colors[stream % len(colors)],
+                edgecolor='black'
+            )
+            ax.text(start + (end - start) / 2, stream, f"B{batch}", ha='center', va='center', fontsize=8)
+
+        ax.set_xlabel('Time (s)')
+        ax.set_ylabel('Streams')
+        ax.set_title('Inference Timeline')
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
 
 
     def setup_model(self, model, verbose=True):
