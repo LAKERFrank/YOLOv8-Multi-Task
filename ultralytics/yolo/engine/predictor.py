@@ -37,7 +37,6 @@ import threading
 import time
 
 import cv2
-from matplotlib import pyplot as plt
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -738,11 +737,14 @@ class BasePredictor:
 
     @smart_inference_mode()
     def stream_inference(self, source=None, model=None, *args, **kwargs):
-        """Streamed Inference with CUDA Graph optimization and Timeline Recording."""
+        """Optimized Asynchronous GPU Streamed Inference with timeline recording and visualization."""
 
         if not self.model:
             self.setup_model(model)
         self.setup_source(source if source is not None else self.args.source)
+
+        if self.args.save or self.args.save_txt:
+            (self.save_dir / 'labels' if self.args.save_txt else self.save_dir).mkdir(parents=True, exist_ok=True)
 
         if not self.done_warmup:
             self.model.warmup(imgsz=(1 if self.model.pt or self.model.triton else self.dataset.bs, 10, *self.imgsz))
@@ -763,13 +765,11 @@ class BasePredictor:
 
         queue = Queue(maxsize=64)
         pending = []
-        timeline_records = []
+        timeline_records = []  # <<< 新增收集timeline
 
         pre_total, infer_total, post_total = 0.0, 0.0, 0.0
         total_images = 0
         feeder_finished = False
-
-        captured_graphs = {}  # {(input_shape): (graph, static_input)}
 
         def batch_feeder():
             nonlocal feeder_finished
@@ -795,47 +795,40 @@ class BasePredictor:
 
                     LOGGER.info(f"[SCHEDULER] Assign batch {i} to Stream-{stream_idx} at {schedule_time:.6f}s")
 
+                    pre_start, pre_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                    infer_start, infer_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                    post_start, post_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                    end_event = torch.cuda.Event(enable_timing=True)
+
                     with torch.cuda.stream(stream):
+                        pre_start.record()
                         im = self.preprocess(im0s)
+                        pre_end.record()
 
-                        # 用 input tensor 的 shape 當 key
-                        input_shape = tuple(im.shape)
+                        infer_start.record()
+                        preds = self.inference(im, *args, **kwargs)
+                        infer_end.record()
 
-                        if input_shape not in captured_graphs:
-                            LOGGER.info(f"[CAPTURE] Capturing CUDA Graph for shape {input_shape}...")
-                            static_input = im.clone()
-                            static_output = None
-
-                            # Start graph capture
-                            g = torch.cuda.CUDAGraph()
-                            static_input = static_input.to(im.device)
-
-                            torch.cuda.synchronize()
-                            g.capture_begin()
-                            static_output = self.inference(static_input)
-                            g.capture_end()
-                            torch.cuda.synchronize()
-
-                            captured_graphs[input_shape] = (g, static_input, static_output)
-
-                        # replay
-                        graph, static_input, static_output = captured_graphs[input_shape]
-                        static_input.copy_(im)  # 複製新的input
-                        graph.replay()
-                        preds = static_output
-
+                        post_start.record()
                         results = self.postprocess(preds, im, im0s)
+                        post_end.record()
 
-                    end_time = time.time() - start_time
+                        end_event.record()
+
                     pending.append({
-                        "batch_idx": i,
+                        "event": end_event,
                         "stream_idx": stream_idx,
-                        "schedule_time": schedule_time,
-                        "complete_time": end_time,
-                        "results": results,
                         "path": path,
                         "im0s": im0s,
                         "vid_cap": vid_cap,
+                        "batch_idx": i,
+                        "schedule_time": schedule_time,   # <<< 記錄
+                        "results": results,
+                        "profiling": {
+                            "pre": (pre_start, pre_end),
+                            "infer": (infer_start, infer_end),
+                            "post": (post_start, post_end)
+                        }
                     })
 
             except Empty:
@@ -843,8 +836,10 @@ class BasePredictor:
 
             next_pending = []
             for p in pending:
-                if True:  # 已經在 CUDA Graph內，所以不需要 event query
-                    complete_time = p["complete_time"]
+                if p["event"].query():
+                    complete_time = time.time() - start_time
+
+                    # 記錄 timeline
                     timeline_records.append({
                         "batch_idx": p["batch_idx"],
                         "stream_idx": p["stream_idx"],
@@ -852,9 +847,28 @@ class BasePredictor:
                         "complete_time": complete_time,
                     })
 
-                    total_images += 1
+                    n = p["im0s"].shape[1]
+                    pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
+                    infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
+                    post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
 
-                    yield from p["results"]
+                    pre_total += pre_e
+                    infer_total += infer_e
+                    post_total += post_e
+                    total_images += n
+
+                    LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "
+                                f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms, "
+                                f"Finished at {complete_time:.6f}s")
+
+                    for j in range(n):
+                        p["results"][j].speed = {
+                            'preprocess': pre_e / n,
+                            'inference': infer_e / n,
+                            'postprocess': post_e / n
+                        }
+                        yield p["results"][j]
+
                     self.run_callbacks('on_predict_batch_end')
                 else:
                     next_pending.append(p)
@@ -866,17 +880,23 @@ class BasePredictor:
 
         self.run_callbacks('on_predict_end')
 
-        elapsed_time = time.time() - start_time
-        fps = total_images / elapsed_time
-        LOGGER.info(f'[SUMMARY] Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
+        if total_images:
+            elapsed_time = time.time() - start_time
+            fps = total_images / elapsed_time
+            LOGGER.info(f'[SUMMARY] Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image'
+                        % (pre_total / total_images, infer_total / total_images, post_total / total_images))
+            LOGGER.info(f'[SUMMARY] Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
+        # 畫 timeline
         self.plot_timeline(timeline_records)
 
+
     def plot_timeline(self, timeline_records):
+        import matplotlib.pyplot as plt
         output_dir = './profiler_output'
         os.makedirs(output_dir, exist_ok=True)
-
         fig, ax = plt.subplots(figsize=(16, 8))
+
         colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
 
         for record in timeline_records:
@@ -893,18 +913,19 @@ class BasePredictor:
                 color=colors[stream % len(colors)],
                 edgecolor='black'
             )
-            ax.text(start + (end - start) / 2, f"Stream-{stream}", f"B{batch}", ha='center', va='center', fontsize=8)
+            ax.text(start + (end - start) / 2, stream, f"B{batch}", ha='center', va='center', fontsize=8)
 
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Streams')
-        ax.set_title('Inference Timeline with CUDA Graphs')
+        ax.set_title('Inference Timeline')
         plt.grid(True)
         plt.tight_layout()
-
+        # 自動生成 filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        save_path = os.path.join(output_dir, f"timeline_cuda_graphs_{timestamp}.png")
+        save_path = os.path.join(output_dir, f"timeline_{timestamp}.png")
+
         plt.savefig(save_path)
-        plt.close(fig)
+        plt.close(fig)  # 重要！釋放記憶體
         print(f"[Profiler] Timeline saved to {save_path}")
 
 
