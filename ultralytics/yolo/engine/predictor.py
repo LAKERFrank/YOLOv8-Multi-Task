@@ -27,6 +27,7 @@ Usage - formats:
                               yolov8n_edgetpu.tflite     # TensorFlow Edge TPU
                               yolov8n_paddle_model       # PaddlePaddle
 """
+from datetime import datetime
 import os
 import platform
 from pathlib import Path
@@ -892,7 +893,8 @@ class BasePredictor:
 
     def plot_timeline(self, timeline_records):
         import matplotlib.pyplot as plt
-
+        output_dir = './profiler_output'
+        os.makedirs(output_dir, exist_ok=True)
         fig, ax = plt.subplots(figsize=(16, 8))
 
         colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
@@ -918,7 +920,13 @@ class BasePredictor:
         ax.set_title('Inference Timeline')
         plt.grid(True)
         plt.tight_layout()
-        plt.show()
+        # 自動生成 filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        save_path = os.path.join(output_dir, f"timeline_{timestamp}.png")
+
+        plt.savefig(save_path)
+        plt.close(fig)  # 重要！釋放記憶體
+        print(f"[Profiler] Timeline saved to {save_path}")
 
 
     def setup_model(self, model, verbose=True):
