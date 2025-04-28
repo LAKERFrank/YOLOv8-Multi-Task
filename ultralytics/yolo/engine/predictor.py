@@ -31,7 +31,7 @@ import os
 import platform
 from pathlib import Path
 from threading import Thread
-from queue import Queue
+from queue import Empty, Queue
 import time
 
 import cv2
@@ -784,7 +784,7 @@ class BasePredictor:
                 if feeder_finished and queue.empty():
                     break
                 try:
-                    i, batch = queue.get(timeout=0.1)
+                    i, batch = queue.get_nowait(timeout=0.1)
                 except Empty:
                     continue
 
