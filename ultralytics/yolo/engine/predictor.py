@@ -794,31 +794,38 @@ class BasePredictor:
                 # CUDA Events
                 pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
                 infer_start, infer_end = torch.cuda.Event(True), torch.cuda.Event(True)
+                post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
                 end_event = torch.cuda.Event(True)
 
                 # Step 1: Preprocess
                 with torch.cuda.stream(stream):
-                    LOGGER.info(f"[Start] Stream {stream_id} processing batch {i} at {time.time():.4f}")
-                    pre_start.record()
+                    LOGGER.info(f"[Start] Stream {i % total_streams} processing batch {i} at {time.time():.4f}")
+                    pre_start.record(stream)
                     im = self.preprocess(im0s)
-                    pre_end.record()
+                    pre_end.record(stream)
 
-                    # Step 2: Inference
-                    stream.wait_event(pre_end)
-                    infer_start.record()
+                    infer_start.record(stream)
                     preds = self.inference(im, *args, **kwargs)
-                    infer_end.record()
-                    end_event.record()
-                    LOGGER.info(f"[End] Stream {stream_id} finished batch {i} at {time.time():.4f}")
+                    infer_end.record(stream)
 
-                result_queue.put({
+                    post_start.record(stream)
+                    results = self.postprocess(preds, im, im0s)
+                    post_end.record(stream)
+
+                    end_event.record(stream)
+                    LOGGER.info(f"[End] Stream {i % total_streams} finished batch {i} at {time.time():.4f}")
+
+                pending.append({
                     "event": end_event,
+                    "stream": stream,
                     "path": path,
                     "im0s": im0s,
-                    "results": preds,
+                    "vid_cap": vid_cap,
+                    "results": results,
                     "profiling": {
                         "pre": (pre_start, pre_end),
                         "infer": (infer_start, infer_end),
+                        "post": (post_start, post_end)
                     }
                 })
 
@@ -844,24 +851,22 @@ class BasePredictor:
             for p in pending:
                 if p["event"].query():
                     n = p["im0s"].shape[1]
-                    im0s = p["im0s"]
-                    path = p["path"]
                     pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
                     infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
+                    post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
 
                     pre_total += pre_e
                     infer_total += infer_e
+                    post_total += post_e
                     total_images += n
-                    result = self.cpu_postprocess(p["results"], im0s)
 
                     for j in range(n):
-                        result[j].speed = {
+                        p["results"][j].speed = {
                             'preprocess': pre_e / n,
                             'inference': infer_e / n,
-                            'postprocess': 0.0,
+                            'postprocess': post_e / n
                         }
-
-                    yield from result
+                    yield from p["results"]
                 else:
                     new_pending.append(p)
             pending = new_pending
@@ -875,7 +880,7 @@ class BasePredictor:
             elapsed_time = time.time() - start_time
             fps = total_images / elapsed_time
             LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
-                        f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
+                        % (pre_total / total_images, infer_total / total_images, post_total / total_images))
             LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
 
