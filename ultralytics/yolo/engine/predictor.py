@@ -761,7 +761,7 @@ class BasePredictor:
 
         preprocess_num_streams = 2
         inference_num_streams = 1
-        total_streams = preprocess_num_streams + inference_num_streams  # 簡單規劃一下
+        total_streams = preprocess_num_streams + inference_num_streams
 
         streams = [torch.cuda.Stream() for _ in range(total_streams)]
         queue = Queue(maxsize=1000)
@@ -785,39 +785,42 @@ class BasePredictor:
                     break
                 try:
                     i, batch = queue.get(timeout=0.1)
-                except:
+                except Empty:
                     continue
 
                 self.batch = batch
                 path, im0s, vid_cap, s = batch
 
                 # CUDA Events
-                pre_start, pre_end = torch.cuda.Event(True), torch.cuda.Event(True)
-                infer_start, infer_end = torch.cuda.Event(True), torch.cuda.Event(True)
-                post_start, post_end = torch.cuda.Event(True), torch.cuda.Event(True)
-                end_event = torch.cuda.Event(True)
+                pre_start, pre_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                infer_start, infer_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                post_start, post_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                end_event = torch.cuda.Event(enable_timing=True)
 
-                # Step 1: Preprocess
+                # Step 1: Preprocess + Inference + Postprocess
                 with torch.cuda.stream(stream):
-                    LOGGER.info(f"[Start] Stream {i % total_streams} processing batch {i} at {time.time():.4f}")
-                    pre_start.record(stream)
+                    LOGGER.info(f"[Start] Stream {stream_id} processing batch {i} at {time.time():.4f}")
+
+                    pre_start.record()
                     im = self.preprocess(im0s)
-                    pre_end.record(stream)
+                    pre_end.record()
 
-                    infer_start.record(stream)
+                    stream.wait_event(pre_end)
+                    infer_start.record()
                     preds = self.inference(im, *args, **kwargs)
-                    infer_end.record(stream)
+                    infer_end.record()
 
-                    post_start.record(stream)
+                    stream.wait_event(infer_end)
+                    post_start.record()
                     results = self.postprocess(preds, im, im0s)
-                    post_end.record(stream)
+                    post_end.record()
 
-                    end_event.record(stream)
-                    LOGGER.info(f"[End] Stream {i % total_streams} finished batch {i} at {time.time():.4f}")
+                    end_event.record()
+                    LOGGER.info(f"[End] Stream {stream_id} finished batch {i} at {time.time():.4f}")
 
-                pending.append({
+                # 🛠 修正：丟到 result_queue，而不是 pending.append
+                result_queue.put({
                     "event": end_event,
-                    "stream": stream,
                     "path": path,
                     "im0s": im0s,
                     "vid_cap": vid_cap,
@@ -842,15 +845,19 @@ class BasePredictor:
 
         while True:
             # 拉結果
-            while not result_queue.empty():
-                p = result_queue.get()
-                pending.append(p)
+            try:
+                while True:
+                    p = result_queue.get_nowait()
+                    pending.append(p)
+            except Empty:
+                pass
 
             # 處理完成的
             new_pending = []
             for p in pending:
                 if p["event"].query():
                     n = p["im0s"].shape[1]
+                    path = p["path"]
                     pre_e = p["profiling"]["pre"][0].elapsed_time(p["profiling"]["pre"][1])
                     infer_e = p["profiling"]["infer"][0].elapsed_time(p["profiling"]["infer"][1])
                     post_e = p["profiling"]["post"][0].elapsed_time(p["profiling"]["post"][1])
@@ -867,6 +874,12 @@ class BasePredictor:
                             'postprocess': post_e / n
                         }
                     yield from p["results"]
+
+                    # 🧹 Optional: 回收 event (進階)
+                    for e in p["profiling"]["pre"] + p["profiling"]["infer"] + p["profiling"]["post"]:
+                        del e
+                    del p["event"]
+
                 else:
                     new_pending.append(p)
             pending = new_pending
@@ -881,7 +894,8 @@ class BasePredictor:
             fps = total_images / elapsed_time
             LOGGER.info(f'Speed: %.1fms preprocess, %.1fms inference, %.1fms postprocess per image at shape '
                         % (pre_total / total_images, infer_total / total_images, post_total / total_images))
-            LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
+            LOGGER.info(f'Total elapsed time: %.2f s, Total images: %d, Overall FPS: %.2f' %
+                        (elapsed_time, total_images, fps))
 
 
     def setup_model(self, model, verbose=True):
