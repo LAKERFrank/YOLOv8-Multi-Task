@@ -1129,6 +1129,8 @@ class BasePredictor:
                 edgecolor='black'
             )
             ax.text(start + (end - start) / 2, stream, f"B{batch}", ha='center', va='center', fontsize=8)
+            if batch > 10:
+                break
 
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Batches')
