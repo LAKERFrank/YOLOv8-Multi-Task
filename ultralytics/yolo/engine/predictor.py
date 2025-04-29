@@ -862,9 +862,9 @@ class BasePredictor:
                     post_total += post_e
                     total_images += n
 
-                    LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "
-                                f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms, "
-                                f"Finished at {complete_time:.6f}s")
+                    # LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "
+                    #             f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms, "
+                    #             f"Finished at {complete_time:.6f}s")
 
                     for j in range(n):
                         p["results"][j].speed = {
