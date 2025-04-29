@@ -818,12 +818,11 @@ class BasePredictor:
 
                         # end_event.record()
                     with torch.cuda.stream(postprocess_stream):
-                        stream.wait_event(infer_end)
-                        post_start.record(postprocess_stream)
+                        postprocess_stream.wait_event(infer_end)
+                        post_start.record()
                         results = self.postprocess(preds, im, im0s)
-                        post_end.record(postprocess_stream)
-
-                        end_event.record(postprocess_stream)
+                        post_end.record()
+                        end_event.record()
                         
 
                     pending.append({
