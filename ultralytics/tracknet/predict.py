@@ -441,8 +441,9 @@ class TrackNetPredictor(BasePredictor):
         # self.profile_resources("Postprocess (after)")
         return result
     
+    @smart_inference_mode()
     def stream_inference(self, source=None, model=None, *args, **kwargs):
-        """Optimized Asynchronous GPU Streamed Inference with torch.profiler support."""
+        """Optimized GPU Streamed Inference using multiple concurrent CUDA Streams."""
 
         if not self.model:
             self.setup_model(model)
@@ -487,7 +488,6 @@ class TrackNetPredictor(BasePredictor):
         self.run_callbacks('on_predict_start')
         start_time = time.time()
 
-        # ====== torch.profiler 正式啟動 ======
         with torch.profiler.profile(
             activities=[
                 torch.profiler.ProfilerActivity.CPU,
@@ -499,63 +499,69 @@ class TrackNetPredictor(BasePredictor):
             profile_memory=True,
             with_stack=True,
         ) as prof:
-            # ===================================
 
-            any_batch_processed = False  # 用來決定是否 prof.step()
+            any_batch_processed = False
 
             while True:
+                # 一次取出多個 batch
+                batches = []
                 try:
-                    while not queue.empty():
+                    while not queue.empty() and len(batches) < num_streams:
                         i, batch = queue.get_nowait()
-                        self.batch = batch
-                        path, im0s, vid_cap, s = batch
-                        stream_idx = i % num_streams
-                        stream = streams[stream_idx]
-
-                        schedule_time = time.time() - start_time
-
-                        # CUDA Event for each stage
-                        pre_start, pre_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-                        infer_start, infer_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-                        post_start, post_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-                        end_event = torch.cuda.Event(enable_timing=True)
-
-                        with torch.cuda.stream(stream):
-                            pre_start.record()
-                            im = self.preprocess(im0s)
-                            pre_end.record()
-
-                            infer_start.record()
-                            preds = self.inference(im, *args, **kwargs)
-                            infer_end.record()
-
-                            post_start.record()
-                            results = self.postprocess(preds, im, im0s)
-                            post_end.record()
-
-                            end_event.record()
-
-                        pending.append({
-                            "event": end_event,
-                            "stream_idx": stream_idx,
-                            "path": path,
-                            "im0s": im0s,
-                            "vid_cap": vid_cap,
-                            "batch_idx": i,
-                            "schedule_time": schedule_time,
-                            "results": results,
-                            "profiling": {
-                                "pre": (pre_start, pre_end),
-                                "infer": (infer_start, infer_end),
-                                "post": (post_start, post_end)
-                            }
-                        })
-
-                        any_batch_processed = True  # 有成功處理 batch
-
+                        batches.append((i, batch))
                 except Empty:
                     pass
 
+                # dispatch batches到streams
+                for batch_info in batches:
+                    batch_idx, batch = batch_info
+                    path, im0s, vid_cap, s = batch
+                    stream_idx = batch_idx % num_streams
+                    stream = streams[stream_idx]
+
+                    # 記錄開始排程時間
+                    schedule_time = time.time() - start_time
+
+                    # 每個batch自己的 timing event
+                    pre_start, pre_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                    infer_start, infer_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                    post_start, post_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+                    end_event = torch.cuda.Event(enable_timing=True)
+
+                    with torch.cuda.stream(stream):
+                        pre_start.record()
+                        im = self.preprocess(im0s)
+                        pre_end.record()
+
+                        infer_start.record()
+                        preds = self.inference(im, *args, **kwargs)
+                        infer_end.record()
+
+                        post_start.record()
+                        results = self.postprocess(preds, im, im0s)
+                        post_end.record()
+
+                        end_event.record()
+
+                    pending.append({
+                        "event": end_event,
+                        "stream_idx": stream_idx,
+                        "path": path,
+                        "im0s": im0s,
+                        "vid_cap": vid_cap,
+                        "batch_idx": batch_idx,
+                        "schedule_time": schedule_time,
+                        "results": results,
+                        "profiling": {
+                            "pre": (pre_start, pre_end),
+                            "infer": (infer_start, infer_end),
+                            "post": (post_start, post_end)
+                        }
+                    })
+
+                    any_batch_processed = True
+
+                # 處理完成的 pending
                 next_pending = []
                 for p in pending:
                     if p["event"].query():
@@ -587,7 +593,7 @@ class TrackNetPredictor(BasePredictor):
                             yield p["results"][j]
 
                         self.run_callbacks('on_predict_batch_end')
-                        any_batch_processed = True  # 有 batch 完成
+                        any_batch_processed = True
                     else:
                         next_pending.append(p)
 
@@ -596,7 +602,6 @@ class TrackNetPredictor(BasePredictor):
                 if feeder_finished and queue.empty() and not pending:
                     break
 
-                # ✅ 只有真的有 batch 被處理，才呼叫 prof.step()
                 if any_batch_processed:
                     prof.step()
                     any_batch_processed = False
@@ -611,7 +616,7 @@ class TrackNetPredictor(BasePredictor):
             LOGGER.info(f'[SUMMARY] Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
         self.plot_timeline(timeline_records)
-
+    
     @smart_inference_mode()
     def stream_inference_profiler(self, source=None, model=None, *args, **kwargs):
         """Optimized Asynchronous GPU inference pipeline with CUDA Streams and Events."""
