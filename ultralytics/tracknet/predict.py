@@ -1,7 +1,7 @@
 
 from datetime import datetime
 import os
-from queue import Queue
+from queue import Empty, Queue
 import threading
 from matplotlib import pyplot as plt
 import torch
