@@ -830,7 +830,7 @@ class BasePredictor:
                         post_end.record()
 
                         end_event.record()
-                        LOGGER.info(f'batch{batch} scheduled on {time.time():.6f}')
+                        LOGGER.info(f'batch{i} scheduled on {time.time():.6f}')
                         
 
                     pending.append({
