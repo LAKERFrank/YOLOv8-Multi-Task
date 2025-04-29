@@ -821,23 +821,16 @@ class BasePredictor:
                         im = self.preprocess(im0s)
                         pre_end.record()
 
-                        # 檢查 preprocess 這段
-                        check_blocking(pre_end, "Preprocess")
-
                         infer_start.record()
                         preds = self.inference(im, *args, **kwargs)
                         infer_end.record()
-
-                        check_blocking(infer_end, "Inference")
 
                         post_start.record()
                         results = self.postprocess(preds, im, im0s)
                         post_end.record()
 
-                        check_blocking(post_end, "Postprocess")
-
                         end_event.record()
-                        check_blocking(end_event, "ALL Done")
+                        LOGGER.info(f'batch{batch} scheduled on {time.time:.6f}')
                         
 
                     pending.append({
@@ -882,9 +875,9 @@ class BasePredictor:
                     post_total += post_e
                     total_images += n
 
-                    # LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "
-                    #             f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms, "
-                    #             f"Finished at {complete_time:.6f}s")
+                    LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "
+                                f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms, "
+                                f"Finished at {complete_time:.6f}s")
 
                     for j in range(n):
                         p["results"][j].speed = {
