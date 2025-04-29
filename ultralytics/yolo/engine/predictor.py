@@ -765,7 +765,9 @@ class BasePredictor:
 
         num_streams = 4
         streams = [torch.cuda.Stream(priority=0) for _ in range(num_streams)]
-        postprocess_stream = [torch.cuda.Stream(priority=0) for _ in range(2)]
+
+        postprocess_num_streams = 2
+        postprocess_streams = [torch.cuda.Stream(priority=0) for _ in range(postprocess_num_streams)]
     
         queue = Queue(maxsize=64)
         pending = []
@@ -794,6 +796,8 @@ class BasePredictor:
                     path, im0s, vid_cap, s = batch
                     stream_idx = i % num_streams
                     stream = streams[stream_idx]
+
+                    postprocess_stream = postprocess_streams[i % postprocess_num_streams]
 
                     schedule_time = time.time() - start_time
 
