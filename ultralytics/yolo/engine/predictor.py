@@ -763,10 +763,10 @@ class BasePredictor:
             persistent_workers=True,
         )
 
-        num_streams = 4
+        num_streams = 6
         streams = [torch.cuda.Stream(priority=0) for _ in range(num_streams)]
 
-        postprocess_num_streams = 2
+        postprocess_num_streams = 1
         postprocess_streams = [torch.cuda.Stream(priority=0) for _ in range(postprocess_num_streams)]
     
         queue = Queue(maxsize=64)
