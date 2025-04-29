@@ -785,9 +785,10 @@ class BasePredictor:
 
         self.run_callbacks('on_predict_start')
         start_time = time.time()
-        stream_count = 0
+        
         while True:
             try:
+                stream_count = 0
                 while not queue.empty() and stream_count < 24:
                     i, batch = queue.get_nowait()
                     self.batch = batch
