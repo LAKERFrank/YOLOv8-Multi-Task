@@ -817,7 +817,6 @@ class BasePredictor:
                         results = self.postprocess(preds, im, im0s)
                         post_end.record()
 
-                        stream.wait_event(post_end)
                         end_event.record()
                         
 
@@ -1122,7 +1121,7 @@ class BasePredictor:
             start = record['schedule_time']
             end = record['complete_time']                 # LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "    
             ax.barh(
-                y=f"Batch-{batch}",
+                y=f"Stream-{stream}",
                 width=end - start,
                 left=start,
                 height=0.4,
@@ -1130,11 +1129,9 @@ class BasePredictor:
                 edgecolor='black'
             )
             ax.text(start + (end - start) / 2, stream, f"B{batch}", ha='center', va='center', fontsize=8)
-            if batch > 10:
-                break
 
         ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Batches')
+        ax.set_ylabel('Streams')
         ax.set_title('Inference Timeline')
         plt.grid(True)
         plt.tight_layout()
