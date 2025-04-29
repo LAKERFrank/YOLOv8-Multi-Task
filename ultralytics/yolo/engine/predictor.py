@@ -1114,28 +1114,24 @@ class BasePredictor:
         fig, ax = plt.subplots(figsize=(16, 8))
 
         colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
-        tab20 = cm.get_cmap('tab20')
-        colors = tab20.colors
 
         for record in timeline_records:
             stream = record['stream_idx']
             batch = record['batch_idx']
             start = record['schedule_time']
-            end = record['complete_time']
-            color_idx = random.randint(0, len(colors)-1)
-            edgecolor = colors[color_idx]                    # LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "    
+            end = record['complete_time']                 # LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "    
             ax.barh(
-                y=f"Stream-{stream}",
+                y=f"Batch-{batch}",
                 width=end - start,
                 left=start,
                 height=0.4,
                 color=colors[stream % len(colors)],
-                edgecolor=edgecolor
+                edgecolor='black'
             )
-            ax.text(start + (end - start) / 2, f"Stream-{stream}", f"B{batch}", ha='center', va='center', fontsize=8)
+            ax.text(start + (end - start) / 2, stream, f"B{batch}", ha='center', va='center', fontsize=8)
 
         ax.set_xlabel('Time (s)')
-        ax.set_ylabel('Streams')
+        ax.set_ylabel('Batches')
         ax.set_title('Inference Timeline')
         plt.grid(True)
         plt.tight_layout()
