@@ -763,12 +763,9 @@ class BasePredictor:
             persistent_workers=True,
         )
 
-        num_streams = 8
+        num_streams = 6
         streams = [torch.cuda.Stream(priority=0) for _ in range(num_streams)]
 
-        postprocess_num_streams = 2
-        postprocess_streams = [torch.cuda.Stream(priority=0) for _ in range(postprocess_num_streams)]
-    
         queue = Queue(maxsize=64)
         pending = []
         timeline_records = []  # <<< 新增收集timeline
@@ -797,8 +794,6 @@ class BasePredictor:
                     stream_idx = i % num_streams
                     stream = streams[stream_idx]
 
-                    postprocess_stream = postprocess_streams[i % postprocess_num_streams]
-
                     schedule_time = time.time() - start_time
 
                     # LOGGER.info(f"[SCHEDULER] Assign batch {i} to Stream-{stream_idx} at {schedule_time:.6f}s")
@@ -816,16 +811,11 @@ class BasePredictor:
                         infer_start.record()
                         preds = self.inference(im, *args, **kwargs)
                         infer_end.record()
-                        # post_start.record()
-                        # results = self.postprocess(preds, im, im0s)
-                        # post_end.record()
-
-                        # end_event.record()
-                    with torch.cuda.stream(postprocess_stream):
-                        postprocess_stream.wait_event(infer_end)
+                        
                         post_start.record()
                         results = self.postprocess(preds, im, im0s)
                         post_end.record()
+
                         end_event.record()
                         
 
