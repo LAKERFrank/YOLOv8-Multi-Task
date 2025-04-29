@@ -441,7 +441,7 @@ class TrackNetPredictor(BasePredictor):
         # self.profile_resources("Postprocess (after)")
         return result
     
-    def stream_inference(self, source=None, model=None, *args, **kwargs):
+    def stream_inference_pro_v2(self, source=None, model=None, *args, **kwargs):
         """Optimized Asynchronous GPU Streamed Inference with torch.profiler support."""
 
         if not self.model:
