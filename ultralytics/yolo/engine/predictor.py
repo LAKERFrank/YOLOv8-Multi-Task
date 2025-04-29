@@ -842,6 +842,7 @@ class BasePredictor:
             
             next_pending = []
             for p in pending:
+                LOGGER.info("start pending loop")
                 if p["event"].query():
                     complete_time = time.time() - start_time
 
@@ -877,7 +878,7 @@ class BasePredictor:
 
                     self.run_callbacks('on_predict_batch_end')
                 else:
-                    LOGGER.debug(f"[PENDING] Batch {p['batch_idx']} on Stream-{p['stream_idx']} is still pending")
+                    LOGGER.info(f"[PENDING] Batch {p['batch_idx']} on Stream-{p['stream_idx']} is still pending")
                     next_pending.append(p)
 
             pending = next_pending
