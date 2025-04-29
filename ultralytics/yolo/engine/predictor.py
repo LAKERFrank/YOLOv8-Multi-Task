@@ -838,7 +838,8 @@ class BasePredictor:
 
             except Empty:
                 pass
-
+            
+            LOGGER.info("start pending loop")
             next_pending = []
             for p in pending:
                 if p["event"].query():
