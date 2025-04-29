@@ -31,6 +31,7 @@ from datetime import datetime
 import os
 import platform
 from pathlib import Path
+import random
 from threading import Thread
 from queue import Empty, Queue
 import threading
@@ -1119,15 +1120,16 @@ class BasePredictor:
             batch = record['batch_idx']
             start = record['schedule_time']
             end = record['complete_time']
-
-            color_idx = batch % len(colors)
+            colors = plt.colormaps()["tab20"].colors  # tab20是常用20色彩表
+            color_idx = random.randint(0, len(colors)-1)
+            edgecolor = colors[color_idx]                    # LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "    
             ax.barh(
                 y=f"Stream-{stream}",
                 width=end - start,
                 left=start,
                 height=0.4,
                 color=colors[stream % len(colors)],
-                edgecolor=colors[color_idx]
+                edgecolor=edgecolor
             )
             ax.text(start + (end - start) / 2, f"Stream-{stream}", f"B{batch}", ha='center', va='center', fontsize=8)
 
