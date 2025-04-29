@@ -811,7 +811,7 @@ class BasePredictor:
                         infer_start.record()
                         preds = self.inference(im, *args, **kwargs)
                         infer_end.record()
-                        
+
                         post_start.record()
                         results = self.postprocess(preds, im, im0s)
                         post_end.record()
@@ -1128,7 +1128,7 @@ class BasePredictor:
                 color=colors[stream % len(colors)],
                 edgecolor='black'
             )
-            ax.text(start + (end - start) / 2, stream, f"B{batch}", ha='center', va='center', fontsize=8)
+            ax.text(start + (end - start) / 2, f"Stream-{stream}", f"B{batch}", ha='center', va='center', fontsize=8)
 
         ax.set_xlabel('Time (s)')
         ax.set_ylabel('Streams')
