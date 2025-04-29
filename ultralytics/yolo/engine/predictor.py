@@ -763,9 +763,10 @@ class BasePredictor:
             persistent_workers=True,
         )
 
-        num_streams = 6
+        num_streams = 4
         streams = [torch.cuda.Stream(priority=0) for _ in range(num_streams)]
-
+        postprocess_stream = [torch.cuda.Stream(priority=0) for _ in range(2)]
+    
         queue = Queue(maxsize=64)
         pending = []
         timeline_records = []  # <<< 新增收集timeline
@@ -811,12 +812,19 @@ class BasePredictor:
                         infer_start.record()
                         preds = self.inference(im, *args, **kwargs)
                         infer_end.record()
+                        # post_start.record()
+                        # results = self.postprocess(preds, im, im0s)
+                        # post_end.record()
 
-                        post_start.record()
+                        # end_event.record()
+                    with torch.cuda.stream(postprocess_stream):
+                        stream.wait_event(infer_end)
+                        post_start.record(postprocess_stream)
                         results = self.postprocess(preds, im, im0s)
-                        post_end.record()
+                        post_end.record(postprocess_stream)
 
-                        end_event.record()
+                        end_event.record(postprocess_stream)
+                        
 
                     pending.append({
                         "event": end_event,
