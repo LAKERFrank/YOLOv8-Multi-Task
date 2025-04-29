@@ -442,7 +442,7 @@ class TrackNetPredictor(BasePredictor):
         return result
     
     def stream_inference(self, source=None, model=None, *args, **kwargs):
-        """Optimized Asynchronous GPU Streamed Inference with timeline recording and visualization."""
+        """Optimized Asynchronous GPU Streamed Inference with torch.profiler support."""
 
         if not self.model:
             self.setup_model(model)
@@ -470,7 +470,7 @@ class TrackNetPredictor(BasePredictor):
 
         queue = Queue(maxsize=64)
         pending = []
-        timeline_records = []  # <<< 新增收集timeline
+        timeline_records = []
 
         pre_total, infer_total, post_total = 0.0, 0.0, 0.0
         total_images = 0
@@ -487,7 +487,7 @@ class TrackNetPredictor(BasePredictor):
         self.run_callbacks('on_predict_start')
         start_time = time.time()
 
-        # 【新增區塊】Profiler 包裝
+        # ====== torch.profiler 正式啟動 ======
         with torch.profiler.profile(
             activities=[
                 torch.profiler.ProfilerActivity.CPU,
@@ -499,6 +499,9 @@ class TrackNetPredictor(BasePredictor):
             profile_memory=True,
             with_stack=True,
         ) as prof:
+            # ===================================
+
+            any_batch_processed = False  # 用來決定是否 prof.step()
 
             while True:
                 try:
@@ -511,6 +514,7 @@ class TrackNetPredictor(BasePredictor):
 
                         schedule_time = time.time() - start_time
 
+                        # CUDA Event for each stage
                         pre_start, pre_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                         infer_start, infer_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
                         post_start, post_end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
@@ -547,6 +551,8 @@ class TrackNetPredictor(BasePredictor):
                             }
                         })
 
+                        any_batch_processed = True  # 有成功處理 batch
+
                 except Empty:
                     pass
 
@@ -581,6 +587,7 @@ class TrackNetPredictor(BasePredictor):
                             yield p["results"][j]
 
                         self.run_callbacks('on_predict_batch_end')
+                        any_batch_processed = True  # 有 batch 完成
                     else:
                         next_pending.append(p)
 
@@ -589,8 +596,10 @@ class TrackNetPredictor(BasePredictor):
                 if feeder_finished and queue.empty() and not pending:
                     break
 
-                # 【新增】Profiler需要進行 step 記錄（這個很重要）
-                prof.step()
+                # ✅ 只有真的有 batch 被處理，才呼叫 prof.step()
+                if any_batch_processed:
+                    prof.step()
+                    any_batch_processed = False
 
         self.run_callbacks('on_predict_end')
 
