@@ -1114,13 +1114,13 @@ class BasePredictor:
 
         colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
 
-        for i, record in timeline_records:
+        for record in timeline_records:
             stream = record['stream_idx']
             batch = record['batch_idx']
             start = record['schedule_time']
             end = record['complete_time']
 
-            color_idx = i % len(colors)
+            color_idx = batch % len(colors)
             ax.barh(
                 y=f"Stream-{stream}",
                 width=end - start,
