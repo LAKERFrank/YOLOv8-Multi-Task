@@ -789,7 +789,7 @@ class BasePredictor:
         while True:
             try:
                 stream_count = 0
-                while not queue.empty() and stream_count < 24:
+                while not queue.empty() and stream_count < 64:
                     i, batch = queue.get_nowait()
                     self.batch = batch
                     path, im0s, vid_cap, s = batch
