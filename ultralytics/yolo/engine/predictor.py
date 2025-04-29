@@ -786,6 +786,18 @@ class BasePredictor:
         self.run_callbacks('on_predict_start')
         start_time = time.time()
 
+        def check_blocking(event, description):
+            start_time = time.time()
+            wait_count = 0
+            # 持續 query event 狀態
+            while not event.query():
+                time.sleep(0.001)  # 避免佔滿 CPU，每1ms檢查一次
+                wait_count += 1
+                if wait_count > 500:  # 超過0.5秒還沒完成，警告
+                    elapsed = time.time() - start_time
+                    LOGGER.warning(f"[BLOCK WARNING] {description} is blocking host for {elapsed:.3f} seconds")
+                    break
+
         while True:
             try:
                 while not queue.empty():
@@ -809,15 +821,23 @@ class BasePredictor:
                         im = self.preprocess(im0s)
                         pre_end.record()
 
+                        # 檢查 preprocess 這段
+                        check_blocking(pre_end, "Preprocess")
+
                         infer_start.record()
                         preds = self.inference(im, *args, **kwargs)
                         infer_end.record()
+
+                        check_blocking(infer_end, "Inference")
 
                         post_start.record()
                         results = self.postprocess(preds, im, im0s)
                         post_end.record()
 
+                        check_blocking(post_end, "Postprocess")
+
                         end_event.record()
+                        check_blocking(end_event, "ALL Done")
                         
 
                     pending.append({
