@@ -265,7 +265,8 @@ class TrackNetPredictor(BasePredictor):
 
         return result
 
-    def postprocess_output_memory(self, preds, img, orig_imgs):
+    # postprocess_output_memory
+    def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
         # self.profile_resources("Postprocess (before)")
         use_nms = True
@@ -441,7 +442,7 @@ class TrackNetPredictor(BasePredictor):
         # self.profile_resources("Postprocess (after)")
         return result
     
-    def postprocess(self, preds, img, orig_imgs):
+    def postprocess_output_file(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
         # self.profile_resources("Postprocess (before)")
         use_nms = True
