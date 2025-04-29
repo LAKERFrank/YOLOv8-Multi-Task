@@ -38,7 +38,7 @@ import threading
 import time
 
 import cv2
-from matplotlib import pyplot as plt
+from matplotlib import cm, pyplot as plt
 import numpy as np
 import psutil
 import torch
@@ -1114,13 +1114,14 @@ class BasePredictor:
         fig, ax = plt.subplots(figsize=(16, 8))
 
         colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple', 'tab:brown']
+        tab20 = cm.get_cmap('tab20')
+        colors = tab20.colors
 
         for record in timeline_records:
             stream = record['stream_idx']
             batch = record['batch_idx']
             start = record['schedule_time']
             end = record['complete_time']
-            colors = plt.colormaps()["tab20"].colors  # tab20是常用20色彩表
             color_idx = random.randint(0, len(colors)-1)
             edgecolor = colors[color_idx]                    # LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "    
             ax.barh(
