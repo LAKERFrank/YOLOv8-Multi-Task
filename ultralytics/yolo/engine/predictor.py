@@ -817,6 +817,7 @@ class BasePredictor:
                         results = self.postprocess(preds, im, im0s)
                         post_end.record()
 
+                        stream.wait_event(post_end)
                         end_event.record()
                         
 
