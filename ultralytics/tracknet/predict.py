@@ -517,7 +517,7 @@ class TrackNetPredictor(BasePredictor):
                 pred=frame_preds if use_nms else frame_preds[0],
                 speed={'preprocess': None, 'inference': None, 'postprocess': None}
             ))
-        orig_images_clone = orig_imgs.squeeze(0).permute(2, 0, 1).contiguous().cpu().numpy()
+        orig_images_clone = orig_imgs.squeeze(0).contiguous().cpu().numpy()
 
         p = Path(self.batch[0][0])
         parent_dir = p.parent.name
