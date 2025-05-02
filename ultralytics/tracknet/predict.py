@@ -605,8 +605,8 @@ class TrackNetPredictor(BasePredictor):
 
 
             # 儲存圖片
-            idx_p = Path([frame_idx])
-            save_img_path = f"{frame_save_path}/{idx_p.name}"
+            idx_p = f'{frame_idx}.png'
+            save_img_path = f"{frame_save_path}/{idx_p}"
             self.saver.save_image(save_img_path, img_np)
         save_csv_path = os.path.join(csv_save_path, f"{p.stem}.csv")
         self.saver.save_csv(save_csv_path, csv_rows)
