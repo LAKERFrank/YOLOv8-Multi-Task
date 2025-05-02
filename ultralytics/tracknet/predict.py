@@ -266,7 +266,7 @@ class TrackNetPredictor(BasePredictor):
         return result
 
     # postprocess_output_memory
-    def postprocess(self, preds, img, orig_imgs):
+    def postprocess_output_memory(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
         # self.profile_resources("Postprocess (before)")
         use_nms = True
@@ -442,7 +442,8 @@ class TrackNetPredictor(BasePredictor):
         # self.profile_resources("Postprocess (after)")
         return result
     
-    def postprocess_output_file(self, preds, img, orig_imgs):
+    # postprocess_output_file
+    def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
         # self.profile_resources("Postprocess (before)")
         use_nms = True
@@ -604,7 +605,7 @@ class TrackNetPredictor(BasePredictor):
 
 
             # 儲存圖片
-            idx_p = Path(self.batch[0][frame_idx])
+            idx_p = Path([frame_idx])
             save_img_path = f"{frame_save_path}/{idx_p.name}"
             self.saver.save_image(save_img_path, img_np)
         save_csv_path = os.path.join(csv_save_path, f"{p.stem}.csv")

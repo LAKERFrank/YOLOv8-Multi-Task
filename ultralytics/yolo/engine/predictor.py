@@ -738,7 +738,7 @@ class BasePredictor:
                         f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
             LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
-    # stream_inference_single_stream_v2 6xxFPS
+    # stream_inference_single_stream_v2 10xxFPS
     @smart_inference_mode()
     def stream_inference(self, source=None, model=None, *args, **kwargs):
         """Optimized Asynchronous GPU Streamed Inference with timeline recording and visualization."""
