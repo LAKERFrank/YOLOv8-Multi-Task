@@ -774,11 +774,22 @@ profession_match_9/1_02_03 最後球落地的階段 有標記了非球頭的狀�
     -v /hdd/dataset/tracknetv4/profiler_output:/usr/src/ultralytics/profiler_output \
     -it tracknet1000 
 
+    docker run --gpus all --ipc=host \
+    -v /home/bartektao/dataset/sportxai_2025:/usr/src/datasets/tracknet/train_data/profession_match_1 \
+    -v /home/bartektao/dataset/sportxai_2025:/usr/src/datasets/tracknet/val_data/sportxai_2025 \
+    -v /home/bartektao/dataset/tracknetv4/runs:/usr/src/ultralytics/runs \
+    -v /home/bartektao/dataset/tracknetv4/profiler_output:/usr/src/ultralytics/profiler_output \
+    -it tracknet1000 
+
     python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/ultralytics/models/v8/tracknetv4.yaml --epoch 20
 
     python tracknet.py --mode predict_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train618/weights/best.pt --source /usr/src/datasets/tracknet/val_data/profession_match_15_test/frame/2_18_14/
 
     python tracknet.py --mode predict_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train618/weights/best.pt --source /usr/src/datasets/tracknet/val_data/sportxai_2025/frame/2025-01-16_15-18-59_0/
+
+    python tracknet.py --mode predict_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train637/weights/best.pt --source /usr/src/datasets/tracknet/val_data/profession_match_15_test/frame/2_18_14/
+
+    python tracknet.py --mode predict_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train637/weights/best.pt --source /usr/src/datasets/tracknet/val_data/sportxai_2025/frame/2025-01-16_15-18-59_0/
 
     python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train618/weights/best.pt --source /usr/src/datasets/tracknet/val_data
 
@@ -1124,5 +1135,5 @@ office_dataset
       label 異常 與 heatmap 相同
       Frame,Visibility,X,Y,Z,Event,Timestamp,Fast
       0,0,1783.0,327.0,0.0,0,0.0,0
-- train636
+- train637
   - python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/runs/detect/train632/weights/last.pt --epoch 20 &
