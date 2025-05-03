@@ -26,13 +26,13 @@ class TrackNetConfigurableDataset(Dataset):
         self.path_counts = {f"profession_match_{i}": 1000 for i in range(1, 30)}
         self.path_counts.update({
             "match_2": 5000, # for local test
-            "AUX_nycu_new_court": 2000,
-            "nycu_new_court_2048_1536": 2000,
-            "sportxai_serve_machine": 2000,
-            "sportxai_rally": 2000,
-            "hsinchu_gym": 2000,
-            "ces2025_all": 2000,
-            "office_dataset": 2000,
+            # "AUX_nycu_new_court": 2000,
+            # "nycu_new_court_2048_1536": 2000,
+            # "sportxai_serve_machine": 2000,
+            # "sportxai_rally": 2000,
+            # "hsinchu_gym": 2000,
+            # "ces2025_all": 2000,
+            # "office_dataset": 2000,
         })
 
         self.idx = set()
