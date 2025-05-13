@@ -1,5 +1,6 @@
 
 from datetime import datetime
+import json
 import os
 from queue import Empty, Queue
 import threading
@@ -13,7 +14,7 @@ from ultralytics.yolo.engine.predictor import STREAM_WARNING, BasePredictor
 from ultralytics.yolo.engine.results import Results
 from torch.utils.data import DataLoader
 
-from ultralytics.yolo.utils import LOGGER, ops
+from ultralytics.yolo.utils import DEFAULT_CFG, LOGGER, ops
 from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.torch_utils import select_device, smart_inference_mode
 from pathlib import Path
@@ -24,6 +25,7 @@ import torch.profiler
 import threading
 import queue as Q
 from contextlib import contextmanager
+import paho.mqtt.client as mqtt
 
 
 @dataclass
@@ -38,16 +40,14 @@ class ResultItem:
     speed: dict[str, float | None]
 
 class TrackNetPredictor(BasePredictor):
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     try:
-    #         pynvml.nvmlInit()
-    #         self.gpu_available = True
-    #         self.gpu_handle = pynvml.nvmlDeviceGetHandleByIndex(0)
-    #     except (ImportError, pynvml.NVMLError_LibraryNotFound):
-    #         print("⚠️ NVML not available on this system (probably no NVIDIA GPU).")
-    #         self.gpu_available = False
-    #     self.proc = psutil.Process(os.getpid())
+    def __init__(self, output_width:int=None, output_height:int=None,
+                 mqttc:mqtt.Client=None, output_topic:str=None,
+                 cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
+        super().__init__(cfg, overrides, _callbacks)
+        self.output_width = output_width
+        self.output_height = output_height
+        self.mqttc = mqttc
+        self.output_topic = output_topic
 
     # def profile_resources(self, tag=""):
     #     cpu = self.proc.cpu_percent(interval=None)
@@ -339,107 +339,13 @@ class TrackNetPredictor(BasePredictor):
                 pred=frame_preds if use_nms else frame_preds[0],
                 speed={'preprocess': None, 'inference': None, 'postprocess': None}
             ))
+        if self.mqttc is not None and self.output_topic is not None:
+            # Publish the results to MQTT
+            self._publishPoints(frame_preds if use_nms else frame_preds[0])
         return result
-        ######### 輸出檔案
-        # orig_images_clone = orig_imgs.transpose(2, 0, 1)
-
-        # p = Path(self.batch[0][0])
-        # parent_dir = p.parent.name
-        # match_dir = p.parent.parent.parent.name
-        # frame_save_path = os.path.join(self.save_dir, match_dir, 'frame', parent_dir)
-        # csv_save_path = os.path.join(self.save_dir, match_dir, 'csv', parent_dir)
-        # os.makedirs(frame_save_path, exist_ok=True)
-        # os.makedirs(csv_save_path, exist_ok=True)
-        # result = []
-        # csv_rows = []
-        # real_frame_idx = int(p.stem)
-        # for frame_idx in range(10):
-        #     p_cell_x = each_pos_x[frame_idx]
-        #     p_cell_y = each_pos_y[frame_idx]
-        #     p_cell_nx = each_pos_nx[frame_idx]
-        #     p_cell_ny = each_pos_ny[frame_idx]
-        #     center = 0.5
-
-        #     # 獲取當前圖片的 conf
-        #     p_conf = each_probs[frame_idx]
-
-        #     frame_preds = []
-        #     if use_nms:
-        #         nms_preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=20)
-
-        #         # 取出 nms 的結果
-        #         for pred in nms_preds:
-        #             max_x, max_y, max_conf = pred
-        #             pred_x = max_x*stride + (center*stride-p_cell_x[int(max_y)][int(max_x)][0]+p_cell_x[int(max_y)][int(max_x)][1])
-        #             pred_y = max_y*stride + (center*stride-p_cell_y[int(max_y)][int(max_x)][0]+p_cell_y[int(max_y)][int(max_x)][1])
-
-        #             frame_preds.append(ResultItem(
-        #                 pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
-        #                 speed={'preprocess': None, 'inference': None, 'postprocess': None }
-        #             ))
-        #     else:
-        #         p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
-        #         max_position = torch.argmax(p_conf_masked)
-        #         # max_y, max_x = np.unravel_index(max_position, p_conf.shape)
-        #         max_y, max_x = np.unravel_index(max_position.cpu().numpy(), p_conf.shape)
-        #         max_conf = p_conf[max_y, max_x].item()
-
-        #         pred_x = max_x*stride + (center*stride-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1])
-        #         pred_y = max_y*stride + (center*stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
-        #         frame_preds.append(ResultItem(
-        #             pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
-        #             speed={'preprocess': None, 'inference': None, 'postprocess': None }
-        #         ))
-            
-        #     result.append(ResultItem(
-        #         pred=frame_preds if use_nms else frame_preds[0],
-        #         speed={'preprocess': None, 'inference': None, 'postprocess': None}
-        #     ))
-            
-        #     for frame_pred in frame_preds:
-        #         pred = frame_pred.pred
-        #         if pred.conf >= conf_threshold:
-        #             csv_rows.append({
-        #                 'Frame': real_frame_idx+frame_idx,
-        #                 'Visibility': 1,
-        #                 'X': round(pred.x.item(), 2),
-        #                 'Y': round(pred.y.item(), 2),
-        #                 'Conf': round(pred.conf, 2)
-        #             })
-            # 視覺化與儲存圖片
-            # img_np = orig_images_clone[frame_idx, :, :]
-            # img_np = img_np.astype(np.uint8)
-            # img_np = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
-            # img_np = np.ascontiguousarray(img_np.copy())
-
-            # for frame_pred in frame_preds:
-            #     pred = frame_pred.pred
-            #     if pred.conf >= conf_threshold:
-            #         cv2.circle(img_np, (int(pred.x.item()), int(pred.y.item())), radius=3, color=(0, 0, 255), thickness=-1)
-            #         conf_text = f"{pred.conf:.2f}"
-            #         cv2.putText(img_np, conf_text, (int(pred.x.item()) + 5, int(pred.y.item()) - 5),
-            #                     cv2.FONT_HERSHEY_SIMPLEX, fontScale=0.5, color=(0, 0, 255), thickness=1)
-            #         csv_rows.append({
-            #             'Frame': real_frame_idx+frame_idx,
-            #             'Visibility': 1,
-            #             'X': round(pred.x.item(), 2),
-            #             'Y': round(pred.y.item(), 2),
-            #             'Conf': round(pred.conf, 2)
-            #         })
-
-
-            # 儲存圖片
-            # idx_p = Path(self.batch[0][frame_idx])
-            # save_img_path = f"{frame_save_path}/{idx_p.name}"
-            # self.saver.save_image(save_img_path, img_np)
-        # save_csv_path = os.path.join(csv_save_path, f"{p.stem}.csv")
-        # self.saver.save_csv(save_csv_path, csv_rows)
-
-        
-        # TODO: 這裡需要將結果轉換為原始圖片的座標系統
-        # result = revert_coordinates(result, orig_imgs[0].shape[2], orig_imgs[0].shape[3], img[0].shape[2])
-        # self.profile_resources("Postprocess (after)")
-        return result
+    def _publishPoints(self, points):
+        payload = {"linear": json.dumps(points)}
+        self.mqttc.publish(self.output_topic, json.dumps(payload))
     
     # postprocess_output_file
     def postprocess_output_file(self, preds, img, orig_imgs):
