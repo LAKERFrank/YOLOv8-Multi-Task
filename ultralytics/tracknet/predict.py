@@ -26,7 +26,7 @@ import threading
 import queue as Q
 from contextlib import contextmanager
 import paho.mqtt.client as mqtt
-
+from torch.utils.data import Dataset
 
 @dataclass
 class Prediction:
@@ -42,12 +42,14 @@ class ResultItem:
 class TrackNetPredictor(BasePredictor):
     def __init__(self, output_width:int=None, output_height:int=None,
                  mqttc:mqtt.Client=None, output_topic:str=None,
-                 cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
+                 cfg=DEFAULT_CFG, overrides=None, _callbacks=None,
+                 dataset:Dataset = None):
         super().__init__(cfg, overrides, _callbacks)
         self.output_width = output_width
         self.output_height = output_height
         self.mqttc = mqttc
         self.output_topic = output_topic
+        self.dataset = dataset
 
     # def profile_resources(self, tag=""):
     #     cpu = self.proc.cpu_percent(interval=None)
@@ -64,7 +66,7 @@ class TrackNetPredictor(BasePredictor):
         """Sets up source and inference mode."""
         self.imgsz = check_imgsz(self.args.imgsz, stride=self.model.stride, min_dim=2)  # check image size
         self.transforms = None
-        self.dataset = TrackNetPredDataset(
+        self.dataset = self.dataset if self.dataset else TrackNetPredDataset(
             dir=source,
             num_input=10,
             imgsz=640,
