@@ -18,6 +18,7 @@ from ultralytics.yolo.utils.checks import check_file, check_imgsz, check_pip_upd
 from ultralytics.yolo.utils.downloads import GITHUB_ASSET_STEMS
 from ultralytics.yolo.utils.torch_utils import smart_inference_mode
 import paho.mqtt.client as mqtt
+from torch.utils.data import Dataset
 
 # Map head to model, trainer, validator, and predictor classes
 TASK_MAP = {
@@ -69,7 +70,8 @@ class TrackNet:
 
     def __init__(self, overrides, task=None,
                  mqttc:mqtt.Client=None, output_topic:str=None,
-                 output_width:int=None, output_height:int=None) -> None:
+                 output_width:int=None, output_height:int=None,
+                 dataset:Dataset=None) -> None:
         """
         Initializes the YOLO model.
 
@@ -93,6 +95,7 @@ class TrackNet:
         self.output_topic = output_topic if output_topic else 'tracknet_test'
         self.output_width = output_width if output_width else 640
         self.output_height = output_height if output_height else 640
+        self.dataset = dataset
 
         # Check if Ultralytics HUB model from https://hub.ultralytics.com
         if self.is_hub_model(model):
@@ -249,7 +252,9 @@ class TrackNet:
             overrides['save'] = kwargs.get('save', False)  # do not save by default if called in Python
         if not self.predictor:
             self.task = overrides.get('task') or self.task
-            self.predictor = TASK_MAP[self.task][3](self.output_width, self.output_height, self.mqttc, self.output_topic, overrides=overrides, _callbacks=self.callbacks)
+            self.predictor = TASK_MAP[self.task][3](output_width=self.output_width, output_height=self.output_height,
+                                                    mqttc=self.mqttc, output_topic=self.output_topic, dataset=self.dataset,
+                                                    overrides=overrides, _callbacks=self.callbacks)
             self.predictor.setup_model(model=self.model, verbose=is_cli)
         else:  # only update args if predictor is already setup
             self.predictor.args = get_cfg(self.predictor.args, overrides)

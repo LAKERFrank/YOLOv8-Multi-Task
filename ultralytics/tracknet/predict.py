@@ -41,9 +41,8 @@ class ResultItem:
 
 class TrackNetPredictor(BasePredictor):
     def __init__(self, output_width:int=None, output_height:int=None,
-                 mqttc:mqtt.Client=None, output_topic:str=None,
-                 cfg=DEFAULT_CFG, overrides=None, _callbacks=None,
-                 dataset:Dataset = None):
+                 mqttc:mqtt.Client=None, output_topic:str=None, dataset:Dataset = None,
+                 cfg=DEFAULT_CFG, overrides=None, _callbacks=None):
         super().__init__(cfg, overrides, _callbacks)
         self.output_width = output_width
         self.output_height = output_height
