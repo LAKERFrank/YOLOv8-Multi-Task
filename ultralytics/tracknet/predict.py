@@ -266,7 +266,7 @@ class TrackNetPredictor(BasePredictor):
         return result
 
     # postprocess_output_memory
-    def postprocess(self, preds, img, orig_imgs):
+    def postprocess_output_memory(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
         # self.profile_resources("Postprocess (before)")
         use_nms = True
@@ -349,7 +349,7 @@ class TrackNetPredictor(BasePredictor):
         self.mqttc.publish(self.output_topic, json.dumps(payload))
     
     # postprocess_output_file
-    def postprocess_output_file(self, preds, img, orig_imgs):
+    def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
         # self.profile_resources("Postprocess (before)")
         use_nms = True
