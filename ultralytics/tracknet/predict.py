@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 import torch
 import numpy as np
 from ultralytics.tracknet.pred_dataset import TrackNetPredDataset
+from ultralytics.tracknet.protocal.point import Point
 from ultralytics.tracknet.utils.nms import non_max_suppression
 from ultralytics.yolo.data.build import load_inference_source
 from ultralytics.yolo.engine.predictor import STREAM_WARNING, BasePredictor
@@ -70,8 +71,8 @@ class TrackNetPredictor(BasePredictor):
             num_input=10,
             imgsz=640,
         )
-        self.source_type = self.dataset.source_type
-        self.vid_path, self.vid_writer = [None] * self.dataset.bs, [None] * self.dataset.bs
+        # self.source_type = self.dataset.source_type
+        # self.vid_path, self.vid_writer = [None] * self.dataset.bs, [None] * self.dataset.bs
     # def setup_model(self, model, verbose=True):
     #     """Initialize YOLO model with given parameters and set it to evaluation mode."""
     #     self.model = model
@@ -266,7 +267,7 @@ class TrackNetPredictor(BasePredictor):
         return result
 
     # postprocess_output_memory
-    def postprocess_output_memory(self, preds, img, orig_imgs):
+    def postprocess(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
         # self.profile_resources("Postprocess (before)")
         use_nms = True
@@ -342,14 +343,23 @@ class TrackNetPredictor(BasePredictor):
             ))
         if self.mqttc is not None and self.output_topic is not None:
             # Publish the results to MQTT
-            self._publishPoints(frame_preds if use_nms else frame_preds[0])
+            self._publishPoints(frame_preds)
         return result
-    def _publishPoints(self, points):
-        payload = {"linear": json.dumps(points)}
+    def _publishPoints(self, resultItems):
+        points = []
+        for i in range(len(resultItems)):
+            points.append(Point(
+                fid=0,
+                timestamp=0,
+                visibility=1,
+                x=resultItems[i].pred.x,
+                y=resultItems[i].pred.y,
+                ))
+        payload = {"linear": [p.toJson() for p in points]}
         self.mqttc.publish(self.output_topic, json.dumps(payload))
     
     # postprocess_output_file
-    def postprocess(self, preds, img, orig_imgs):
+    def postprocess_output_file(self, preds, img, orig_imgs):
         """Postprocesses predictions and returns a list of Results objects."""
         # self.profile_resources("Postprocess (before)")
         use_nms = True
