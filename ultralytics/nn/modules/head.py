@@ -219,6 +219,27 @@ class Detect(nn.Module):
                               1)
         if self.training:
             return x
+        else:
+            x_cat = x[0].view(shape[0], self.no, -1)
+            current_dfl, next_dfl, cls = x_cat.split((self.reg_max * 4, self.reg_max * 4, self.nc), 1)
+            current = self.dfl(current_dfl)
+            next = self.dfl(next_dfl)
+            y = torch.cat((current, next, cls.sigmoid()), 1)
+            return (y, x)
+            # feats = x[0].clone()
+            # pred_distri, pred_scores = feats.view(self.no, -1).split(
+            #     (reg_max * feat_no, nc), 0)
+            
+            # pred_scores = pred_scores.permute(1, 0).contiguous()
+            # pred_distri = pred_distri.permute(1, 0).contiguous()
+
+            # pred_probs = torch.sigmoid(pred_scores)
+            # # pred_probs = [10*self.cell_num*self.cell_num]
+            
+            # a, c = pred_distri.shape
+
+            # pred_pos = pred_distri.view(a, feat_no, c // feat_no).softmax(2).matmul(
+            #     proj.type(pred_distri.dtype))
         # elif self.dynamic or self.shape != shape:
         #     self.anchors, self.strides = (x.transpose(0, 1) for x in make_anchors(x, self.stride, 0.5))
         #     self.shape = shape

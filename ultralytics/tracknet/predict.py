@@ -273,28 +273,17 @@ class TrackNetPredictor(BasePredictor):
         use_nms = True
         conf_threshold = 0.5
         nc = 1
-        reg_max = 16
         feat_no = 8
-        no = nc + reg_max * feat_no
         cell_num = 80
         stride = 8
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        proj = torch.arange(reg_max, dtype=torch.float, device=device)
 
-        feats = preds[0].clone()
-        pred_distri, pred_scores = feats.view(no, -1).split(
-            (reg_max * feat_no, nc), 0)
+        feats = preds[0][0]
+        pred_distri, pred_probs = feats.view(feat_no + nc, -1).split(
+            (feat_no, nc), 0)
         
-        pred_scores = pred_scores.permute(1, 0).contiguous()
-        pred_distri = pred_distri.permute(1, 0).contiguous()
+        pred_probs = pred_probs.permute(1, 0)
+        pred_pos = pred_distri.permute(1, 0)
 
-        pred_probs = torch.sigmoid(pred_scores)
-        # pred_probs = [10*self.cell_num*self.cell_num]
-        
-        a, c = pred_distri.shape
-
-        pred_pos = pred_distri.view(a, feat_no, c // feat_no).softmax(2).matmul(
-            proj.type(pred_distri.dtype))
         each_probs = pred_probs.view(10, cell_num, cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, cell_num, cell_num, feat_no).split([2, 2, 2, 2], dim=3)
 
