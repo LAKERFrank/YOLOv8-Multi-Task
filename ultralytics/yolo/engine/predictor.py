@@ -249,7 +249,7 @@ class BasePredictor:
             self.dataset,
             batch_size=1,
             shuffle=False,
-            num_workers=8,
+            num_workers=0,
             pin_memory=True,
         )
         self.seen, self.windows, self.batch, profilers = 0, [], None, (ops.Profile(), ops.Profile(), ops.Profile())
@@ -758,7 +758,7 @@ class BasePredictor:
             self.dataset,
             batch_size=1,
             shuffle=False,
-            num_workers=4,
+            num_workers=0,
             pin_memory=True,
             prefetch_factor=2,
             persistent_workers=True,
@@ -767,7 +767,10 @@ class BasePredictor:
         num_streams = 6
         streams = [torch.cuda.Stream(priority=0) for _ in range(num_streams)]
 
-        queue = Queue(maxsize=64)
+        max_pending_batches = min(64, torch.cuda.get_device_properties(0).multi_processor_count * 2)
+        queue = Queue(maxsize=max_pending_batches)
+        print(f"Max pending batches: {max_pending_batches}")
+
         pending = []
         timeline_records = []  # <<< 新增收集timeline
 
@@ -789,7 +792,7 @@ class BasePredictor:
         while True:
             try:
                 stream_count = 0
-                while not queue.empty() and stream_count < 64:
+                while not queue.empty() and stream_count < max_pending_batches:
                     i, batch = queue.get_nowait()
                     self.batch = batch
                     path, im0s, vid_cap, s = batch

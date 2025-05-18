@@ -344,6 +344,7 @@ class TrackNetPredictor(BasePredictor):
         if self.mqttc is not None and self.output_topic is not None:
             # Publish the results to MQTT
             self._publishPoints(frame_preds)
+            LOGGER.info(f"Published {len(frame_preds)} points to MQTT topic {self.output_topic}")
         return result
     def _publishPoints(self, resultItems):
         points = []
