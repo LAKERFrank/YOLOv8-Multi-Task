@@ -760,7 +760,7 @@ class BasePredictor:
             shuffle=False,
             num_workers=0,
             pin_memory=True,
-            prefetch_factor=2,
+            prefetch_factor=None,
             persistent_workers=True,
         )
 
