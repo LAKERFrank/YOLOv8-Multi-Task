@@ -32,7 +32,7 @@ class ImageFeederThread(threading.Thread):
                 img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
                 if img is not None:
                     is_eos = False
-                    if idx == 10:
+                    if idx == 300:
                         is_eos = True
                     frame = FakeFrame(img, index=idx, is_eos=is_eos)
                     idx += 1
@@ -103,16 +103,16 @@ if __name__ == "__main__":
     image_buffer = FakeImageBuffer()
 
     # 啟動圖片餵入
-    image_path = r'/Users/bartek/git/BartekTao/datasets/tracknet/train_data/match_2/frame/1_00_01/'
-    # image_path = r'/usr/src/datasets/tracknet/val_data/sport_ai_2048_1536/frame/CameraReader_1/'
+    # image_path = r'/Users/bartek/git/BartekTao/datasets/tracknet/train_data/match_2/frame/1_00_01/'
+    image_path = r'/usr/src/datasets/tracknet/val_data/sport_ai_2048_1536/frame/CameraReader_1/'
     feeder = ImageFeederThread(image_path, image_buffer)
     feeder.start()
 
     time.sleep(1)
 
     # 啟動推論線程
-    model_path = r'/Users/bartek/git/BartekTao/ultralytics/runs/detect/train178/weights/last.pt'
-    # model_path = r'/usr/src/ultralytics/runs/detect/train637/weights/best.pt'
+    # model_path = r'/Users/bartek/git/BartekTao/ultralytics/runs/detect/train178/weights/last.pt'
+    model_path = r'/usr/src/ultralytics/runs/detect/train637/weights/best.pt'
     predictor = TrackNet1000Thread(mqtt_client, "predict/result", 640, 640, model_path, image_buffer)
     predictor.start()
 
