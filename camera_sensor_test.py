@@ -7,9 +7,9 @@ import cv2
 import paho.mqtt.client as mqtt
 
 from ultralytics.tracknet.engine.model import TrackNet
-from ultralytics.tracknet.protocal.image_buffer import FakeImageBuffer, ImageBufferProtocol
-from ultralytics.tracknet.test import ImageBufferDataset
-from ultralytics.tracknet.test.mqtt_test import FakeFrame
+from ultralytics.tracknet.pred_stream_dataset import ImageBufferDataset
+from ultralytics.tracknet.protocal.image_buffer import FakeFrame, FakeImageBuffer, ImageBufferProtocol
+
 from ultralytics.yolo.utils import LOGGER
 
 # STEP 1
@@ -32,10 +32,16 @@ class ImageFeederThread(threading.Thread):
                 img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
                 if img is not None:
                     print(f"[Feeder] Push {filename}")
-                    frame = FakeFrame(img, index=idx)
+                    is_eos = False
+                    if idx == 10:
+                        is_eos = True
+                    frame = FakeFrame(img, index=idx, is_eos=is_eos)
                     idx += 1
                     self.buffer.push(frame)
-                # time.sleep(0.5)  # 模擬延遲
+                    if is_eos:
+                        print("[Feeder] Push EOS")
+                        break
+                    
 
 # STEP 3
 # 起一個 thread 執行 model.predict()，使用 ImageBufferDataset
@@ -61,7 +67,7 @@ class TrackNet1000Thread:
         overrides['mode'] = 'predict_v2'
         overrides['data'] = 'tracknet.yaml'
         overrides['batch'] = 1
-        self.model = TrackNet(overrides, mqttc=mqttc, output_topic=output_topic, dataset=ImageBufferDataset.ImageBufferDataset(imgbuf))
+        self.model = TrackNet(overrides, mqttc=mqttc, output_topic=output_topic, dataset=ImageBufferDataset(imgbuf))
 
     def start(self):
         #logging.debug("TrackNetThread started.")
@@ -98,16 +104,16 @@ if __name__ == "__main__":
     image_buffer = FakeImageBuffer()
 
     # 啟動圖片餵入
-    # image_path = r'/Users/bartek/git/BartekTao/datasets/tracknet/train_data/match_2/frame/1_00_01/'
-    image_path = r'/usr/src/datasets/tracknet/val_data/sport_ai_2048_1536/frame/CameraReader_1/'
+    image_path = r'/Users/bartek/git/BartekTao/datasets/tracknet/train_data/match_2/frame/1_00_01/'
+    # image_path = r'/usr/src/datasets/tracknet/val_data/sport_ai_2048_1536/frame/CameraReader_1/'
     feeder = ImageFeederThread(image_path, image_buffer)
     feeder.start()
 
     time.sleep(1)
 
     # 啟動推論線程
-    # model_path = r'/Users/bartek/git/BartekTao/ultralytics/runs/detect/train178/weights/last.pt'
-    model_path = r'/usr/src/ultralytics/runs/detect/train637/weights/best.pt'
+    model_path = r'/Users/bartek/git/BartekTao/ultralytics/runs/detect/train178/weights/last.pt'
+    # model_path = r'/usr/src/ultralytics/runs/detect/train637/weights/best.pt'
     predictor = TrackNet1000Thread(mqtt_client, "predict/result", 640, 640, model_path, image_buffer)
     predictor.start()
 

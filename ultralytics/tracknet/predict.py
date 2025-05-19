@@ -267,10 +267,10 @@ class TrackNetPredictor(BasePredictor):
         return result
 
     # postprocess_output_memory
-    def postprocess(self, preds, img, orig_imgs):
+    def postprocess(self, preds, img, orig_imgs, fids, timestamps):
         """Postprocesses predictions and returns a list of Results objects."""
         # self.profile_resources("Postprocess (before)")
-        use_nms = True
+        use_nms = False
         conf_threshold = 0.5
         nc = 1
         feat_no = 8
@@ -293,12 +293,15 @@ class TrackNetPredictor(BasePredictor):
             p_cell_y = each_pos_y[frame_idx]
             p_cell_nx = each_pos_nx[frame_idx]
             p_cell_ny = each_pos_ny[frame_idx]
+            fid = fids[frame_idx]
+            timestamp = timestamps[frame_idx]
             center = 0.5
 
             # 獲取當前圖片的 conf
             p_conf = each_probs[frame_idx]
 
             frame_preds = []
+            metadata = []
             if use_nms:
                 nms_preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=20)
 
@@ -312,6 +315,7 @@ class TrackNetPredictor(BasePredictor):
                         pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
                         speed={'preprocess': None, 'inference': None, 'postprocess': None }
                     ))
+                    metadata.append((fid, timestamp))
             else:
                 p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
                 max_position = torch.argmax(p_conf_masked)
@@ -325,6 +329,7 @@ class TrackNetPredictor(BasePredictor):
                     pred=Prediction(x=pred_x, y=pred_y, conf=max_conf),
                     speed={'preprocess': None, 'inference': None, 'postprocess': None }
                 ))
+                metadata.append((fid, timestamp))
             
             result.append(ResultItem(
                 pred=frame_preds if use_nms else frame_preds[0],
@@ -332,15 +337,15 @@ class TrackNetPredictor(BasePredictor):
             ))
         if self.mqttc is not None and self.output_topic is not None:
             # Publish the results to MQTT
-            self._publishPoints(frame_preds)
+            self._publishPoints(frame_preds, metadata)
             LOGGER.info(f"Published {len(frame_preds)} points to MQTT topic {self.output_topic}")
         return result
-    def _publishPoints(self, resultItems):
+    def _publishPoints(self, resultItems, metadata):
         points = []
         for i in range(len(resultItems)):
             points.append(Point(
-                fid=0,
-                timestamp=0,
+                fid=metadata[i][0],
+                timestamp=metadata[i][1],
                 visibility=1,
                 x=resultItems[i].pred.x,
                 y=resultItems[i].pred.y,
@@ -349,7 +354,7 @@ class TrackNetPredictor(BasePredictor):
         self.mqttc.publish(self.output_topic, json.dumps(payload))
     
     # postprocess_output_file
-    def postprocess_output_file(self, preds, img, orig_imgs):
+    def postprocess_output_file(self, preds, img, orig_imgs, fids, timestamps):
         """Postprocesses predictions and returns a list of Results objects."""
         # self.profile_resources("Postprocess (before)")
         use_nms = True

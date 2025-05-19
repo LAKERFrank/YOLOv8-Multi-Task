@@ -1,39 +1,12 @@
-
-import json
 import cv2
 import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-class Frame:
-    is_eos: bool
-    def __init__(self) -> None:
-        """__init__(self: recorder_module.Frame) -> None"""
-    @property
-    def height(self) -> int: ...
-    @property
-    def image(self) -> np.ndarray[np.uint8]: ...
-    @property
-    def index(self) -> int: ...
-    @property
-    def monotonic_timestamp(self) -> float: ...
-    @property
-    def timestamp(self) -> float: ...
-    @property
-    def width(self) -> int: ...
-
-class ImageBuffer:
-    def __init__(self) -> None:
-        """__init__(self: recorder_module.ImageBuffer) -> None"""
-    def clear(self) -> None:
-        """clear(self: recorder_module.ImageBuffer) -> None"""
-    def pop(self, blocking: bool = ...) -> Frame:
-        """pop(self: recorder_module.ImageBuffer, blocking: bool = True) -> recorder_module.Frame"""
-    def push(self, arg0: Frame) -> None:
-        """push(self: recorder_module.ImageBuffer, arg0: recorder_module.Frame) -> None"""
+from ultralytics.tracknet.protocal.image_buffer import ImageBufferProtocol
 
 class ImageBufferDataset(Dataset):
-    def __init__(self, image_buffer: ImageBuffer, track_size: int = 10):
+    def __init__(self, image_buffer: ImageBufferProtocol, track_size: int = 10):
         self.image_buffer = image_buffer
         self.track_size = track_size
         self.buffer = []  # 儲存一組 track_size 連續 frame
@@ -52,8 +25,8 @@ class ImageBufferDataset(Dataset):
     
     def __getitem__(self, index):
         frames = []
-        # fids = []
-        # timestamps = []
+        fids = []
+        timestamps = []
 
         while len(frames) < self.track_size:
             frame = self.image_buffer.pop(True)
@@ -64,11 +37,10 @@ class ImageBufferDataset(Dataset):
             img = cv2.resize(img, dsize=(self.imgsz, self.imgsz), interpolation=cv2.INTER_CUBIC)
             img = np.expand_dims(img, axis=0)  # (1, H, W)
             frames.append(img)
-            # frames.append(frame.image)
-            # fids.append(frame.index)
-            # timestamps.append(frame.monotonic_timestamp)
+            fids.append(frame.index)
+            timestamps.append(frame.monotonic_timestamp)
 
         img = np.concatenate(frames, 0)
         img_tensor = torch.from_numpy(img).float()
             
-        return (f"stream_dataset_{index}", img_tensor, "", "")
+        return (f"stream_dataset_{index}", img_tensor, "", "", fids, timestamps)

@@ -225,7 +225,7 @@ class BasePredictor:
         self.vid_path, self.vid_writer = [None] * self.dataset.bs, [None] * self.dataset.bs
 
     @smart_inference_mode()
-    def stream_inference_v1(self, source=None, model=None, *args, **kwargs):
+    def stream_inference(self, source=None, model=None, *args, **kwargs):
         """Streams real-time inference on camera feed and saves results to file."""
         if self.args.verbose:
             LOGGER.info('')
@@ -257,7 +257,7 @@ class BasePredictor:
         for batch in dataloader:
             self.run_callbacks('on_predict_batch_start')
             self.batch = batch
-            path, im0s, vid_cap, s = batch
+            path, im0s, vid_cap, s, fids, timestamps = batch
 
             # Preprocess
             with profilers[0]:
@@ -269,7 +269,7 @@ class BasePredictor:
 
             # Postprocess
             with profilers[2]:
-                self.results = self.postprocess(preds, im, im0s)
+                self.results = self.postprocess(preds, im, im0s, fids, timestamps)
             self.run_callbacks('on_predict_postprocess_end')
 
             # Visualize, save, write results
@@ -740,7 +740,7 @@ class BasePredictor:
 
     # stream_inference_single_stream_v2 10xxFPS
     @smart_inference_mode()
-    def stream_inference(self, source=None, model=None, *args, **kwargs):
+    def stream_inference2(self, source=None, model=None, *args, **kwargs):
         """Optimized Asynchronous GPU Streamed Inference with timeline recording and visualization."""
 
         if not self.model:
@@ -795,7 +795,7 @@ class BasePredictor:
                 while not queue.empty() and stream_count < max_pending_batches:
                     i, batch = queue.get_nowait()
                     self.batch = batch
-                    path, im0s, vid_cap, s = batch
+                    path, im0s, vid_cap, s, fids, timestamps = batch
                     stream_idx = i % num_streams
                     stream = streams[stream_idx]
 
@@ -818,7 +818,7 @@ class BasePredictor:
                         infer_end.record()
 
                         post_start.record()
-                        results = self.postprocess(preds, im, im0s)
+                        results = self.postprocess(preds, im, im0s, fids, timestamps)
                         post_end.record()
 
                         end_event.record()
