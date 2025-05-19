@@ -270,7 +270,7 @@ class TrackNetPredictor(BasePredictor):
     def postprocess(self, preds, img, orig_imgs, fids, timestamps):
         """Postprocesses predictions and returns a list of Results objects."""
         # self.profile_resources("Postprocess (before)")
-        use_nms = False
+        use_nms = True
         conf_threshold = 0.5
         nc = 1
         feat_no = 8

@@ -114,7 +114,7 @@ class BasePredictor:
         self.batch = None
         self.results = None
         self.transforms = None
-        self.saver = PostprocessSaver(num_workers=self.args.workers)
+        # self.saver = PostprocessSaver(num_workers=self.args.workers)
         self.callbacks = _callbacks or callbacks.get_default_callbacks()
         callbacks.add_integration_callbacks(self)
 
@@ -225,7 +225,7 @@ class BasePredictor:
         self.vid_path, self.vid_writer = [None] * self.dataset.bs, [None] * self.dataset.bs
 
     @smart_inference_mode()
-    def stream_inference(self, source=None, model=None, *args, **kwargs):
+    def stream_inference_v1(self, source=None, model=None, *args, **kwargs):
         """Streams real-time inference on camera feed and saves results to file."""
         if self.args.verbose:
             LOGGER.info('')
@@ -738,9 +738,9 @@ class BasePredictor:
                         f'{(1, 1, *im.shape[2:])}' % (pre_total / total_images, infer_total / total_images, post_total / total_images))
             LOGGER.info(f'Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
-    # stream_inference_single_stream_v2 10xxFPS
+    # stream_inference_single_stream_v2 1010FPS
     @smart_inference_mode()
-    def stream_inference2(self, source=None, model=None, *args, **kwargs):
+    def stream_inference(self, source=None, model=None, *args, **kwargs):
         """Optimized Asynchronous GPU Streamed Inference with timeline recording and visualization."""
 
         if not self.model:
@@ -772,7 +772,7 @@ class BasePredictor:
         print(f"Max pending batches: {max_pending_batches}")
 
         pending = []
-        timeline_records = []  # <<< 新增收集timeline
+        timeline_records = []
 
         pre_total, infer_total, post_total = 0.0, 0.0, 0.0
         total_images = 0
@@ -822,7 +822,7 @@ class BasePredictor:
                         post_end.record()
 
                         end_event.record()
-                        LOGGER.info(f'batch{i} scheduled on {time.time():.6f}')
+                        # LOGGER.info(f'batch{i} scheduled on {time.time():.6f}')
                         
 
                     pending.append({
@@ -847,7 +847,6 @@ class BasePredictor:
             
             next_pending = []
             for p in pending:
-                LOGGER.info("start pending loop")
                 if p["event"].query():
                     complete_time = time.time() - start_time
 
@@ -870,8 +869,7 @@ class BasePredictor:
                     total_images += n
 
                     LOGGER.info(f"[COMPLETE] Batch {p['batch_idx']} on Stream-{p['stream_idx']} "
-                                f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms, "
-                                f"Finished at {complete_time:.6f}s")
+                                f"Pre: {pre_e:.2f}ms, Infer: {infer_e:.2f}ms, Post: {post_e:.2f}ms")
 
                     for j in range(n):
                         p["results"][j].speed = {
@@ -901,7 +899,7 @@ class BasePredictor:
             LOGGER.info(f'[SUMMARY] Total elapsed time: {elapsed_time:.2f}s, Total images: {total_images}, Overall FPS: {fps:.2f}')
 
         # 畫 timeline
-        self.plot_timeline(timeline_records)
+        # self.plot_timeline(timeline_records)
 
     @smart_inference_mode()
     def stream_inference_single_stream_v2_with_gpu_plot(self, source=None, model=None, *args, **kwargs):

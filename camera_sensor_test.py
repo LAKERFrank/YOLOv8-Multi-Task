@@ -31,7 +31,6 @@ class ImageFeederThread(threading.Thread):
                 img_path = os.path.join(self.image_dir, filename)
                 img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
                 if img is not None:
-                    print(f"[Feeder] Push {filename}")
                     is_eos = False
                     if idx == 10:
                         is_eos = True
