@@ -92,6 +92,7 @@ class ImageBufferPredictor:
             t.join()  # 阻塞直到所有 thread 結束
 
     def stop(self):
+        print("Calling stop()...")
         self.running = False
 
     def _preprocess_loop(self):
