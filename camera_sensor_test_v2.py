@@ -33,7 +33,7 @@ class ImageFeederThread(threading.Thread):
                 img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
                 if img is not None:
                     is_eos = False
-                    if idx == 300:
+                    if idx == 1000:
                         is_eos = True
                     frame = FakeFrame(img, index=idx, is_eos=is_eos)
                     idx += 1
@@ -122,11 +122,14 @@ if __name__ == "__main__":
 
     print("Starting predictor...", time.monotonic())
 
+    srart_time = time.monotonic()
     # 啟動推論線程
     model_path = r'/Users/bartek/git/BartekTao/ultralytics/runs/detect/train178/weights/last.pt'
     model_path = r'/usr/src/ultralytics/runs/detect/train637/weights/best.pt'
     predictor = TrackNet1000Thread(mqtt_client, "predict/result", 640, 640, model_path, image_buffer)
     predictor.start()
+    endTime = time.monotonic()
+    print("FPS: ", 1000 / (endTime - srart_time))
 
     try:
         while True:
