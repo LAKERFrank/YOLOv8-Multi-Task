@@ -53,8 +53,9 @@ class ImageBufferPredictor:
             self.event_pool.put(torch.cuda.Event())
 
         self.stream_idx = 0
-        self.infer_q = queue.Queue(maxsize=128)
+        self.infer_q = queue.Queue(maxsize=1000)
         self.result_q = queue.Queue(maxsize=256)
+        self._stopper = threading.Event()
 
 
     def get_save_dir(self):
