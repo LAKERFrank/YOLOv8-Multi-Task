@@ -120,6 +120,8 @@ if __name__ == "__main__":
 
     time.sleep(10)
 
+    print("Starting predictor...", time.monotonic())
+
     # 啟動推論線程
     model_path = r'/Users/bartek/git/BartekTao/ultralytics/runs/detect/train178/weights/last.pt'
     model_path = r'/usr/src/ultralytics/runs/detect/train637/weights/best.pt'
