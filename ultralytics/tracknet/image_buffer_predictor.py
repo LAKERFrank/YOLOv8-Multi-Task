@@ -106,7 +106,11 @@ class ImageBufferPredictor:
     def _inference_loop(self):
         while self.running:
             try:
-                tensor, meta, stream_id = self.infer_q.get(timeout=0.1)
+                item = self.infer_q.get(timeout=0.1)
+                if not isinstance(item, tuple) or len(item) != 3:
+                    LOGGER.error(f"[Inference] invalid infer_q item: {item}")
+                    continue
+                tensor, meta, stream_id = item
                 stream = self.streams[stream_id]
                 event = self.event_pool.get()
 
