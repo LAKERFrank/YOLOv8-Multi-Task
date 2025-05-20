@@ -92,12 +92,12 @@ class ImageBufferPredictor:
             t.join()  # 阻塞直到所有 thread 結束
 
     def stop(self):
-        print("Calling stop()...")
         self.running = False
 
     def _preprocess_loop(self):
         while self.running:
             try:
+                print("[Preprocess] Start")
                 tensor, fids, timestamps = self._preprocess()
                 self.stream_idx = (self.stream_idx + 1) % self.max_streams
                 self.infer_q.put((tensor, (fids, timestamps), self.stream_idx), timeout=1)
@@ -134,6 +134,7 @@ class ImageBufferPredictor:
     def _inference_loop(self):
         while self.running:
             try:
+                print("[Inference] Start")
                 tensor, meta, stream_id = self.infer_q.get(timeout=0.1)
                 stream = self.streams[stream_id]
                 event = self.event_pool.get()
@@ -158,6 +159,7 @@ class ImageBufferPredictor:
     def _postprocess_loop(self):
         while self.running:
             try:
+                print("[Postprocess] Start")
                 event, output, meta, stream = self.result_q.get(timeout=0.1)
                 if event.query():
                     self._postprocess(output, meta)
