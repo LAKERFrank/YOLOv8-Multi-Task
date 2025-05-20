@@ -199,6 +199,8 @@ class ImageBufferPredictor:
         each_probs = pred_probs.view(10, cell_num, cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, cell_num, cell_num, feat_no).split([2, 2, 2, 2], dim=3)
 
+        frame_preds = []
+        metadata = []
         for frame_idx in range(10):
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
@@ -211,8 +213,6 @@ class ImageBufferPredictor:
             # 獲取當前圖片的 conf
             p_conf = each_probs[frame_idx]
 
-            frame_preds = []
-            metadata = []
             if use_nms:
                 nms_preds = non_max_suppression(p_conf, p_cell_x, p_cell_y, conf_threshold=conf_threshold, dis_tolerance=20)
 
