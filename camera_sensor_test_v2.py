@@ -38,6 +38,7 @@ class ImageFeederThread(threading.Thread):
                     frame = FakeFrame(img, index=idx, is_eos=is_eos)
                     idx += 1
                     self.buffer.push(frame)
+                    print(f"[Feeder] Push {idx}")
                     if is_eos:
                         print("[Feeder] Push EOS")
                         break
@@ -118,7 +119,7 @@ if __name__ == "__main__":
     feeder = ImageFeederThread(image_path, image_buffer)
     feeder.start()
 
-    time.sleep(10)
+    time.sleep(60)
 
     print("Starting predictor...", time.monotonic())
 
