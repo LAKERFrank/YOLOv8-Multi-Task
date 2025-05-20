@@ -53,27 +53,23 @@ class ImageBufferPredictor:
             self.event_pool.put(torch.cuda.Event())
 
         self.stream_idx = 0
-        self.infer_q = queue.Queue(maxsize=128)
+        self.infer_q = queue.Queue(maxsize=1000)
         self.result_q = queue.Queue(maxsize=256)
         self._stopper = threading.Event()
 
 
-    def stop(self):
-        self._stopper.set()  
-
-    def _stopped(self):
-        return self._stopper.is_set()
-    
     def get_save_dir(self):
         project = self.args.project or Path(SETTINGS['runs_dir']) / self.args.task
         name = self.args.name or f'{self.args.mode}'
         return increment_path(Path(project) / name, exist_ok=self.args.exist_ok)
     
     def start_preprocess(self):
+        self.running = True
         self.preprocess_thread = threading.Thread(target=self._preprocess_loop)
         self.preprocess_thread.start()
 
     def start_for_test(self):
+        self.running = True
         self.threads = [
             threading.Thread(target=self._inference_loop),
             threading.Thread(target=self._postprocess_loop),
@@ -84,6 +80,7 @@ class ImageBufferPredictor:
             t.join()  # 阻塞直到所有 thread 結束
 
     def start(self):
+        self.running = True
         self.threads = [
             threading.Thread(target=self._preprocess_loop),
             threading.Thread(target=self._inference_loop),
@@ -94,8 +91,11 @@ class ImageBufferPredictor:
         for t in self.threads:
             t.join()  # 阻塞直到所有 thread 結束
 
+    def stop(self):
+        self.running = False
+
     def _preprocess_loop(self):
-        while not self._stopped():
+        while self.running:
             try:
                 tensor, fids, timestamps = self._preprocess()
                 self.stream_idx = (self.stream_idx + 1) % self.max_streams
@@ -131,7 +131,7 @@ class ImageBufferPredictor:
         return torch.from_numpy(img).contiguous().pin_memory(), fids, timestamps
 
     def _inference_loop(self):
-        while not self._stopped() or not self.infer_q.empty():
+        while self.running:
             try:
                 tensor, meta, stream_id = self.infer_q.get(timeout=0.1)
                 stream = self.streams[stream_id]
@@ -155,7 +155,7 @@ class ImageBufferPredictor:
                 LOGGER.warning(f"Inference loop error: {e}")
 
     def _postprocess_loop(self):
-        while not self._stopped() or not self.result_q.empty():
+        while self.running:
             try:
                 event, output, meta, stream = self.result_q.get(timeout=0.1)
                 if event.query():
