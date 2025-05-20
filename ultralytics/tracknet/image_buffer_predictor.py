@@ -53,7 +53,7 @@ class ImageBufferPredictor:
             self.event_pool.put(torch.cuda.Event())
 
         self.stream_idx = 0
-        self.infer_q = queue.Queue(maxsize=1000)
+        self.infer_q = queue.Queue(maxsize=128)
         self.result_q = queue.Queue(maxsize=256)
         self._stopper = threading.Event()
 
@@ -238,7 +238,7 @@ class ImageBufferPredictor:
         result = (frame_preds, metadata)
         if self.mqttc is not None:
             self._publishPoints((frame_preds, metadata) if use_nms else (frame_preds[:1], metadata[:1]))
-        print("[Result] output shape:", output_tensor[0][0].shape, "fid", fid, "timestamp", timestamp, "endTime", time.monotonic())
+        print("[Result] output shape:", len(frame_preds), "fid", fid, "timestamp", timestamp, "endTime", time.monotonic())
         return result
 
     def _publishPoints(self, resultItems):
