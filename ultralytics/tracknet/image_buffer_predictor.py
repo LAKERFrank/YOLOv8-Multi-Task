@@ -244,6 +244,10 @@ class ImageBufferPredictor:
     def _publishPoints(self, resultItems):
         points = []
         for i in range(len(resultItems)):
+            item = resultItems[i]
+            print(f"item = {item}, type = {type(item)}, len = {len(item) if isinstance(item, tuple) else 'N/A'}")
+
+
             (pred_x, pred_y, conf), (fids, timestamps) = resultItems[i]
             points.append(Point(
                 fid=fids[i],
