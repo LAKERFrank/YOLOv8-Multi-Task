@@ -152,5 +152,6 @@ class ImageBufferPredictor:
         padded[:h, :w] = img
         return padded
 
-    def on_result(self, output_tensor: torch.Tensor, meta):
-        print("[Result] output shape:", output_tensor.shape, "meta:", meta, "fid", meta[0], "timestamp", meta[1], "endTime", time.time())
+    def on_result(self, output_tensor: torch.Tensor, meta:Tuple[List[int], List[float]]):
+        fid, timestamp = meta
+        print("[Result] output shape:", output_tensor.shape, "fid", fid, "timestamp", timestamp, "endTime", time.time())
