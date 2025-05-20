@@ -106,11 +106,7 @@ class ImageBufferPredictor:
     def _inference_loop(self):
         while self.running:
             try:
-                item = self.infer_q.get(timeout=0.1)
-                if not isinstance(item, tuple) or len(item) != 3:
-                    LOGGER.error(f"[Inference] invalid infer_q item: {item}")
-                    continue
-                tensor, meta, stream_id = item
+                tensor, meta, stream_id = self.infer_q.get(timeout=0.1)
                 stream = self.streams[stream_id]
                 event = self.event_pool.get()
 
@@ -118,6 +114,7 @@ class ImageBufferPredictor:
                     input_gpu = tensor.to(self.device, non_blocking=True)
                     median = input_gpu.median(dim=0).values
                     input_gpu.sub_(median).clamp_(0, 255).div_(255.0)
+                    input_gpu = input_gpu.unsqueeze(0)
                     if self.model.fp16:
                         input_gpu = input_gpu.half()
                     with torch.no_grad():
@@ -129,7 +126,6 @@ class ImageBufferPredictor:
                 continue
             except Exception as e:
                 LOGGER.warning(f"Inference loop error: {e}")
-                raise e
 
     def _postprocess_loop(self):
         while self.running:
@@ -156,4 +152,4 @@ class ImageBufferPredictor:
         return padded
 
     def on_result(self, output_tensor: torch.Tensor, meta):
-        print("[Result] output shape:", output_tensor.shape, "meta:", meta, "fid", meta[0], "timestamp", meta[1], "endTime", time.time())   
+        print("[Result] output shape:", output_tensor.shape, "meta:", meta, "fid", meta[0], "timestamp", meta[1], "endTime", time.time())
