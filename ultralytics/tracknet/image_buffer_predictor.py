@@ -59,6 +59,22 @@ class ImageBufferPredictor:
         name = self.args.name or f'{self.args.mode}'
         return increment_path(Path(project) / name, exist_ok=self.args.exist_ok)
     
+    def start_preprocess(self):
+        self.running = True
+        self.preprocess_thread = threading.Thread(target=self._preprocess_loop)
+        self.preprocess_thread.start()
+
+    def start_for_test(self):
+        self.running = True
+        self.threads = [
+            threading.Thread(target=self._inference_loop),
+            threading.Thread(target=self._postprocess_loop),
+        ]
+        for t in self.threads:
+            t.start()
+        for t in self.threads:
+            t.join()  # 阻塞直到所有 thread 結束
+
     def start(self):
         self.running = True
         self.threads = [
