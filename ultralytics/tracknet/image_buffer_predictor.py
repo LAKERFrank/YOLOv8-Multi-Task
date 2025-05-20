@@ -168,7 +168,6 @@ class ImageBufferPredictor:
                 time.sleep(0.001)
             except Exception as e:
                 LOGGER.warning(f"Postprocess loop error: {e}")
-                raise e
 
 
     def pad_to_square(self, img: np.ndarray) -> np.ndarray:
@@ -244,17 +243,19 @@ class ImageBufferPredictor:
     def _publishPoints(self, resultItems):
         points = []
         for i in range(len(resultItems)):
-            item = resultItems[i]
-            print(f"item = {item}, type = {type(item)}, len = {len(item) if isinstance(item, tuple) else 'N/A'}")
-
+            output_list, meta_list = resultItems[i]
+            (output_x, output_y, output_conf) = output_list
+            (fid, timestamp) = meta_list
+            output_x = output_x.item()     # GPU → CPU → float
+            output_y = output_y.item()
 
             (pred_x, pred_y, conf), (fids, timestamps) = resultItems[i]
             points.append(Point(
-                fid=fids[i],
-                timestamp=timestamps[i],
-                visibility=1,
-                x=pred_x[i],
-                y=pred_y[i],
+                fid=fid,
+                timestamp=timestamp,
+                visibility=output_conf>=0.5,
+                x=output_x,
+                y=output_y,
                 ))
         payload = {"linear": [p.toJson() for p in points]}
         self.mqttc.publish(self.output_topic, json.dumps(payload))
