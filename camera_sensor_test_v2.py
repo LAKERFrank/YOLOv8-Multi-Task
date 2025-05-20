@@ -118,7 +118,7 @@ if __name__ == "__main__":
     feeder = ImageFeederThread(image_path, image_buffer)
     feeder.start()
 
-    time.sleep(1)
+    time.sleep(10)
 
     # 啟動推論線程
     model_path = r'/Users/bartek/git/BartekTao/ultralytics/runs/detect/train178/weights/last.pt'
