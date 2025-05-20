@@ -235,8 +235,9 @@ class ImageBufferPredictor:
                     pred_x = max_x*stride + (center*stride-p_cell_x[int(max_y)][int(max_x)][0]+p_cell_x[int(max_y)][int(max_x)][1])
                     pred_y = max_y*stride + (center*stride-p_cell_y[int(max_y)][int(max_x)][0]+p_cell_y[int(max_y)][int(max_x)][1])
 
-                    frame_preds.append((pred_x, pred_y, max_conf))
-                    metadata.append((fid, timestamp))
+                    if fid != -1:
+                        frame_preds.append((pred_x, pred_y, max_conf))
+                        metadata.append((fid, timestamp))
             else:
                 p_conf_masked = p_conf * (p_conf >= conf_threshold).float()
                 max_position = torch.argmax(p_conf_masked)
@@ -246,8 +247,9 @@ class ImageBufferPredictor:
 
                 pred_x = max_x*stride + (center*stride-p_cell_x[max_y][max_x][0]+p_cell_x[max_y][max_x][1])
                 pred_y = max_y*stride + (center*stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
-                frame_preds.append((pred_x, pred_y, max_conf))
-                metadata.append((fid, timestamp))
+                if fid != -1:
+                    frame_preds.append((pred_x, pred_y, max_conf))
+                    metadata.append((fid, timestamp))
         result = (frame_preds, metadata)
         if self.mqttc is not None:
             self._publishPoints((frame_preds, metadata) if use_nms else (frame_preds[:1], metadata[:1]))
