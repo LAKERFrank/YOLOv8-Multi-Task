@@ -248,8 +248,7 @@ class ImageBufferPredictor:
             (fid, timestamp) = meta_list
             output_x = output_x.item()     # GPU → CPU → float
             output_y = output_y.item()
-
-            (pred_x, pred_y, conf), (fids, timestamps) = resultItems[i]
+            
             points.append(Point(
                 fid=fid,
                 timestamp=timestamp,

@@ -33,7 +33,7 @@ class ImageFeederThread(threading.Thread):
                 img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
                 if img is not None:
                     is_eos = False
-                    if idx == 1000:
+                    if idx < 1000:
                         is_eos = True
                     frame = FakeFrame(img, index=idx, is_eos=is_eos)
                     idx += 1
