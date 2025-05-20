@@ -80,6 +80,7 @@ class ImageBufferPredictor:
             t.join()  # 阻塞直到所有 thread 結束
 
     def start(self):
+        print("[Predictor] Start")
         self.running = True
         self.threads = [
             threading.Thread(target=self._preprocess_loop),
@@ -90,6 +91,7 @@ class ImageBufferPredictor:
             t.start()
         for t in self.threads:
             t.join()  # 阻塞直到所有 thread 結束
+        print("[Predictor] All threads finished.")
 
     def stop(self):
         self.running = False
@@ -101,7 +103,6 @@ class ImageBufferPredictor:
                 self.stream_idx = (self.stream_idx + 1) % self.max_streams
                 self.infer_q.put((tensor, (fids, timestamps), self.stream_idx), timeout=1)
                 if not self.running:
-                    print("[Preprocess] Stop")
                     self.infer_q.put(None)
             except Exception as e:
                 LOGGER.warning(f"Preprocess loop error: {e}")
@@ -138,7 +139,6 @@ class ImageBufferPredictor:
             try:
                 item = self.infer_q.get(timeout=0.1)
                 if item is None:
-                    print("[Inference] Stop")
                     self.result_q.put(None)
                     break
 
@@ -168,7 +168,6 @@ class ImageBufferPredictor:
             try:
                 item = self.result_q.get(timeout=0.1)
                 if item is None:
-                    print("[Postprocess] Stop")
                     break
                 event, output, meta, stream = item
                 if event.query():
@@ -253,7 +252,7 @@ class ImageBufferPredictor:
         result = (frame_preds, metadata)
         if self.mqttc is not None:
             self._publishPoints((frame_preds, metadata) if use_nms else (frame_preds[:1], metadata[:1]))
-        print("[Result] output shape:", len(frame_preds), "fid", fid, "timestamp", timestamp, "endTime", time.monotonic())
+        # print("[Result] output shape:", len(frame_preds), "fid", fid, "timestamp", timestamp, "endTime", time.monotonic())
         return result
 
     def _publishPoints(self, resultItems):
