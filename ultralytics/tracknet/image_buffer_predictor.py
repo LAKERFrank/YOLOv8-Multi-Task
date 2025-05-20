@@ -142,7 +142,6 @@ class ImageBufferPredictor:
                 time.sleep(0.001)
             except Exception as e:
                 LOGGER.warning(f"Postprocess loop error: {e}")
-                raise e
 
 
     def pad_to_square(self, img: np.ndarray) -> np.ndarray:
@@ -154,4 +153,4 @@ class ImageBufferPredictor:
 
     def on_result(self, output_tensor: torch.Tensor, meta:Tuple[List[int], List[float]]):
         fid, timestamp = meta
-        print("[Result] output shape:", output_tensor[0][0].shape, "fid", fid, "timestamp", timestamp, "endTime", time.time())
+        print("[Result] output shape:", output_tensor[0][0].shape, "fid", fid, "timestamp", timestamp, "endTime", time.monotonic())

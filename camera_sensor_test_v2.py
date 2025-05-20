@@ -113,7 +113,7 @@ if __name__ == "__main__":
     image_buffer = FakeImageBuffer()
 
     # 啟動圖片餵入
-    # image_path = r'/Users/bartek/git/BartekTao/datasets/tracknet/train_data/match_2/frame/1_00_01/'
+    image_path = r'/Users/bartek/git/BartekTao/datasets/tracknet/train_data/match_2/frame/1_00_01/'
     image_path = r'/usr/src/datasets/tracknet/val_data/sport_ai_2048_1536/frame/CameraReader_1/'
     feeder = ImageFeederThread(image_path, image_buffer)
     feeder.start()
@@ -121,20 +121,10 @@ if __name__ == "__main__":
     time.sleep(1)
 
     # 啟動推論線程
-    # model_path = r'/Users/bartek/git/BartekTao/ultralytics/runs/detect/train178/weights/last.pt'
+    model_path = r'/Users/bartek/git/BartekTao/ultralytics/runs/detect/train178/weights/last.pt'
     model_path = r'/usr/src/ultralytics/runs/detect/train637/weights/best.pt'
     predictor = TrackNet1000Thread(mqtt_client, "predict/result", 640, 640, model_path, image_buffer)
     predictor.start()
-
-    # 訂閱用戶端（可省略）
-    def on_message(client, userdata, msg):
-        print("[Client] Got:", msg.payload.decode())
-
-    sub = mqtt.Client()
-    sub.on_message = on_message
-    sub.connect("localhost", 1883)
-    sub.subscribe("predict/result")
-    sub.loop_start()
 
     try:
         while True:
