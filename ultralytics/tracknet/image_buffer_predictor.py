@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import threading
 import time
@@ -10,6 +11,7 @@ import torch
 import paho.mqtt.client as mqtt
 
 from ultralytics.nn.autobackend import AutoBackend
+from ultralytics.tracknet.protocal.point import Point
 from ultralytics.tracknet.utils.nms import non_max_suppression
 from ultralytics.yolo.cfg import get_cfg
 from ultralytics.yolo.utils import DEFAULT_CFG, LOGGER, SETTINGS, callbacks
@@ -104,9 +106,6 @@ class ImageBufferPredictor:
         frames, fids, timestamps = [], [], []
         while len(frames) < self.track_size:
             frame = self.image_buffer.pop(True)
-            if frame.is_eos:
-                self.stop()
-                break
 
             img = frame.image.astype(np.float32)
             if img.ndim == 3:
@@ -116,7 +115,17 @@ class ImageBufferPredictor:
             frames.append(np.expand_dims(img, axis=0))
             fids.append(frame.index)
             timestamps.append(frame.monotonic_timestamp)
+            if frame.is_eos:
+                self.stop()
+                break
 
+        if len(frames) < self.track_size:
+            for _ in range(self.track_size - len(frames)):
+                img = np.zeros((self.imgsz, self.imgsz), dtype=np.float32)
+                frames.append(np.expand_dims(img, axis=0))
+                fids.append(-1)
+                timestamps.append(-1)
+                
         img = np.concatenate(frames, 0)
         return torch.from_numpy(img).contiguous().pin_memory(), fids, timestamps
 
@@ -149,7 +158,7 @@ class ImageBufferPredictor:
             try:
                 event, output, meta, stream = self.result_q.get(timeout=0.1)
                 if event.query():
-                    self.on_result(output, meta)
+                    self._postprocess(output, meta)
                     self.event_pool.put(event)
                 else:
                     # 沒完成的重新放回，但避免 busy loop
@@ -168,7 +177,7 @@ class ImageBufferPredictor:
         padded[:h, :w] = img
         return padded
 
-    def on_result(self, output_tensor: torch.Tensor, meta:Tuple[List[int], List[float]]):
+    def _postprocess(self, output_tensor: torch.Tensor, meta:Tuple[List[int], List[float]]):
         fids, timestamps = meta
 
         use_nms = True
@@ -225,5 +234,22 @@ class ImageBufferPredictor:
                 pred_y = max_y*stride + (center*stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
                 frame_preds.append((pred_x, pred_y, max_conf))
                 metadata.append((fid, timestamp))
-        result.append(frame_preds if use_nms else frame_preds[0])
-        print("[Result] output shape:", output_tensor[0][0].shape, "fid", fid, "timestamp", timestamp, "endTime", time.monotonic())
+        result.append((frame_preds, metadata) if use_nms else (frame_preds[:1], metadata[:1]))
+        if self.mqttc is not None:
+            self._publishPoints(result)
+        # print("[Result] output shape:", output_tensor[0][0].shape, "fid", fid, "timestamp", timestamp, "endTime", time.monotonic())
+        return result
+
+    def _publishPoints(self, resultItems):
+        (pred_x, pred_y, conf), (fids, timestamps) = resultItems
+        points = []
+        for i in range(len(resultItems)):
+            points.append(Point(
+                fid=fids[i],
+                timestamp=timestamps[i],
+                visibility=1,
+                x=pred_x[i],
+                y=pred_y[i],
+                ))
+        payload = {"linear": [p.toJson() for p in points]}
+        self.mqttc.publish(self.output_topic, json.dumps(payload))
