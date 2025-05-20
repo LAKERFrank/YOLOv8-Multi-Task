@@ -129,6 +129,7 @@ class ImageBufferPredictor:
                 continue
             except Exception as e:
                 LOGGER.warning(f"Inference loop error: {e}")
+                raise e
 
     def _postprocess_loop(self):
         while self.running:
