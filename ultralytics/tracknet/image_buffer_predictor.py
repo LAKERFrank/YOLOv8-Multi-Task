@@ -154,4 +154,4 @@ class ImageBufferPredictor:
 
     def on_result(self, output_tensor: torch.Tensor, meta:Tuple[List[int], List[float]]):
         fid, timestamp = meta
-        print("[Result] output shape:", output_tensor.shape, "fid", fid, "timestamp", timestamp, "endTime", time.time())
+        print("[Result] output shape:", output_tensor[0][0].shape, "fid", fid, "timestamp", timestamp, "endTime", time.time())
