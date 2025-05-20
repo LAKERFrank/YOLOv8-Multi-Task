@@ -81,7 +81,12 @@ class TrackNet1000Thread:
 
     def start(self):
         #logging.debug("TrackNetThread started.")
-        self.predictor.start()
+        self.predictor.start_preprocess()
+
+        time.sleep(60)
+        print("Starting start_for_test...", time.monotonic())
+        
+        self.predictor.start_for_test()
         # try:
         #     self.model.predict()
         # except Exception as e:
@@ -119,18 +124,11 @@ if __name__ == "__main__":
     feeder = ImageFeederThread(image_path, image_buffer)
     feeder.start()
 
-    time.sleep(60)
-
-    print("Starting predictor...", time.monotonic())
-
-    srart_time = time.monotonic()
     # 啟動推論線程
     model_path = r'/Users/bartek/git/BartekTao/ultralytics/runs/detect/train178/weights/last.pt'
     model_path = r'/usr/src/ultralytics/runs/detect/train637/weights/best.pt'
     predictor = TrackNet1000Thread(mqtt_client, "predict/result", 640, 640, model_path, image_buffer)
     predictor.start()
-    endTime = time.monotonic()
-    print("FPS: ", 1000 / (endTime - srart_time))
 
     try:
         while True:
