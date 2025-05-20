@@ -142,6 +142,7 @@ class ImageBufferPredictor:
                 time.sleep(0.001)
             except Exception as e:
                 LOGGER.warning(f"Postprocess loop error: {e}")
+                raise e
 
 
     def pad_to_square(self, img: np.ndarray) -> np.ndarray:
