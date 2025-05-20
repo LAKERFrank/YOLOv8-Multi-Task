@@ -198,7 +198,6 @@ class ImageBufferPredictor:
         each_probs = pred_probs.view(10, cell_num, cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, cell_num, cell_num, feat_no).split([2, 2, 2, 2], dim=3)
 
-        result = []
         for frame_idx in range(10):
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
@@ -235,19 +234,19 @@ class ImageBufferPredictor:
                 pred_y = max_y*stride + (center*stride-p_cell_y[max_y][max_x][0]+p_cell_y[max_y][max_x][1])
                 frame_preds.append((pred_x, pred_y, max_conf))
                 metadata.append((fid, timestamp))
-        result.append((frame_preds, metadata) if use_nms else (frame_preds[:1], metadata[:1]))
+        result = (frame_preds, metadata)
         if self.mqttc is not None:
-            self._publishPoints(result)
+            self._publishPoints((frame_preds, metadata) if use_nms else (frame_preds[:1], metadata[:1]))
         # print("[Result] output shape:", output_tensor[0][0].shape, "fid", fid, "timestamp", timestamp, "endTime", time.monotonic())
         return result
 
     def _publishPoints(self, resultItems):
+        (frame_preds, metadata) = resultItems
         points = []
-        for i in range(len(resultItems)):
-            output_list, meta_list = resultItems[i]
-            (output_x, output_y, output_conf) = output_list
-            (fid, timestamp) = meta_list
-            output_x = output_x.item()     # GPU → CPU → float
+        for i in range(len(frame_preds)):
+            (output_x, output_y, output_conf) = frame_preds[i]
+            (fid, timestamp) = metadata[i]
+            output_x = output_x.item()
             output_y = output_y.item()
 
             points.append(Point(
