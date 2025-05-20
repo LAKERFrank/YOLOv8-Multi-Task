@@ -242,9 +242,9 @@ class ImageBufferPredictor:
         return result
 
     def _publishPoints(self, resultItems):
-        (pred_x, pred_y, conf), (fids, timestamps) = resultItems
         points = []
         for i in range(len(resultItems)):
+            (pred_x, pred_y, conf), (fids, timestamps) = resultItems[i]
             points.append(Point(
                 fid=fids[i],
                 timestamp=timestamps[i],
