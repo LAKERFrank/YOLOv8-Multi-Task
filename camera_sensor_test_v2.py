@@ -129,9 +129,3 @@ if __name__ == "__main__":
     model_path = r'/usr/src/ultralytics/runs/detect/train637/weights/best.pt'
     predictor = TrackNet1000Thread(mqtt_client, "predict/result", 640, 640, model_path, image_buffer)
     predictor.start()
-
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("Stopped")
