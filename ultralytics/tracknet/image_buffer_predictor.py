@@ -97,10 +97,12 @@ class ImageBufferPredictor:
     def _preprocess_loop(self):
         while self.running:
             try:
-                print("[Preprocess] Start")
                 tensor, fids, timestamps = self._preprocess()
                 self.stream_idx = (self.stream_idx + 1) % self.max_streams
                 self.infer_q.put((tensor, (fids, timestamps), self.stream_idx), timeout=1)
+                if not self.running:
+                    print("[Preprocess] Stop")
+                    self.infer_q.put(None)
             except Exception as e:
                 LOGGER.warning(f"Preprocess loop error: {e}")
 
@@ -134,8 +136,13 @@ class ImageBufferPredictor:
     def _inference_loop(self):
         while self.running:
             try:
-                print("[Inference] Start")
-                tensor, meta, stream_id = self.infer_q.get(timeout=0.1)
+                item = self.infer_q.get(timeout=0.1)
+                if item is None:
+                    print("[Inference] Stop")
+                    self.result_q.put(None)
+                    break
+
+                tensor, meta, stream_id = item
                 stream = self.streams[stream_id]
                 event = self.event_pool.get()
 
@@ -159,8 +166,11 @@ class ImageBufferPredictor:
     def _postprocess_loop(self):
         while self.running:
             try:
-                print("[Postprocess] Start")
-                event, output, meta, stream = self.result_q.get(timeout=0.1)
+                item = self.result_q.get(timeout=0.1)
+                if item is None:
+                    print("[Postprocess] Stop")
+                    break
+                event, output, meta, stream = item
                 if event.query():
                     self._postprocess(output, meta)
                     self.event_pool.put(event)
