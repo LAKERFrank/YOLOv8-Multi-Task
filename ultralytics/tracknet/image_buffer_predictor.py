@@ -237,7 +237,7 @@ class ImageBufferPredictor:
         result = (frame_preds, metadata)
         if self.mqttc is not None:
             self._publishPoints((frame_preds, metadata) if use_nms else (frame_preds[:1], metadata[:1]))
-        # print("[Result] output shape:", output_tensor[0][0].shape, "fid", fid, "timestamp", timestamp, "endTime", time.monotonic())
+        print("[Result] output shape:", output_tensor[0][0].shape, "fid", fid, "timestamp", timestamp, "endTime", time.monotonic())
         return result
 
     def _publishPoints(self, resultItems):
