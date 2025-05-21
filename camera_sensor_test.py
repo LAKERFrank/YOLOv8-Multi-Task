@@ -6,11 +6,11 @@ import os
 import cv2
 import paho.mqtt.client as mqtt
 
-from ultralytics.tracknet.engine.model import TrackNet
-from ultralytics.tracknet.pred_stream_dataset import ImageBufferDataset
-from ultralytics.tracknet.protocal.image_buffer import FakeFrame, FakeImageBuffer, ImageBufferProtocol
+from ultralytics_tracknet.tracknet.engine.model import TrackNet
+from ultralytics_tracknet.tracknet.pred_stream_dataset import ImageBufferDataset
+from ultralytics_tracknet.tracknet.protocal.image_buffer import FakeFrame, FakeImageBuffer, ImageBufferProtocol
 
-from ultralytics.yolo.utils import LOGGER
+from ultralytics_tracknet.yolo.utils import LOGGER
 
 # STEP 1
 # 起一個 thread 建立 mqtt server

@@ -10,25 +10,25 @@ from tqdm import tqdm
 import numpy as np
 import torch
 import torch.nn as nn
-from ultralytics.tracknet.dataset import TrackNetDataset
-from ultralytics.tracknet.engine.model import TrackNet
-from ultralytics.tracknet.predict import TrackNetPredictor
-from ultralytics.tracknet.test_dataset import TrackNetTestDataset
-from ultralytics.tracknet.train import TrackNetTrainer
-from ultralytics.tracknet.utils.confusion_matrix import ConfConfusionMatrix
-from ultralytics.tracknet.utils.loss import TrackNetLoss
-from ultralytics.tracknet.utils.plotting import display_image_with_coordinates, display_predict_image
-from ultralytics.tracknet.utils.transform import target_grid
-from ultralytics.tracknet.val_dataset import TrackNetValDataset
-from ultralytics.yolo.data import dataloaders
-from ultralytics.yolo.data.build import build_dataloader
-from ultralytics.yolo.engine.model import YOLO
-from ultralytics.yolo.engine.predictor import BasePredictor
-from ultralytics.yolo.engine.validator import BaseValidator
-from ultralytics.yolo.utils.metrics import ConfusionMatrix, DetMetrics
-from ultralytics.yolo.v8.detect.train import DetectionTrainer
-from ultralytics.nn.tasks import DetectionModel, attempt_load_one_weight
-from ultralytics.yolo.utils import LOGGER, RANK, TQDM_BAR_FORMAT, ops
+from ultralytics_tracknet.tracknet.dataset import TrackNetDataset
+from ultralytics_tracknet.tracknet.engine.model import TrackNet
+from ultralytics_tracknet.tracknet.predict import TrackNetPredictor
+from ultralytics_tracknet.tracknet.test_dataset import TrackNetTestDataset
+from ultralytics_tracknet.tracknet.train import TrackNetTrainer
+from ultralytics_tracknet.tracknet.utils.confusion_matrix import ConfConfusionMatrix
+from ultralytics_tracknet.tracknet.utils.loss import TrackNetLoss
+from ultralytics_tracknet.tracknet.utils.plotting import display_image_with_coordinates, display_predict_image
+from ultralytics_tracknet.tracknet.utils.transform import target_grid
+from ultralytics_tracknet.tracknet.val_dataset import TrackNetValDataset
+from ultralytics_tracknet.yolo.data import dataloaders
+from ultralytics_tracknet.yolo.data.build import build_dataloader
+from ultralytics_tracknet.yolo.engine.model import YOLO
+from ultralytics_tracknet.yolo.engine.predictor import BasePredictor
+from ultralytics_tracknet.yolo.engine.validator import BaseValidator
+from ultralytics_tracknet.yolo.utils.metrics import ConfusionMatrix, DetMetrics
+from ultralytics_tracknet.yolo.v8.detect.train import DetectionTrainer
+from ultralytics_tracknet.nn.tasks import DetectionModel, attempt_load_one_weight
+from ultralytics_tracknet.yolo.utils import LOGGER, RANK, TQDM_BAR_FORMAT, ops
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -40,11 +40,11 @@ import pandas as pd
 import numpy as np
 from torchvision import transforms
 import torch.nn.functional as F
-from ultralytics.yolo.utils.checks import check_file, check_imgsz, check_pip_update_available, check_yaml
-from ultralytics.yolo.utils import (DEFAULT_CFG, DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, RANK, ROOT, callbacks,
+from ultralytics_tracknet.yolo.utils.checks import check_file, check_imgsz, check_pip_update_available, check_yaml
+from ultralytics_tracknet.yolo.utils import (DEFAULT_CFG, DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, RANK, ROOT, callbacks,
                                     is_git_dir, yaml_load)
-from ultralytics.yolo.utils.loss import v8ClassificationLoss, v8DetectionLoss, v8PoseLoss, v8SegmentationLoss
-from ultralytics.yolo.utils.tal import TaskAlignedAssigner, dist2bbox, make_anchors
+from ultralytics_tracknet.yolo.utils.loss import v8ClassificationLoss, v8DetectionLoss, v8PoseLoss, v8SegmentationLoss
+from ultralytics_tracknet.yolo.utils.tal import TaskAlignedAssigner, dist2bbox, make_anchors
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from pathlib import Path

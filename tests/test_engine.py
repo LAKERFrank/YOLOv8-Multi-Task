@@ -2,11 +2,11 @@
 
 from pathlib import Path
 
-from ultralytics import YOLO
-from ultralytics.yolo.cfg import get_cfg
-from ultralytics.yolo.engine.exporter import Exporter
-from ultralytics.yolo.utils import DEFAULT_CFG, ROOT, SETTINGS
-from ultralytics.yolo.v8 import classify, detect, segment
+from ultralytics_tracknet import YOLO
+from ultralytics_tracknet.yolo.cfg import get_cfg
+from ultralytics_tracknet.yolo.engine.exporter import Exporter
+from ultralytics_tracknet.yolo.utils import DEFAULT_CFG, ROOT, SETTINGS
+from ultralytics_tracknet.yolo.v8 import classify, detect, segment
 
 CFG_DET = 'yolov8n.yaml'
 CFG_SEG = 'yolov8n-seg.yaml'
