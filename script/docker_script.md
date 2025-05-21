@@ -271,7 +271,7 @@ python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/run
 
 python tracknet.py --mode predict_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train618/weights/best.pt --source /usr/src/datasets/tracknet/val_data/profession_match_1_test/frame/1_06_09/
 
-python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/runs/detect/train603/weights/last.pt --epoch 200 &
+python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/runs/detect/train642/weights/best.pt --epoch 20 &
 python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/runs/detect/train540/weights/last.pt --epoch 200 &
 python tracknet.py --mode train_v3 --model_path /usr/src/ultralytics/runs/detect/train618/weights/best.pt --epoch 50 &
 python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/runs/detect/train630/weights/last.pt --epoch 20 &

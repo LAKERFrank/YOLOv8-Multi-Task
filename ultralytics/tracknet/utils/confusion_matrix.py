@@ -56,6 +56,7 @@ class ConfConfusionMatrix:
         if (self.conf_precision+self.recall) != 0:
             f1 = 2*self.conf_precision*self.recall/(self.conf_precision+self.recall)
         data_row = [self.conf_TN, self.conf_FP, self.conf_FN, self.conf_TP, self.conf_acc, self.conf_precision, self.recall, f1]
+        csv_file_path = r'/Users/bartek/git/BartekTao/datasets/tracknet/val_confusion_matrix/conf_matrix.csv'
         csv_file_path = r'/usr/src/datasets/tracknet/val_confusion_matrix/conf_matrix.csv'
         with open(csv_file_path, mode='a', newline='') as file:
             writer = csv.writer(file)

@@ -781,6 +781,10 @@ profession_match_9/1_02_03 最後球落地的階段 有標記了非球頭的狀�
     -v /home/bartektao/dataset/tracknetv4/profiler_output:/usr/src/ultralytics/profiler_output \
     -it tracknet1000 
 
+    c
+
+    python tracknet.py --mode predict_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train637/weights/best.pt --source /usr/src/datasets/tracknet/val_data/sport_ai_2048_1536/frame/CameraReader_1/
+
     python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/ultralytics/models/v8/tracknetv4.yaml --epoch 20
 
     python tracknet.py --mode predict_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train618/weights/best.pt --source /usr/src/datasets/tracknet/val_data/profession_match_15_test/frame/2_18_14/
@@ -1137,3 +1141,7 @@ office_dataset
       0,0,1783.0,327.0,0.0,0,0.0,0
 - train637
   - python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/runs/detect/train632/weights/last.pt --epoch 20 &
+
+
+## 多球
+/hdd/dataset/sport_ai_2048_1536/video/
