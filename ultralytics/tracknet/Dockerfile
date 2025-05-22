@@ -4,15 +4,6 @@
 
 # Start FROM PyTorch image https://hub.docker.com/r/pytorch/pytorch or nvcr.io/nvidia/pytorch:23.03-py3
 FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
-RUN apt-get update && apt-get install -y wget gnupg2
-RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/nvidia-cuda-keyring_1.1-1_all.deb && \
-    dpkg -i nvidia-cuda-keyring_1.1-1_all.deb && \
-    apt-get update
-
-RUN apt-get install -y tensorrt \
-    && apt-get install -y libnvinfer-dev libnvinfer-plugin-dev \
-    && apt-get install -y python3-libnvinfer-dev uff-converter-tf
-
 RUN pip install --no-cache nvidia-tensorrt --index-url https://pypi.ngc.nvidia.com
 
 # Downloads to user config dir
