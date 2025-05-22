@@ -9,15 +9,9 @@ RUN apt-get update && apt-get install -y wget gnupg2 && \
     dpkg -i cuda-keyring_1.1-1_all.deb && \
     apt-get update
 
-RUN apt-mark hold cuda-repo-ubuntu2004 \
-    && apt-get update && apt-get install -y \
-    libnvinfer8=8.6.1-1+cuda11.7 \
-    libnvinfer-dev=8.6.1-1+cuda11.7 \
-    libnvinfer-plugin8=8.6.1-1+cuda11.7 \
-    libnvinfer-plugin-dev=8.6.1-1+cuda11.7 \
-    python3-libnvinfer=8.6.1-1+cuda11.7 \
-    python3-libnvinfer-dev=8.6.1-1+cuda11.7 \
-    uff-converter-tf
+RUN apt-get install -y tensorrt \
+    && apt-get install -y libnvinfer-dev libnvinfer-plugin-dev \
+    && apt-get install -y python3-libnvinfer-dev uff-converter-tf
 
 RUN pip install --no-cache nvidia-tensorrt --index-url https://pypi.ngc.nvidia.com
 
