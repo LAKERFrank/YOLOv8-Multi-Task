@@ -9,7 +9,8 @@ RUN apt-get update && apt-get install -y wget gnupg2 && \
     dpkg -i cuda-keyring_1.1-1_all.deb && \
     apt-get update
 
-RUN apt-get install -y \
+RUN apt-mark hold cuda-repo-ubuntu2004 \
+    && apt-get update && apt-get install -y \
     libnvinfer8=8.6.1-1+cuda11.7 \
     libnvinfer-dev=8.6.1-1+cuda11.7 \
     libnvinfer-plugin8=8.6.1-1+cuda11.7 \
