@@ -10,7 +10,7 @@ import os
 import re
 from collections import defaultdict
 from pathlib import Path
-from ultralytics_tracknet.yolo.utils import ROOT
+from ultralytics.yolo.utils import ROOT
 
 NEW_YAML_DIR = ROOT.parent
 CODE_DIR = ROOT

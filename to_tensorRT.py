@@ -2,10 +2,10 @@
 import argparse
 import torch
 
-from ultralytics_tracknet.nn.autobackend import AutoBackend
-from ultralytics_tracknet.yolo.cfg import get_cfg
-from ultralytics_tracknet.yolo.utils import DEFAULT_CFG
-from ultralytics_tracknet.yolo.utils.torch_utils import select_device
+from ultralytics.nn.autobackend import AutoBackend
+from ultralytics.yolo.cfg import get_cfg
+from ultralytics.yolo.utils import DEFAULT_CFG
+from ultralytics.yolo.utils.torch_utils import select_device
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_path', type=str,

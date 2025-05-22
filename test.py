@@ -4,9 +4,9 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
-from ultralytics_tracknet.yolo.v8.detect.train import DetectionTrainer
-from ultralytics_tracknet.nn.tasks import DetectionModel
-from ultralytics_tracknet.yolo.utils import LOGGER, RANK
+from ultralytics.yolo.v8.detect.train import DetectionTrainer
+from ultralytics.nn.tasks import DetectionModel
+from ultralytics.yolo.utils import LOGGER, RANK
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 from torchvision import transforms
@@ -19,11 +19,11 @@ import pandas as pd
 import numpy as np
 from torchvision import transforms
 import torch.nn.functional as F
-from ultralytics_tracknet.yolo.utils.checks import check_file, check_imgsz, check_pip_update_available, check_yaml
-from ultralytics_tracknet.yolo.utils import (DEFAULT_CFG, DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, RANK, ROOT, callbacks,
+from ultralytics.yolo.utils.checks import check_file, check_imgsz, check_pip_update_available, check_yaml
+from ultralytics.yolo.utils import (DEFAULT_CFG, DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, RANK, ROOT, callbacks,
                                     is_git_dir, yaml_load)
-from ultralytics_tracknet.yolo.utils.loss import v8ClassificationLoss, v8DetectionLoss, v8PoseLoss, v8SegmentationLoss
-from ultralytics_tracknet.yolo.utils.tal import TaskAlignedAssigner, dist2bbox, make_anchors
+from ultralytics.yolo.utils.loss import v8ClassificationLoss, v8DetectionLoss, v8PoseLoss, v8SegmentationLoss
+from ultralytics.yolo.utils.tal import TaskAlignedAssigner, dist2bbox, make_anchors
 
 class TrackNetV4(DetectionModel):
     def init_criterion(self):
@@ -201,7 +201,7 @@ class TrackNetDataset(Dataset):
 
         return img
 
-from ultralytics_tracknet import YOLO
+from ultralytics import YOLO
 
 # Create a new YOLO model from scratch
 model = YOLO(r'C:\Users\user1\bartek\github\BartekTao\ultralytics\ultralytics\models\v8\yolov8.yaml')

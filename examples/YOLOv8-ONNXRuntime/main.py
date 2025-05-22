@@ -5,8 +5,8 @@ import numpy as np
 import onnxruntime as ort
 import torch
 
-from ultralytics_tracknet.yolo.utils import ROOT, yaml_load
-from ultralytics_tracknet.yolo.utils.checks import check_requirements, check_yaml
+from ultralytics.yolo.utils import ROOT, yaml_load
+from ultralytics.yolo.utils.checks import check_requirements, check_yaml
 
 
 class Yolov8:
