@@ -34,7 +34,7 @@ model = AutoBackend(args.model,
 model.eval()
 
 # 假設輸入是 1x3x640x640 的圖像
-dummy_input = torch.randn(1, 10, 640, 640)
+dummy_input = torch.randn(1, 10, 640, 640).to(model.device)
 
 # 將模型轉為 ONNX
 torch.onnx.export(
