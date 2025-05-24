@@ -126,7 +126,7 @@ class TrackNetValDataset(Dataset):
         median_frame = np.median(frames, axis=0).astype(np.float32)
 
         # 影像減去中位數影像，確保計算不發生溢出
-        processed_frames = np.clip(frames - median_frame, 0, 255).astype(np.float32)
+        processed_frames = (frames - median_frame).astype(np.float32)
         images = []
         for i, processed_frame in enumerate(processed_frames):
             img = self.pad_to_square(processed_frame)
