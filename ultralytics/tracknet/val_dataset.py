@@ -17,6 +17,7 @@ from ultralytics.tracknet.utils.preprocess import preprocess_csv
 
 class TrackNetValDataset(Dataset):
     def __init__(self, root_dir, num_input=10, transform=None, prefix=''):
+        self.match_mog2 = {}
         self.total_ball = 0
         self.root_dir = root_dir
         self.transform = transform
@@ -115,6 +116,45 @@ class TrackNetValDataset(Dataset):
         return f
 
     def img_cache(self, match_name, video_name, img_files, npy_path):
+        if os.path.isfile(npy_path):
+            return
+
+        # 確保該 match_name 有專屬的 MOG2
+        if match_name not in self.match_mog2:
+            self.match_mog2[match_name] = cv2.createBackgroundSubtractorMOG2(
+                history=500, varThreshold=16, detectShadows=False
+            )
+        mog2 = self.match_mog2[match_name]
+
+        images = []
+
+        for fp in img_files:
+            img_path = os.path.join(self.root_dir, match_name, 'frame', video_name, fp)
+            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+            if img is None:
+                continue
+
+            img_float = img.astype(np.float32)
+
+            # 前景提取
+            fg_mask = mog2.apply(img_float)
+
+            # 用 mask 取得灰階前景
+            foreground = cv2.bitwise_and(img_float, img_float, mask=fg_mask)
+
+            # pad_to_square & resize
+            img_square = self.pad_to_square(foreground)
+            img_resized = cv2.resize(img_square, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
+
+            # expand dims
+            img_exp = np.expand_dims(img_resized, axis=0)
+            images.append(img_exp)
+
+        # 合併所有 frames
+        img_stack = np.concatenate(images, axis=0)
+        np.save(npy_path, img_stack)
+
+    def img_cache_v1(self, match_name, video_name, img_files, npy_path):
         if os.path.isfile(npy_path):
             return
         # generate cache
