@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 import cv2
 import torch
@@ -45,7 +46,7 @@ class TrackNetPredDataset(Dataset):
                 img = self.transform(img)
 
             img_tensor = torch.from_numpy(img).float()  # (num_input, H, W)
-            self.samples.append((img_files_10[0], img_tensor, "", ""))
+            self.samples.append((img_files_10[0], img_tensor, "", "", i, time.time()))
 
     def __len__(self):
         return len(self.samples)
