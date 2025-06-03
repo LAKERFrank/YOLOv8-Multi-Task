@@ -26,10 +26,13 @@ class TrackNetPredDataset(Dataset):
                            key=lambda x: int(os.path.basename(x).split('.')[0]))
 
         total_batches = len(img_files) // num_input
+        fid = 0
         for i in tqdm(range(total_batches), desc="Loading batches", ncols=80):
             img_files_10 = img_files[i*self.num_input : i*self.num_input + self.num_input]
 
             frames = []
+            fids = []
+            timestamps = []
             for fp in img_files_10:
                 img = cv2.imread(fp, cv2.IMREAD_GRAYSCALE)
                 if img is None:
@@ -39,6 +42,9 @@ class TrackNetPredDataset(Dataset):
                 img = cv2.resize(img, dsize=(self.imgsz, self.imgsz), interpolation=cv2.INTER_CUBIC)
                 img = np.expand_dims(img, axis=0)  # (1, H, W)
                 frames.append(img)
+                fids.append(fid)
+                fid += 1
+                timestamps.append(time.time())
 
             img = np.concatenate(frames, 0)  # (num_input, H, W)
 
@@ -46,7 +52,7 @@ class TrackNetPredDataset(Dataset):
                 img = self.transform(img)
 
             img_tensor = torch.from_numpy(img).float()  # (num_input, H, W)
-            self.samples.append((img_files_10[0], img_tensor, "", "", i, time.time()))
+            self.samples.append((img_files_10[0], img_tensor, "", "", fids, timestamps))
 
     def __len__(self):
         return len(self.samples)
