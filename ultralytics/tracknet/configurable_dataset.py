@@ -183,7 +183,8 @@ class TrackNetConfigurableDataset(Dataset):
         f = os.path.join(d, f"{filename}.npy")
         return f
 
-    def img_cache(self, match_name, video_name, img_files, npy_path):
+    # v2 版本的影像快取，使用 MOG2 背景減除法，測試效果較差
+    def img_cache_v2(self, match_name, video_name, img_files, npy_path):
         if os.path.isfile(npy_path):
             return
 

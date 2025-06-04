@@ -115,7 +115,8 @@ class TrackNetValDataset(Dataset):
         f = os.path.join(d, f"{filename}.npy")
         return f
 
-    def img_cache(self, match_name, video_name, img_files, npy_path):
+    # 使用 MOG2 背景減除器來處理影像，測試效果較差
+    def img_cache_v2(self, match_name, video_name, img_files, npy_path):
         if os.path.isfile(npy_path):
             return
 
