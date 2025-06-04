@@ -223,7 +223,7 @@ class TrackNetConfigurableDataset(Dataset):
         img_stack = np.concatenate(images, axis=0)
         np.save(npy_path, img_stack)
 
-    def img_cache_v1(self, match_name, video_name, img_files, npy_path):
+    def img_cache(self, match_name, video_name, img_files, npy_path):
 
         if os.path.isfile(npy_path):
             return
@@ -233,7 +233,7 @@ class TrackNetConfigurableDataset(Dataset):
                 for fp in img_files]
         frames = np.array(frames)  # 轉換為 NumPy 陣列
 
-        background_remove = True
+        background_remove = False
 
         if background_remove:
             # 計算中位數影像，確保 dtype 為 float32

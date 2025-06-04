@@ -155,7 +155,7 @@ class TrackNetValDataset(Dataset):
         img_stack = np.concatenate(images, axis=0)
         np.save(npy_path, img_stack)
 
-    def img_cache_v1(self, match_name, video_name, img_files, npy_path):
+    def img_cache(self, match_name, video_name, img_files, npy_path):
         if os.path.isfile(npy_path):
             return
         # generate cache
@@ -164,11 +164,16 @@ class TrackNetValDataset(Dataset):
                 for fp in img_files]
         frames = np.array(frames)  # 轉換為 NumPy 陣列
 
-        # 計算中位數影像，確保 dtype 為 float32
-        median_frame = np.median(frames, axis=0).astype(np.float32)
+        background_remove = False
 
-        # 影像減去中位數影像，確保計算不發生溢出
-        processed_frames = (frames - median_frame).astype(np.float32)
+        if background_remove:
+            # 計算中位數影像，確保 dtype 為 float32
+            median_frame = np.median(frames, axis=0).astype(np.float32)
+
+            # 影像減去中位數影像，確保計算不發生溢出
+            processed_frames = (frames - median_frame).astype(np.float32)
+        else:
+            processed_frames = frames
         images = []
         for i, processed_frame in enumerate(processed_frames):
             img = self.pad_to_square(processed_frame)
