@@ -44,6 +44,12 @@ video frame with high accuracy and speed.
 
 [Pose Examples](pose.md){ .md-button .md-button--primary}
 
+## [MultiTask](multitask.md)
+
+The MultiTask model predicts detection boxes, tracking IDs and pose keypoints simultaneously.
+
+[MultiTask Examples](multitask.md){ .md-button .md-button--primary}
+
 ## Conclusion
 
 YOLOv8 supports multiple tasks, including detection, segmentation, classification, and keypoints detection. Each of
