@@ -9,6 +9,8 @@ from copy import copy
 from torch.utils.data import random_split
 import torch
 
+from ultralytics.multitask.multitask import MultiTaskModel
+
 class TrackNetTrainer(DetectionTrainer):
     def build_dataset(self, img_path, mode='train', batch=None):
         # generator = torch.Generator().manual_seed(42)
@@ -60,3 +62,17 @@ class TrackNetTrainer(DetectionTrainer):
     def plot_training_labels(self):
         """Plots training labels for YOLO model."""
         pass
+
+
+class MultiTaskTrainer(TrackNetTrainer):
+    """Trainer that trains TrackNet and Pose tasks independently."""
+
+    def get_model(self, cfg=None, weights=None, verbose=True):
+        model = MultiTaskModel(cfg, verbose=verbose)
+        if weights:
+            if 'track' in weights:
+                model.track.load(weights['track'])
+            if 'pose' in weights:
+                model.pose.load(weights['pose'])
+        return model
+
