@@ -20,6 +20,7 @@ from ultralytics.yolo.utils.checks import check_imgsz
 from ultralytics.yolo.utils.torch_utils import select_device, smart_inference_mode
 from pathlib import Path
 import cv2
+from ultralytics.yolo.v8.pose.predict import PosePredictor
 from dataclasses import dataclass
 import time
 import torch.profiler
@@ -1233,3 +1234,32 @@ class TrackNetPredictor(BasePredictor):
                 save_path = str(Path(save_path).with_suffix(suffix))
                 self.vid_writer[idx] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*fourcc), fps, (w, h))
             self.vid_writer[idx].write(im0)
+
+
+class MultiTaskPredictor(TrackNetPredictor):
+    """Predictor that returns TrackNet and Pose results."""
+
+    def setup_model(self, model, verbose=True):
+        self.track_predictor = TrackNetPredictor(overrides=self.args)
+        self.track_predictor.setup_model(model.track, verbose)
+        self.pose_predictor = PosePredictor(overrides=self.args)
+        self.pose_predictor.setup_model(model.pose, verbose)
+        self.model = model
+
+    def preprocess(self, img):
+        track_in = self.track_predictor.preprocess(img)
+        pose_in = self.pose_predictor.preprocess(img)
+        return track_in, pose_in
+
+    def inference(self, imgs, *args, **kwargs):
+        track_x, pose_x = imgs
+        t = self.track_predictor.inference(track_x, *args, **kwargs)
+        p = self.pose_predictor.inference(pose_x, *args, **kwargs)
+        return t, p
+
+    def postprocess(self, preds, img, orig_imgs):
+        track_out, pose_out = preds
+        results_track = self.track_predictor.postprocess(track_out, img[0], orig_imgs)
+        results_pose = self.pose_predictor.postprocess(pose_out, img[1], orig_imgs)
+        return {'track': results_track, 'pose': results_pose}
+
