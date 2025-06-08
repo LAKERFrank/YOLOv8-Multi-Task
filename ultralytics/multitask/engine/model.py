@@ -10,6 +10,10 @@ from ultralytics.tracknet.predict import TrackNetPredictor
 from ultralytics.tracknet.tracknet_v4 import TrackNetV4Model
 from ultralytics.tracknet.train import TrackNetTrainer
 from ultralytics.tracknet.val import TrackNetValidator
+from ultralytics.multitask.multitask import MultiTaskModel
+from ultralytics.multitask.train import MultiTaskTrainer
+from ultralytics.multitask.val import MultiTaskValidator
+from ultralytics.multitask.predict import MultiTaskPredictor
 from ultralytics.yolo.cfg import get_cfg
 from ultralytics.yolo.engine.exporter import Exporter
 from ultralytics.yolo.utils import (DEFAULT_CFG, DEFAULT_CFG_DICT, DEFAULT_CFG_KEYS, LOGGER, RANK, ROOT, callbacks,
@@ -24,7 +28,10 @@ from torch.utils.data import Dataset
 TASK_MAP = {
     'detect': [
         TrackNetV4Model, TrackNetTrainer, TrackNetValidator,
-        TrackNetPredictor]
+        TrackNetPredictor],
+    'multitask': [
+        MultiTaskModel, MultiTaskTrainer, MultiTaskValidator,
+        MultiTaskPredictor],
 }
 
 class TrackNet:
@@ -448,3 +455,12 @@ class TrackNet:
         """Reset all registered callbacks."""
         for event in callbacks.default_callbacks.keys():
             self.callbacks[event] = [callbacks.default_callbacks[event][0]]
+
+
+class MultiTask(TrackNet):
+    """TrackNet + YOLO pose model wrapper."""
+
+    def __init__(self, overrides, mqttc: mqtt.Client = None, output_topic: str = None,
+                 output_width: int = None, output_height: int = None, dataset: Dataset = None) -> None:
+        super().__init__(overrides, task='multitask', mqttc=mqttc, output_topic=output_topic,
+                         output_width=output_width, output_height=output_height, dataset=dataset)

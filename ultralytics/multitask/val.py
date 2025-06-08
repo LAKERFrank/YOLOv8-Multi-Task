@@ -244,6 +244,12 @@ class TrackNetValidatorV3(BaseValidator):
         """Return a description for tqdm progress bar."""
         return "Validating TrackNet"
 
+
+class MultiTaskValidator(TrackNetValidator):
+    """Placeholder validator that inherits TrackNetValidator."""
+
+    pass
+
 # use original input image and output predict result as csv file
 class TrackNetValidatorV4(BaseValidator):
     def __init__(self, dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
