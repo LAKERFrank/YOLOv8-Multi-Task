@@ -3,7 +3,7 @@
 """Convenience imports for the MultiTask package."""
 
 from .engine.model import TrackNet as MultiTask
-from .tracknet_v4 import TrackNetV4Model as MultiTaskModel
+from .multitask import MultiTaskModel
 from .train import TrackNetTrainer as MultiTaskTrainer
 from .val import TrackNetValidator as MultiTaskValidator
 from .predict import TrackNetPredictor as MultiTaskPredictor
