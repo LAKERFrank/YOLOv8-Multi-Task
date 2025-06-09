@@ -1,0 +1,53 @@
+# Ultralytics MultiTask dataset configuration
+# Dataset contains detection, tracking and pose information in a custom JSON format.
+# Example frame annotation structure:
+# [
+#     {
+#         "Frame": 0,
+#         "Balls": [{"X":0, "Y":0}, ...],
+#         "Players": [
+#             {
+#                 "Bounding Box": {"X":0, "Y":0, "Width":0, "Height":0},
+#                 "Keypoints": [{"X":0, "Y":0}, ...]
+#             },
+#             ...
+#         ]
+#     },
+#     ...
+# ]
+
+# Root directory for images and labels
+path: ../datasets/multitask
+train: images/train
+val: images/val
+test: images/test
+
+# Detection classes
+nc: 2
+names:
+  0: player
+  1: ball
+
+# Pose configuration
+kpt_shape: [17, 3]
+flip_idx: [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]
+skeleton:
+  - [16, 14]
+  - [14, 12]
+  - [17, 15]
+  - [15, 13]
+  - [12, 13]
+  - [6, 12]
+  - [7, 13]
+  - [6, 7]
+  - [6, 8]
+  - [7, 9]
+  - [8, 10]
+  - [9, 11]
+  - [2, 3]
+  - [1, 2]
+  - [1, 3]
+  - [2, 4]
+  - [3, 5]
+  - [4, 6]
+  - [5, 7]
