@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from matplotlib import patches, pyplot as plt
 import torch
 from torch.utils.data import Dataset
@@ -321,3 +322,119 @@ class TrackNetValDataset(Dataset):
         img = cv2.copyMakeBorder(img, *pad, borderType=cv2.BORDER_CONSTANT, value=pad_value)
 
         return img
+
+
+class MultiTaskValDataset(Dataset):
+    """Validation dataset for the multitask model."""
+
+    def __init__(self, root_dir, num_input=10, imgsz=640, prefix=""):
+        self.root_dir = Path(root_dir)
+        self.num_input = num_input
+        self.imgsz = imgsz
+        self.prefix = prefix
+        self.samples = []
+
+        for video_dir in sorted(self.root_dir.iterdir()):
+            ann_path = video_dir / "annotation.json"
+            frame_dir = video_dir / "frame"
+            if not ann_path.is_file() or not frame_dir.is_dir():
+                continue
+
+            with open(ann_path, "r", encoding="utf-8") as f:
+                frames_data = json.load(f)
+            frame_map = {int(f["Frame"]): f for f in frames_data}
+            img_files = sorted(frame_dir.glob("*.png"), key=lambda x: int(x.stem))
+
+            for i in range(len(img_files) // self.num_input):
+                imgs = img_files[i * self.num_input : i * self.num_input + self.num_input]
+                if len(imgs) < self.num_input:
+                    continue
+                info = [frame_map.get(int(p.stem), {}) for p in imgs]
+                target = self.build_ball_target(info)
+                players = info[-1].get("Players", [])
+                self.samples.append({
+                    "img_paths": [str(p) for p in imgs],
+                    "target": target,
+                    "players": players,
+                })
+
+    def build_ball_target(self, frames):
+        target = []
+        for i, f in enumerate(frames):
+            balls = f.get("Balls", [])
+            if balls:
+                bx = balls[0]["X"]
+                by = balls[0]["Y"]
+                vis = 1
+            else:
+                bx, by, vis = 0, 0, 0
+            if i < len(frames) - 1:
+                nb = frames[i + 1].get("Balls", [])
+                dx = nb[0]["X"] if nb else 0
+                dy = nb[0]["Y"] if nb else 0
+            else:
+                dx, dy = 0, 0
+            target.append([f.get("Frame", 0), vis, bx, by, dx, dy, 0])
+        return np.array(target, dtype=np.float32)
+
+    def transform_points(self, pts, w, h):
+        pts = np.array(pts, dtype=np.float32)
+        max_dim = max(w, h)
+        pad = (max_dim - min(w, h)) // 2
+        if h < w:
+            pts[:, 1] += pad
+        else:
+            pts[:, 0] += pad
+        scale = self.imgsz / max_dim
+        pts *= scale
+        return pts
+
+    def process_players(self, players, w, h):
+        boxes, kpts = [], []
+        for p in players:
+            bbox = p.get("Bounding Box")
+            kp_list = p.get("Keypoints", [])
+            if not bbox or not kp_list:
+                continue
+            x1, y1 = bbox["X"], bbox["Y"]
+            x2 = x1 + bbox["Width"]
+            y2 = y1 + bbox["Height"]
+            points = self.transform_points([[x1, y1], [x2, y2]], w, h)
+            x1, y1 = points[0]
+            x2, y2 = points[1]
+            box = [(x1 + x2) / 2, (y1 + y2) / 2, x2 - x1, y2 - y1]
+            boxes.append([c / self.imgsz for c in box])
+            kps = self.transform_points([[k["X"], k["Y"]] for k in kp_list], w, h)
+            kpt = []
+            for x, y in kps:
+                kpt.extend([x / self.imgsz, y / self.imgsz, 1.0])
+            kpts.append(kpt)
+        boxes = torch.tensor(boxes, dtype=torch.float32)
+        kpts = torch.tensor(kpts, dtype=torch.float32)
+        return boxes, kpts
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        sample = self.samples[idx]
+        imgs = [self.__preprocess_img(p) for p in sample["img_paths"]]
+        img = np.concatenate(imgs, 0)
+        img_tensor = torch.from_numpy(img).float()
+        target = torch.from_numpy(sample["target"])
+
+        last_img = self.open_image(sample["img_paths"][-1])
+        h, w = last_img.shape
+        boxes, keypoints = self.process_players(sample["players"], w, h)
+        cls = torch.zeros((len(boxes), 1), dtype=torch.float32)
+        batch_idx = torch.zeros((len(boxes), 1), dtype=torch.float32)
+
+        return {
+            "img": img_tensor,
+            "target": target,
+            "bboxes": boxes,
+            "cls": cls,
+            "keypoints": keypoints,
+            "batch_idx": batch_idx,
+            "img_files": sample["img_paths"],
+        }
