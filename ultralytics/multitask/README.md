@@ -31,9 +31,7 @@ docker run --gpus all --ipc=host \
 -v /hdd/dataset/tracknetv4/val_confusion_matrix:/usr/src/datasets/tracknet/val_confusion_matrix \
 -it tracknetv4
 
-python tracknet.py --mode train_v2 --model_path /usr/src/ultralytics/ultralytics/models/v8/tracknetv4.yaml --epoch 200
-
-python tracknet.py --mode val_v2 --batch 1 --model_path /usr/src/ultralytics/runs/detect/train345/weights/last.pt --source /usr/src/datasets/tracknet/val_data
+python multitask.py --mode train --model_path /usr/src/ultralytics/ultralytics/models/v8/multitask.yaml --epochs 200
 ```
 
 ## TODO
