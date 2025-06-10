@@ -245,53 +245,6 @@ class TrackNetValidatorV3(BaseValidator):
         """Return a description for tqdm progress bar."""
         return "Validating TrackNet"
 
-
-class MultiTaskValidator(TrackNetValidator):
-    """Validator that handles both TrackNet and Pose outputs."""
-
-    def __init__(self, dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
-        super().__init__(dataloader, save_dir, pbar, args, _callbacks)
-        self.pose_validator = PoseValidator(dataloader, save_dir, pbar, args, _callbacks)
-
-    def preprocess(self, batch):
-        batch = super().preprocess(batch)
-        return self.pose_validator.preprocess(batch)
-
-    def postprocess(self, preds):
-        track_pred, pose_pred = preds
-        pose_pred = self.pose_validator.postprocess(pose_pred)
-        return [track_pred, pose_pred]
-
-    def init_metrics(self, model):
-        super().init_metrics(model.track if hasattr(model, 'track') else model)
-        self.pose_validator.dataloader = self.dataloader
-        self.pose_validator.device = self.device
-        self.pose_validator.args = self.args
-        self.pose_validator.save_dir = self.save_dir
-        self.pose_validator.on_plot = self.on_plot
-        self.pose_validator.init_metrics(model.pose if hasattr(model, 'pose') else model)
-
-    def update_metrics(self, preds, batch, loss):
-        track_pred, pose_pred = preds
-        super().update_metrics([None, [track_pred]], batch, loss)
-        self.pose_validator.update_metrics(pose_pred, batch)
-
-    def finalize_metrics(self):
-        super().finalize_metrics()
-        self.pose_validator.finalize_metrics()
-
-    def get_stats(self):
-        stats = super().get_stats()
-        pose_stats = self.pose_validator.get_stats()
-        return {**stats, **{f"pose_{k}": v for k, v in pose_stats.items()}}
-
-    def print_results(self):
-        super().print_results()
-        self.pose_validator.print_results()
-
-    def get_desc(self):
-        return "Validating MultiTask"
-
 # use original input image and output predict result as csv file
 class TrackNetValidatorV4(BaseValidator):
     def __init__(self, dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
@@ -1046,6 +999,51 @@ class TrackNetValidator(BaseValidator):
         """Return a description for tqdm progress bar."""
         return "Validating TrackNet"
 
+class MultiTaskValidator(TrackNetValidator):
+    """Validator that handles both TrackNet and Pose outputs."""
+
+    def __init__(self, dataloader=None, save_dir=None, pbar=None, args=None, _callbacks=None):
+        super().__init__(dataloader, save_dir, pbar, args, _callbacks)
+        self.pose_validator = PoseValidator(dataloader, save_dir, pbar, args, _callbacks)
+
+    def preprocess(self, batch):
+        batch = super().preprocess(batch)
+        return self.pose_validator.preprocess(batch)
+
+    def postprocess(self, preds):
+        track_pred, pose_pred = preds
+        pose_pred = self.pose_validator.postprocess(pose_pred)
+        return [track_pred, pose_pred]
+
+    def init_metrics(self, model):
+        super().init_metrics(model.track if hasattr(model, 'track') else model)
+        self.pose_validator.dataloader = self.dataloader
+        self.pose_validator.device = self.device
+        self.pose_validator.args = self.args
+        self.pose_validator.save_dir = self.save_dir
+        self.pose_validator.on_plot = self.on_plot
+        self.pose_validator.init_metrics(model.pose if hasattr(model, 'pose') else model)
+
+    def update_metrics(self, preds, batch, loss):
+        track_pred, pose_pred = preds
+        super().update_metrics([None, [track_pred]], batch, loss)
+        self.pose_validator.update_metrics(pose_pred, batch)
+
+    def finalize_metrics(self):
+        super().finalize_metrics()
+        self.pose_validator.finalize_metrics()
+
+    def get_stats(self):
+        stats = super().get_stats()
+        pose_stats = self.pose_validator.get_stats()
+        return {**stats, **{f"pose_{k}": v for k, v in pose_stats.items()}}
+
+    def print_results(self):
+        super().print_results()
+        self.pose_validator.print_results()
+
+    def get_desc(self):
+        return "Validating MultiTask"
 
 # p3 v1
 class TrackNetValidatorV2(BaseValidator):
