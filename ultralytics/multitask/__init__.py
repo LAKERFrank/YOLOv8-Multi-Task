@@ -5,7 +5,7 @@
 from .engine.model import TrackNet as MultiTask
 from .multitask import MultiTaskModel
 from .train import TrackNetTrainer as MultiTaskTrainer
-from .val import TrackNetValidator as MultiTaskValidator
+from .val import MultiTaskValidator
 from .predict import TrackNetPredictor as MultiTaskPredictor
 
 __all__ = (

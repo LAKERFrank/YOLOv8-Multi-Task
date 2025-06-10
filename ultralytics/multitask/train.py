@@ -5,6 +5,7 @@ from copy import copy
 from ultralytics.tracknet.configurable_dataset import TrackNetConfigurableDataset
 from ultralytics.tracknet.tracknet_v4 import TrackNetV4Model
 from ultralytics.tracknet.val import TrackNetValidator
+from ultralytics.multitask.val import MultiTaskValidator
 from ultralytics.tracknet.val_dataset import TrackNetValDataset
 from ultralytics.yolo.utils import DEFAULT_CFG, RANK
 from ultralytics.yolo.v8.detect.train import DetectionTrainer
@@ -56,6 +57,18 @@ class MultiTaskTrainer(TrackNetTrainer):
         if weights:
             model.load(weights)
         return model
+
+    def get_validator(self):
+        self.loss_names = (
+            "pos_loss",
+            "conf_loss",
+            "box_loss",
+            "pose_loss",
+            "kobj_loss",
+            "cls_loss",
+            "dfl_loss",
+        )
+        return MultiTaskValidator(self.test_loader, save_dir=self.save_dir, args=copy(self.args))
 
     def progress_string(self):
         self.add_callback("print_confusion_matrix", self.model.print_confusion_matrix())
