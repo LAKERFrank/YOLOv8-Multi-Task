@@ -7,6 +7,8 @@ from ultralytics.tracknet.tracknet_v4 import TrackNetV4Model
 from ultralytics.tracknet.val import TrackNetValidator
 from ultralytics.multitask.val import MultiTaskValidator
 from ultralytics.tracknet.val_dataset import TrackNetValDataset
+from ultralytics.multitask.configurable_dataset import MultiTaskConfigurableDataset
+from ultralytics.multitask.val_dataset import MultiTaskValDataset
 from ultralytics.yolo.utils import DEFAULT_CFG, RANK
 from ultralytics.yolo.v8.detect.train import DetectionTrainer
 
@@ -51,6 +53,11 @@ class TrackNetTrainer(DetectionTrainer):
 
 class MultiTaskTrainer(TrackNetTrainer):
     """Trainer that trains TrackNet and Pose tasks together."""
+
+    def build_dataset(self, img_path, mode="train", batch=None):
+        if mode == "train":
+            return MultiTaskConfigurableDataset(root_dir=img_path)
+        return MultiTaskValDataset(root_dir=img_path)
 
     def get_model(self, cfg=None, weights=None, verbose=True):
         model = MultiTaskModel(cfg, verbose=verbose)
