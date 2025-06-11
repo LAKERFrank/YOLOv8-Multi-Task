@@ -25,7 +25,10 @@ class TrackNetDataset(Dataset):
 
         self.idx = set()
 
-        image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
+        image_count = (
+            len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
+            + len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.jpg")))
+        )
 
         self.pbar = tqdm(total=image_count+(image_count-self.num_input*2+1)
                          +(image_count-self.num_input*3+1), miniters=1, smoothing=1)
@@ -61,10 +64,14 @@ class TrackNetDataset(Dataset):
 
             frame_dir = os.path.join(self.root_dir, match_name, 'frame', video_name)
 
-            img_files = sorted(glob("*.png", root_dir=frame_dir), key=lambda x: int(x.removesuffix(".png")))
+            frame_path = Path(frame_dir)
+            img_files = sorted(
+                list(frame_path.glob("*.png")) + list(frame_path.glob("*.jpg")),
+                key=lambda x: int(x.stem.split("_")[-1])
+            )
 
             # open first image with out coordinates
-            img = cv2.cvtColor(cv2.imread(os.path.join(frame_dir, img_files[0])), cv2.COLOR_BGR2GRAY)
+            img = cv2.cvtColor(cv2.imread(str(img_files[0])), cv2.COLOR_BGR2GRAY)
             h, w = img.shape
 
             # Create sliding windows of num_input frames
@@ -193,7 +200,8 @@ class TrackNetDataset(Dataset):
             self.pbar.update(self.num_input-1)
 
     def img_cache_dir(self, match_name, video_name, img_files):
-        s = '|'.join([match_name]+[video_name]+img_files)
+        img_names = [p.name if isinstance(p, Path) else os.path.basename(p) for p in img_files]
+        s = '|'.join([match_name, video_name, *img_names])
         filename = hashlib.sha1(s.encode('utf-8')).hexdigest()
 
         if filename in self.idx:
@@ -211,7 +219,7 @@ class TrackNetDataset(Dataset):
             return
 
         # generate cache
-        images = [self.__preprocess_img(os.path.join(self.root_dir, match_name, 'frame', video_name, img_file)) for img_file in img_files]
+        images = [self.__preprocess_img(str(img_file)) for img_file in img_files]
         img = np.concatenate(images, 0)
 
         np.save(npy_path, img)
@@ -255,7 +263,7 @@ class TrackNetDataset(Dataset):
         img = torch.from_numpy(img).float()
         target = torch.from_numpy(d['target'])
 
-        img_files = [f"{self.root_dir}/../{im}" for im in d['img_files']]
+        img_files = [str(p) for p in d['img_files']]
 
         return {"img": img, "target": target, "img_files": img_files}
 
@@ -378,10 +386,13 @@ class MultiTaskDataset(Dataset):
             with open(ann_path, "r", encoding="utf-8") as f:
                 frames_data = json.load(f)
             frame_map = {int(f["Frame"]): f for f in frames_data}
-            img_files = sorted(frame_dir.glob("*.png"), key=lambda x: int(x.stem))
+            img_files = sorted(
+                list(frame_dir.glob("*.png")) + list(frame_dir.glob("*.jpg")),
+                key=lambda x: int(x.stem.split("_")[-1])
+            )
             for i in range(len(img_files) - self.num_input + 1):
                 imgs = img_files[i : i + self.num_input]
-                info = [frame_map.get(int(p.stem), {}) for p in imgs]
+                info = [frame_map.get(int(p.stem.split("_")[-1]), {}) for p in imgs]
                 target = self.build_ball_target(info)
                 players = info[-1].get("Players", [])
                 self.samples.append({

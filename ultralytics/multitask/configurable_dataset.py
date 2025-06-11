@@ -47,8 +47,9 @@ class TrackNetConfigurableDataset(Dataset):
             if not os.path.isdir(match_dir_path):
                 continue
 
-            total_samples = len(
-                glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*/", "*.png"))
+            total_samples = (
+                len(glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*/", "*.png")))
+                + len(glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*/", "*.jpg")))
             )
             with tqdm(total=total_samples, desc=f"Processing {match_name}", miniters=1, smoothing=1) as pbar:
                 self.read_match(match_name, pbar)
@@ -83,12 +84,16 @@ class TrackNetConfigurableDataset(Dataset):
 
             frame_dir = os.path.join(self.root_dir, match_name, "frame", video_name)
 
-            img_files = sorted(glob("*.png", root_dir=frame_dir), key=lambda x: int(x.removesuffix(".png")))
+            frame_path = Path(frame_dir)
+            img_files = sorted(
+                list(frame_path.glob("*.png")) + list(frame_path.glob("*.jpg")),
+                key=lambda x: int(x.stem.split("_")[-1])
+            )
             total_img_len = len(img_files)
             limit_count = self.path_counts.get(match_name, len(img_files))
             min_len = min(limit_count, total_img_len)
             # print(f"{video_name}:total_img_len: {total_img_len}, limit_count: {limit_count}, min_len: {min_len}")
-            img = cv2.imread(frame_dir + "/" + img_files[0])
+            img = cv2.imread(str(img_files[0]))
             height, width, _ = img.shape
 
             # Create sliding windows of num_input frames
@@ -164,7 +169,8 @@ class TrackNetConfigurableDataset(Dataset):
         return [step for step in range(2, original_fps + 1) if original_fps / step >= min_fps]
 
     def img_cache_dir(self, match_name, video_name, img_files):
-        s = '|'.join([match_name]+[video_name]+img_files)
+        img_names = [p.name if isinstance(p, Path) else os.path.basename(p) for p in img_files]
+        s = '|'.join([match_name, video_name, *img_names])
         filename = hashlib.sha1(s.encode('utf-8')).hexdigest()
 
         if filename in self.idx:
@@ -191,8 +197,7 @@ class TrackNetConfigurableDataset(Dataset):
         images = []
 
         for fp in img_files:
-            img_path = os.path.join(self.root_dir, match_name, 'frame', video_name, fp)
-            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+            img = cv2.imread(str(fp), cv2.IMREAD_GRAYSCALE)
             if img is None:
                 continue
 
@@ -222,8 +227,7 @@ class TrackNetConfigurableDataset(Dataset):
             return
 
         # generate cache
-        frames = [cv2.imread(os.path.join(self.root_dir, match_name, 'frame', video_name, fp), cv2.IMREAD_GRAYSCALE).astype(np.float32) 
-                for fp in img_files]
+        frames = [cv2.imread(str(fp), cv2.IMREAD_GRAYSCALE).astype(np.float32) for fp in img_files]
         frames = np.array(frames)  # 轉換為 NumPy 陣列
 
         background_remove = False
@@ -267,7 +271,7 @@ class TrackNetConfigurableDataset(Dataset):
         img = torch.from_numpy(img).float()
         target = torch.from_numpy(d['target'])
 
-        img_files = [f"{self.root_dir}/{d['match_name']}/frame/{d['video_name']}/{im}" for im in d['img_files']]
+        img_files = [str(p) for p in d['img_files']]
 
         return {"img": img, "target": target, "img_files": img_files}
 
@@ -395,13 +399,16 @@ class MultiTaskConfigurableDataset(Dataset):
             with open(ann_path, "r", encoding="utf-8") as f:
                 frames_data = json.load(f)
             frame_map = {int(f["Frame"]): f for f in frames_data}
-            img_files = sorted(frame_dir.glob("*.png"), key=lambda x: int(x.stem))
+            img_files = sorted(
+                list(frame_dir.glob("*.png")) + list(frame_dir.glob("*.jpg")),
+                key=lambda x: int(x.stem.split("_")[-1])
+            )
 
             limit = self.path_counts.get(match_name, len(img_files))
             max_len = min(limit, len(img_files))
             for i in range(max(0, max_len - self.num_input + 1)):
                 imgs = img_files[i : i + self.num_input]
-                info = [frame_map.get(int(p.stem), {}) for p in imgs]
+                info = [frame_map.get(int(p.stem.split("_")[-1]), {}) for p in imgs]
                 target = self.build_ball_target(info)
                 players = info[-1].get("Players", [])
                 self.samples.append({
