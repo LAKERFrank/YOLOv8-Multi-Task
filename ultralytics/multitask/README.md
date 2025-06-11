@@ -16,12 +16,16 @@ Each match directory under the dataset root should include at least:
 ```
 match_x/
 ├── annotation.json        # frame annotations
-├── frame/                 # extracted PNG frames
-│   ├── 000001.png
+├── frame/                 # extracted image frames (.png or .jpg)
+│   ├── frame_000001.png   # or frame_000001.jpg
 │   └── ...
 ├── csv/                   # ball trajectory CSV files (optional)
 └── video/                 # source videos (optional)
 ```
+
+Frame numbers are extracted from the final underscore-separated field of each
+filename, so `foo_bar_000123.png` and `foo_bar_000123.jpg` both correspond to
+frame `123`.
 
 The number of frames loaded from each `match_x` folder can be limited by
 adjusting the optional `path_counts` dictionary in
