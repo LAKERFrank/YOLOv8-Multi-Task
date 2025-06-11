@@ -74,91 +74,92 @@ class TrackNetConfigurableDataset(Dataset):
             cap = cv2.VideoCapture(video_path)
             fps = int(cap.get(cv2.CAP_PROP_FPS))
 
-                video_name = video_name.removesuffix('.mp4')
+            video_name = video_name.removesuffix(".mp4")
+            csv_file = os.path.join(csv_dir, video_name + "_ball" + ".csv")
+            ball_trajectory_df = self.__preprocess_csv(csv_file, fps, head_width)
 
-                csv_file = os.path.join(csv_dir, video_name + "_ball" + '.csv')
-                
-                ball_trajectory_df = self.__preprocess_csv(csv_file, fps, head_width)
+            # print(ball_trajectory_df.columns)
+            # ['Frame', 'Visibility', 'X', 'Y', 'dX', 'dY', 'hit']
 
-                #print(ball_trajectory_df.columns)
-                #['Frame', 'Visibility', 'X', 'Y', 'dX', 'dY', 'hit']
-
-                frame_dir = os.path.join(self.root_dir, match_name, 'frame', video_name)
+            frame_dir = os.path.join(self.root_dir, match_name, "frame", video_name)
 
             img_files = sorted(glob("*.png", root_dir=frame_dir), key=lambda x: int(x.removesuffix(".png")))
             total_img_len = len(img_files)
             limit_count = self.path_counts.get(match_name, len(img_files))
             min_len = min(limit_count, total_img_len)
-                # print(f"{video_name}:total_img_len: {total_img_len}, limit_count: {limit_count}, min_len: {min_len}")
-                img = cv2.imread(frame_dir+"/"+img_files[0])
-                height, width, _ = img.shape
+            # print(f"{video_name}:total_img_len: {total_img_len}, limit_count: {limit_count}, min_len: {min_len}")
+            img = cv2.imread(frame_dir + "/" + img_files[0])
+            height, width, _ = img.shape
 
-                # Create sliding windows of num_input frames
-                for i in range(max(0, min_len - (self.num_input - 1))):
-                    frames = img_files[i: i + self.num_input]
+            # Create sliding windows of num_input frames
+            for i in range(max(0, min_len - (self.num_input - 1))):
+                frames = img_files[i : i + self.num_input]
+                target = ball_trajectory_df.iloc[i : i + self.num_input].values
+                target = self.transform_coordinates(target, width, height)
 
-                    target = ball_trajectory_df.iloc[i: i + self.num_input].values
-                    target = self.transform_coordinates(target, width, height)
+                # Avoid invalid data
+                if len(frames) == self.num_input and len(target) == self.num_input:
+                    npy_path = self.img_cache_dir(match_name, video_name, frames)
 
-                    # Avoid invalid data
-                    if len(frames) == self.num_input and len(target) == self.num_input:
-                        npy_path = self.img_cache_dir(match_name, video_name, frames)
-
-                        self.samples.append({
+                    self.samples.append(
+                        {
                             "match_name": match_name,
                             "video_name": video_name,
                             "cache_npy": npy_path,
                             "img_files": frames,
-                            "target": target
-                        })
+                            "target": target,
+                        }
+                    )
 
-                        self.img_cache(match_name, video_name, frames, npy_path)
+                    self.img_cache(match_name, video_name, frames, npy_path)
 
-                        hit_exists = np.any(target[:, 6] == 1)
-                        if hit_exists:
-                            for i in range(5):
-                                self.samples.append({
+                    hit_exists = np.any(target[:, 6] == 1)
+                    if hit_exists:
+                        for _ in range(5):
+                            self.samples.append(
+                                {
                                     "match_name": match_name,
                                     "video_name": video_name,
                                     "cache_npy": npy_path,
                                     "img_files": frames,
-                                    "target": target
-                                })
-                
-                min_fps = 15
-                valid_steps = self.get_valid_downsample_steps(fps, min_fps)
+                                    "target": target,
+                                }
+                            )
 
-                for step in valid_steps:
-                    num_frames_needed = self.num_input * step
-                    max_start_idx = len(img_files) - num_frames_needed + 1
+            min_fps = 15
+            valid_steps = self.get_valid_downsample_steps(fps, min_fps)
 
-                    for i in range(max_start_idx):
-                        frames = img_files[i: i + num_frames_needed: step]
-                        target = ball_trajectory_df.iloc[i: i + num_frames_needed: step].values
-                        target = self.transform_coordinates(target, width, height)
+            for step in valid_steps:
+                num_frames_needed = self.num_input * step
+                max_start_idx = len(img_files) - num_frames_needed + 1
 
-                        if len(frames) == self.num_input and len(target) == self.num_input:
-                            npy_path = self.img_cache_dir(match_name, video_name, frames)
+                for i in range(max_start_idx):
+                    frames = img_files[i : i + num_frames_needed : step]
+                    target = ball_trajectory_df.iloc[i : i + num_frames_needed : step].values
+                    target = self.transform_coordinates(target, width, height)
 
-                            sample = {
-                                "match_name": match_name,
-                                "video_name": video_name,
-                                "cache_npy": npy_path,
-                                "img_files": frames,
-                                "target": target
-                            }
+                    if len(frames) == self.num_input and len(target) == self.num_input:
+                        npy_path = self.img_cache_dir(match_name, video_name, frames)
 
-                            self.samples.append(sample)
-                            self.img_cache(match_name, video_name, frames, npy_path)
+                        sample = {
+                            "match_name": match_name,
+                            "video_name": video_name,
+                            "cache_npy": npy_path,
+                            "img_files": frames,
+                            "target": target,
+                        }
 
-                            # 擴充 hit 樣本
-                            if np.any(target[:, 6] == 1):
-                                for _ in range(5):
-                                    self.samples.append(sample.copy())
-                
-                if match_name in self.path_counts:
-                    self.path_counts[match_name] -= min_len
-                pbar.update(min_len)
+                        self.samples.append(sample)
+                        self.img_cache(match_name, video_name, frames, npy_path)
+
+                        # 擴充 hit 樣本
+                        if np.any(target[:, 6] == 1):
+                            for _ in range(5):
+                                self.samples.append(sample.copy())
+
+            if match_name in self.path_counts:
+                self.path_counts[match_name] -= min_len
+            pbar.update(min_len)
     def get_valid_downsample_steps(self, original_fps: int, min_fps: int) -> list[int]:
         return [step for step in range(2, original_fps + 1) if original_fps / step >= min_fps]
 
