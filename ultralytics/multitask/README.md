@@ -9,6 +9,24 @@
     - testing data
         - /hdd/dataset/profession_match_{n}_test
 
+### Folder layout
+
+Each match directory under the dataset root should include at least:
+
+```
+match_x/
+├── annotation.json        # frame annotations
+├── frame/                 # extracted PNG frames
+│   ├── 000001.png
+│   └── ...
+├── csv/                   # ball trajectory CSV files (optional)
+└── video/                 # source videos (optional)
+```
+
+The number of frames loaded from each `match_x` folder can be limited by
+adjusting the optional `path_counts` dictionary in
+`MultiTaskConfigurableDataset`.
+
 ## how to build
 ULTRALYTICS_BRANCH: 指定使用分之
 CACHE_BUSTER: 確保每次都能拉取最新的分支
@@ -33,6 +51,14 @@ docker run --gpus all --ipc=host \
 
 python multitask.py --mode train --model_path ultralytics/models/v8/multitask.yaml --data ultralytics/datasets/multitask.yaml --epochs 200
 
+```
+
+The dataset root is defined by the `path` field in `multitask.yaml`. You can
+edit the file directly or supply a custom YAML on the command line via the
+`--data` argument:
+
+```
+python multitask.py --data path/to/your_multitask.yaml
 ```
 
 ## TODO
