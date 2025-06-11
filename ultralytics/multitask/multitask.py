@@ -11,11 +11,23 @@ class MultiTaskModel(DetectionModel):
     """YOLO-based model with shared backbone for TrackNet and Pose tasks."""
 
     def __init__(self, cfg='ultralytics/models/v8/multitask.yaml', ch=10, nc=None, verbose=True):
+        # Placeholder indices are assigned before any forward call to avoid
+        # AttributeErrors when ``super().__init__`` performs a dry forward pass
+        # to build model metadata.
+        self.detect_idx, self.pose_idx = None, None
         super().__init__(cfg=cfg, ch=ch, nc=nc, verbose=verbose)
+        # Finalize the indices once the model structure has been created.
         self.detect_idx = len(self.model) - 2
         self.pose_idx = len(self.model) - 1
 
     def _predict_once(self, x, profile=False, visualize=False):
+        # Lazily determine detection and pose layer indices. These may not be
+        # known during ``__init__`` as ``super().__init__`` can perform an early
+        # forward pass before the model structure is finalized.
+        if self.detect_idx is None or self.pose_idx is None:
+            self.detect_idx = len(self.model) - 2
+            self.pose_idx = len(self.model) - 1
+
         outputs, y = [None, None], []
         for m in self.model:
             if m.f != -1:
