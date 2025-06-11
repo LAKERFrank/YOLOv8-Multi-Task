@@ -4,14 +4,15 @@
 
 from .engine.model import TrackNet as MultiTask
 from .multitask import MultiTaskModel
-from .train import TrackNetTrainer as MultiTaskTrainer
+from .train import MultiTaskTrainer, TrackNetTrainer
 from .val import MultiTaskValidator
-from .predict import TrackNetPredictor as MultiTaskPredictor
+from .predict import MultiTaskPredictor
 
 __all__ = (
     'MultiTask',
     'MultiTaskModel',
     'MultiTaskTrainer',
+    'TrackNetTrainer',
     'MultiTaskValidator',
     'MultiTaskPredictor',
 )
