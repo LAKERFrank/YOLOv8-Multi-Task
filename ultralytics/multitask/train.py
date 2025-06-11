@@ -9,7 +9,9 @@ from ultralytics.multitask.val import MultiTaskValidator
 from ultralytics.tracknet.val_dataset import TrackNetValDataset
 from ultralytics.multitask.configurable_dataset import MultiTaskConfigurableDataset
 from ultralytics.multitask.val_dataset import MultiTaskValDataset
-from ultralytics.yolo.utils import DEFAULT_CFG, RANK
+from ultralytics.yolo.utils import DEFAULT_CFG, LOGGER, RANK
+from ultralytics.yolo.utils.torch_utils import torch_distributed_zero_first
+from ultralytics.yolo.data import build_dataloader
 from ultralytics.yolo.v8.detect.train import DetectionTrainer
 
 from .multitask import MultiTaskModel
@@ -58,6 +60,20 @@ class MultiTaskTrainer(TrackNetTrainer):
         if mode == "train":
             return MultiTaskConfigurableDataset(root_dir=img_path)
         return MultiTaskValDataset(root_dir=img_path)
+
+    def get_dataloader(self, dataset_path, batch_size=16, rank=0, mode="train", custom_sampler=None):
+        """Construct and return dataloader with empty dataset check."""
+        assert mode in ["train", "val"]
+        with torch_distributed_zero_first(rank):
+            dataset = self.build_dataset(dataset_path, mode, batch_size)
+        if len(dataset) == 0:
+            raise ValueError("Dataset is empty; check dataset path or contents")
+        shuffle = mode == "train"
+        if getattr(dataset, "rect", False) and shuffle:
+            LOGGER.warning("WARNING ⚠️ 'rect=True' is incompatible with DataLoader shuffle, setting shuffle=False")
+            shuffle = False
+        workers = self.args.workers if mode == "train" else self.args.workers * 2
+        return build_dataloader(dataset, batch_size, workers, shuffle, rank, custom_sampler)
 
     def get_model(self, cfg=None, weights=None, verbose=True):
         model = MultiTaskModel(cfg, verbose=verbose)
