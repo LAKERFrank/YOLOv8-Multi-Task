@@ -345,10 +345,8 @@ class MultiTaskValDataset(Dataset):
             frame_map = {int(f["Frame"]): f for f in frames_data}
             img_files = sorted(frame_dir.glob("*.png"), key=lambda x: int(x.stem))
 
-            for i in range(len(img_files) // self.num_input):
-                imgs = img_files[i * self.num_input : i * self.num_input + self.num_input]
-                if len(imgs) < self.num_input:
-                    continue
+            for i in range(max(0, len(img_files) - self.num_input + 1)):
+                imgs = img_files[i : i + self.num_input]
                 info = [frame_map.get(int(p.stem), {}) for p in imgs]
                 target = self.build_ball_target(info)
                 players = info[-1].get("Players", [])

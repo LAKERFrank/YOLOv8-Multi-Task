@@ -40,10 +40,6 @@ class TrackNetConfigurableDataset(Dataset):
 
         self.idx = set()
 
-        image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
-
-        # Traverse all matches
-        last_len = 0
         for match_name in glob("*/", root_dir=root_dir):
             match_name = match_name.strip('/')
 
@@ -54,13 +50,11 @@ class TrackNetConfigurableDataset(Dataset):
                 continue
 
             if match_name in self.path_counts:
-                image_count = len(glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*/", "*.png")))
-                total_samples = image_count
-
+                total_samples = len(
+                    glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*/", "*.png"))
+                )
                 with tqdm(total=total_samples, desc=f"Processing {match_name}", miniters=1, smoothing=1) as pbar:
                     self.read_match(match_name, pbar)
-            print(f"Total samples for {match_name}: {len(self.samples)-last_len}\n")
-            last_len = len(self.samples)
 
 
     def read_match(self, match_name, pbar):
@@ -104,7 +98,7 @@ class TrackNetConfigurableDataset(Dataset):
                 height, width, _ = img.shape
 
                 # Create sliding windows of num_input frames
-                for i in range(min_len - (self.num_input-1)):
+                for i in range(max(0, min_len - (self.num_input - 1))):
                     frames = img_files[i: i + self.num_input]
 
                     target = ball_trajectory_df.iloc[i: i + self.num_input].values
@@ -407,7 +401,7 @@ class MultiTaskConfigurableDataset(Dataset):
 
             limit = self.path_counts.get(match_name, len(img_files))
             max_len = min(limit, len(img_files))
-            for i in range(max_len - self.num_input + 1):
+            for i in range(max(0, max_len - self.num_input + 1)):
                 imgs = img_files[i : i + self.num_input]
                 info = [frame_map.get(int(p.stem), {}) for p in imgs]
                 target = self.build_ball_target(info)
