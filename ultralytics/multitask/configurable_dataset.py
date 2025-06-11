@@ -47,12 +47,11 @@ class TrackNetConfigurableDataset(Dataset):
             if not os.path.isdir(match_dir_path):
                 continue
 
-            if match_name in self.path_counts:
-                total_samples = len(
-                    glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*/", "*.png"))
-                )
-                with tqdm(total=total_samples, desc=f"Processing {match_name}", miniters=1, smoothing=1) as pbar:
-                    self.read_match(match_name, pbar)
+            total_samples = len(
+                glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*/", "*.png"))
+            )
+            with tqdm(total=total_samples, desc=f"Processing {match_name}", miniters=1, smoothing=1) as pbar:
+                self.read_match(match_name, pbar)
 
 
     def read_match(self, match_name, pbar):
@@ -68,13 +67,12 @@ class TrackNetConfigurableDataset(Dataset):
 
         pbar.set_description(f'{self.prefix} Generating image cache: {match_name}/ ')
 
-        if match_name in self.path_counts:
-            # Traverse all videos in the match directory
-            for video_name in glob("*.mp4", root_dir=video_dir):
-                # get video fps
-                video_path = os.path.join(video_dir, video_name)
-                cap = cv2.VideoCapture(video_path)
-                fps = int(cap.get(cv2.CAP_PROP_FPS))
+        # Traverse all videos in the match directory
+        for video_name in glob("*.mp4", root_dir=video_dir):
+            # get video fps
+            video_path = os.path.join(video_dir, video_name)
+            cap = cv2.VideoCapture(video_path)
+            fps = int(cap.get(cv2.CAP_PROP_FPS))
 
                 video_name = video_name.removesuffix('.mp4')
 
@@ -87,10 +85,10 @@ class TrackNetConfigurableDataset(Dataset):
 
                 frame_dir = os.path.join(self.root_dir, match_name, 'frame', video_name)
 
-                img_files = sorted(glob("*.png", root_dir=frame_dir), key=lambda x: int(x.removesuffix(".png")))
-                total_img_len = len(img_files)
-                limit_count = self.path_counts[match_name]
-                min_len = min(limit_count, total_img_len)
+            img_files = sorted(glob("*.png", root_dir=frame_dir), key=lambda x: int(x.removesuffix(".png")))
+            total_img_len = len(img_files)
+            limit_count = self.path_counts.get(match_name, len(img_files))
+            min_len = min(limit_count, total_img_len)
                 # print(f"{video_name}:total_img_len: {total_img_len}, limit_count: {limit_count}, min_len: {min_len}")
                 img = cv2.imread(frame_dir+"/"+img_files[0])
                 height, width, _ = img.shape
@@ -158,7 +156,8 @@ class TrackNetConfigurableDataset(Dataset):
                                 for _ in range(5):
                                     self.samples.append(sample.copy())
                 
-                self.path_counts[match_name] = self.path_counts[match_name] - min_len
+                if match_name in self.path_counts:
+                    self.path_counts[match_name] -= min_len
                 pbar.update(min_len)
     def get_valid_downsample_steps(self, original_fps: int, min_fps: int) -> list[int]:
         return [step for step in range(2, original_fps + 1) if original_fps / step >= min_fps]
