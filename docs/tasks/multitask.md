@@ -39,3 +39,17 @@ Or perform tracking on video streams:
 ```bash
 yolo track model=path/to/best.pt source=path/to/video.mp4 track=True pose=True
 ```
+
+## Head attributes
+
+The detection head predicts multiple groups of outputs. Two attributes control
+its tensor shape:
+
+- **feat_no**: number of regression feature sets per group. Each set produces
+  `reg_max` channels, so the box regression tensor uses `feat_no * reg_max`
+  channels.
+- **num_groups**: number of prediction groups at each spatial location. The total
+  channel dimension becomes `num_groups * (feat_no * reg_max + nc)`.
+
+When creating custom heads or losses ensure that these values match between your
+configuration and the network so the outputs align with the targets.
