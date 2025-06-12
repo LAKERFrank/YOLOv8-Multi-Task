@@ -300,6 +300,7 @@ class v8PoseLoss(v8DetectionLoss):
     def __init__(self, model):  # model must be de-paralleled
         super().__init__(model)
         self.kpt_shape = model.model[-1].kpt_shape
+        self.num_groups = getattr(model.model[-1], "num_groups", 1)
         self.bce_pose = nn.BCEWithLogitsLoss()
         is_pose = self.kpt_shape == [17, 3]
         nkpt = self.kpt_shape[0]  # number of keypoints
@@ -322,6 +323,9 @@ class v8PoseLoss(v8DetectionLoss):
         imgsz = torch.tensor(feats[0].shape[2:], device=self.device, dtype=dtype) * self.stride[0]  # image size (h,w)
         anchor_points, stride_tensor = make_anchors(feats, self.stride, 0.5)
 
+        if self.num_groups > 1:
+            anchor_points = anchor_points.repeat(self.num_groups, 1)
+            stride_tensor = stride_tensor.repeat(self.num_groups, 1)
         # targets
         batch_size = pred_scores.shape[0]
         batch_idx = batch['batch_idx'].view(-1, 1)
