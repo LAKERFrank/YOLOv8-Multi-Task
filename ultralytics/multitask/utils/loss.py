@@ -7,7 +7,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from ultralytics.tracknet.utils.confusion_matrix import ConfConfusionMatrix
 from ultralytics.tracknet.utils.plotting import display_image_with_coordinates, display_predict_in_checkerboard
-from ultralytics.tracknet.utils.transform import calculate_angle, calculate_dist, target_grid
+from ultralytics.multitask.utils.transform import (
+    calculate_angle,
+    calculate_dist,
+    target_grid,
+)
 
 from ultralytics.yolo.utils import LOGGER
 

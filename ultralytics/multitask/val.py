@@ -7,7 +7,11 @@ import torch
 from ultralytics.tracknet.dataset import TrackNetDataset
 from ultralytics.tracknet.utils.nms import non_max_suppression
 from ultralytics.tracknet.utils.plotting import display_predict_image
-from ultralytics.tracknet.utils.transform import calculate_angle, calculate_dist, target_grid
+from ultralytics.multitask.utils.transform import (
+    calculate_angle,
+    calculate_dist,
+    target_grid,
+)
 from ultralytics.yolo.v8.pose.val import PoseValidator
 from ultralytics.tracknet.val_dataset import TrackNetValDataset
 from ultralytics.yolo.data.build import build_dataloader
