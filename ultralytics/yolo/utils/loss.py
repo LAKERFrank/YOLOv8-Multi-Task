@@ -314,10 +314,10 @@ class v8PoseLoss(v8DetectionLoss):
         feats, pred_kpts = preds if isinstance(preds[0], list) else preds[1]
         pred_distri_all, pred_scores = torch.cat(
             [xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2
-        ).split((self.reg_max * self.feat_no, self.nc), 1)
+        ).split((self.reg_max * self.num_groups, self.nc), 1)
         pred_distri, _ = (
-            pred_distri_all.split((self.reg_max * 4, self.reg_max * (self.feat_no - 4)), 1)
-            if self.feat_no > 4
+            pred_distri_all.split((self.reg_max * 4, self.reg_max * (self.num_groups - 4)), 1)
+            if self.num_groups > 4
             else (pred_distri_all, None)
         )
 
