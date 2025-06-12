@@ -118,6 +118,7 @@ class v8DetectionLoss:
         self.nc = m.nc  # number of classes
         self.no = m.no
         self.reg_max = m.reg_max
+        self.feat_no = getattr(m, 'feat_no', (self.no - self.nc) // self.reg_max)
         self.device = device
 
         self.use_dfl = m.reg_max > 1
