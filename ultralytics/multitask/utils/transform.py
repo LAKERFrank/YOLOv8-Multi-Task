@@ -6,18 +6,27 @@ import torch
 def target_grid(target_x, target_y, stride, target_shape = 640):
     grid_x = int(target_x / stride)
     grid_y = int(target_y / stride)
-    offset_x = (target_x % stride)
-    offset_y = (target_y % stride)
+    offset_x = target_x % stride
+    offset_y = target_y % stride
 
     limit_grid_size = int(target_shape / stride)
     adjust_offset = int(stride - 1)
-    if grid_x == limit_grid_size:
+
+    # clamp grid indices within valid range
+    if grid_x >= limit_grid_size:
         grid_x = limit_grid_size - 1
         offset_x = adjust_offset
-    if grid_y == limit_grid_size:
+    elif grid_x < 0:
+        grid_x = 0
+        offset_x = 0
+
+    if grid_y >= limit_grid_size:
         grid_y = limit_grid_size - 1
         offset_y = adjust_offset
-    assert grid_x < limit_grid_size and grid_y < limit_grid_size
+    elif grid_y < 0:
+        grid_y = 0
+        offset_y = 0
+
     return grid_x, grid_y, offset_x, offset_y
 
 def calculate_dist(p1, p2):
