@@ -31,6 +31,9 @@ The number of frames loaded from each `match_x` folder can be limited by
 adjusting the optional `path_counts` dictionary in
 `MultiTaskConfigurableDataset`.
 
+MultiTask dataset classes also define a `collate_fn` so `build_dataloader`
+automatically stacks images and concatenates detection targets.
+
 ## how to build
 ULTRALYTICS_BRANCH: 指定使用分之
 CACHE_BUSTER: 確保每次都能拉取最新的分支
