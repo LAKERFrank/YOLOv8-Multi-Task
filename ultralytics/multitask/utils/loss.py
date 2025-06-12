@@ -25,7 +25,9 @@ class TrackNetLossWithHit:
         device = next(model.parameters()).device  # get model device
         h = model.args  # hyperparameters
         self.hyp = h
-        print(self.hyp.weight_conf, self.hyp.weight_mov, self.hyp.weight_pos, self.hyp.use_dxdy_loss)
+        LOGGER.info(
+            f"{self.hyp.weight_conf} {self.hyp.weight_mov} {self.hyp.weight_pos} {self.hyp.use_dxdy_loss}"
+        )
 
         m = model.model[-1]  # Detect() module
         pos_weight = torch.tensor(self.hyp.weight_hit).to(device)
@@ -189,7 +191,9 @@ class TrackNetLossWithHit:
                 recall = self.TP/(self.TP+self.FN)
                 f1 = (2*precision*recall)/(precision+recall)
             acc = (self.TN + self.TP) / (self.FN+self.FP+self.TN + self.TP)
-            print(f"\nTraining Accuracy: {acc:.4f}, Training Precision: {precision:.4f}, Training Recall: {recall:.4f}, , Training F1-Score: {f1:.4f}\n")
+            LOGGER.info(
+                f"\nTraining Accuracy: {acc:.4f}, Training Precision: {precision:.4f}, Training Recall: {recall:.4f}, , Training F1-Score: {f1:.4f}\n"
+            )
             self.TP = 0
             self.FP = 0
             self.TN = 0
@@ -265,7 +269,9 @@ class TrackNetLoss:
                     # target xy
                     grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
                     if grid_x >= 80 or grid_y >= 80:
-                        print(grid_x, grid_y, offset_x, offset_y)
+                        LOGGER.warning(
+                            f"grid out of range: {grid_x}, {grid_y}, {offset_x}, {offset_y}"
+                        )
 
                     if target[1] == 1:
                         mask_has_ball[idx, target_idx, grid_y, grid_x] = 1
@@ -275,7 +281,7 @@ class TrackNetLoss:
                         t_x = (grid_x*stride+center*stride-target[2])*8/stride
                         t_y = (grid_y*stride+center*stride-target[3])*8/stride
                         if abs(t_x) >= self.reg_max - 1 or abs(t_y) >= self.reg_max - 1:
-                            print(f"warning 超過可預測範圍: t_x: {t_x}, t_y: {t_y}")
+                            LOGGER.warning(f"warning 超過可預測範圍: t_x: {t_x}, t_y: {t_y}")
                         if t_x >= 0:
                             target_pos_distri[idx, target_idx, grid_y, grid_x, 0] = clamp(t_x, 0, self.reg_max-1 - 0.01)
                         else:
@@ -837,7 +843,9 @@ class FocalLossWithMask(nn.Module):
         if alpha > 0:
             alpha_factor = label * alpha + (1 - label) * (1 - alpha)
             if (alpha_factor < 0).any():
-                print("Negative alpha_factor detected:", alpha_factor[alpha_factor < 0])
+                LOGGER.warning(
+                    "Negative alpha_factor detected: %s", alpha_factor[alpha_factor < 0]
+                )
             loss *= alpha_factor
         
         TP_mask = (pred_prob >= 0.5) & (label == 1)  # True Positive
