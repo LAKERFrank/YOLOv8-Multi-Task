@@ -82,11 +82,11 @@ class DetectV2(nn.Module):
         super().__init__()
         self.nc = nc  # number of classes
         self.nl = len(ch)  # number of detection layers
-        self.num_groups = 10
+        self.num_groups = 10  # number of prediction groups per location
         self.reg_max = 16  # DFL channels (ch[0] // 16 to scale 4/8/12/16/20 for n/s/m/l/x)
-        self.feat_no = 2
+        self.feat_no = 2  # regression feature sets per group
         self.dxdy_no = 2
-        self.no = nc + self.dxdy_no + self.reg_max * self.feat_no  # number of outputs per anchor
+        self.no = nc + self.dxdy_no + self.reg_max * self.feat_no  # outputs per group before multiplying by num_groups
         self.stride = torch.zeros(self.nl)  # strides computed during build
         c2, c3 = max((16, ch[0] // self.feat_no, self.reg_max * self.feat_no)), max(ch[0], min(self.nc, 100))  # channels
         self.cv2 = nn.ModuleList(
@@ -143,10 +143,10 @@ class DetectV3(nn.Module):
         super().__init__()
         self.nc = nc  # number of classes
         self.nl = len(ch)  # number of detection layers
-        self.num_groups = 10
+        self.num_groups = 10  # number of prediction groups per location
         self.reg_max = 20  # DFL channels (ch[0] // 16 to scale 4/8/12/16/20 for n/s/m/l/x)
-        self.feat_no = 2
-        self.no = nc + self.reg_max * self.feat_no  # number of outputs per anchor
+        self.feat_no = 2  # regression feature sets per group
+        self.no = nc + self.reg_max * self.feat_no  # outputs per group before multiplying by num_groups
         self.stride = torch.zeros(self.nl)  # strides computed during build
         c2, c3 = max((16, ch[0] // self.feat_no, self.reg_max * self.feat_no)), max(ch[0], min(self.nc, 100))  # channels
         self.cv2 = nn.ModuleList(
@@ -199,10 +199,10 @@ class Detect(nn.Module):
         super().__init__()
         self.nc = nc  # number of classes
         self.nl = len(ch)  # number of detection layers
-        self.num_groups = 10
+        self.num_groups = 10  # number of prediction groups per location
         self.reg_max = 16  # DFL channels (ch[0] // 16 to scale 4/8/12/16/20 for n/s/m/l/x)
-        self.feat_no = 8
-        self.no = self.nc + self.reg_max * self.feat_no  # number of outputs per anchor
+        self.feat_no = 8  # regression feature sets per group
+        self.no = self.nc + self.reg_max * self.feat_no  # outputs per group before multiplying by num_groups
         self.stride = torch.zeros(self.nl)  # strides computed during build
         c2, c3 = max((16, ch[0] // self.feat_no, self.reg_max * self.feat_no)), max(ch[0], min(self.nc, 100))  # channels
         self.cv2 = nn.ModuleList(
