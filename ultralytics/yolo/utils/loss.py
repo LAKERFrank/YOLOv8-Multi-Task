@@ -298,10 +298,26 @@ class v8SegmentationLoss(v8DetectionLoss):
 # Criterion class for computing training losses
 class v8PoseLoss(v8DetectionLoss):
 
-    def __init__(self, model):  # model must be de-paralleled
-        super().__init__(model)
-        self.kpt_shape = model.model[-1].kpt_shape
-        self.num_groups = getattr(model.model[-1], "num_groups", 1)
+    def __init__(self, head, args):  # head is Pose() module
+        # initialize base detection attributes manually using provided head
+        device = next(head.parameters()).device
+        self.bce = nn.BCEWithLogitsLoss(reduction='none')
+        self.hyp = args
+        self.stride = head.stride
+        self.nc = head.nc
+        self.no = head.no
+        self.reg_max = head.reg_max
+        self.feat_no = getattr(head, 'feat_no', (self.no - self.nc) // self.reg_max)
+        self.device = device
+
+        self.use_dfl = head.reg_max > 1
+
+        self.assigner = TaskAlignedAssigner(topk=10, num_classes=self.nc, alpha=0.5, beta=6.0)
+        self.bbox_loss = BboxLoss(head.reg_max - 1, use_dfl=self.use_dfl).to(device)
+        self.proj = torch.arange(head.reg_max, dtype=torch.float, device=device)
+
+        self.kpt_shape = head.kpt_shape
+        self.num_groups = getattr(head, "num_groups", 1)
         self.bce_pose = nn.BCEWithLogitsLoss()
         is_pose = self.kpt_shape == [17, 3]
         nkpt = self.kpt_shape[0]  # number of keypoints

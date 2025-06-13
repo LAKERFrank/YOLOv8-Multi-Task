@@ -202,13 +202,13 @@ class TrackNetLossWithHit:
 
 # use p3 p4 p5
 class TrackNetLoss:
-    def __init__(self, model):  # model must be de-paralleled
+    def __init__(self, head, args):  # head is Detect() module
 
-        device = next(model.parameters()).device  # get model device
-        h = model.args  # hyperparameters
+        device = next(head.parameters()).device  # get model device
+        h = args  # hyperparameters
         self.hyp = h
 
-        m = model.model[-1]  # Detect() module
+        m = head  # Detect() module
         self.mse = nn.MSELoss(reduction='sum')
         self.FLM = FocalLossWithMask()
         self.stride = m.stride  # model strides

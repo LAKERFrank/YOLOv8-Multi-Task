@@ -11,8 +11,8 @@ class MultiTaskLoss:
     """Combine TrackNetLoss and YOLO Pose loss."""
 
     def __init__(self, model) -> None:
-        self.track_loss = TrackNetLoss(model)
-        self.pose_loss = v8PoseLoss(model)
+        self.track_loss = TrackNetLoss(model.model[model.detect_idx], model.args)
+        self.pose_loss = v8PoseLoss(model.model[model.pose_idx], model.args)
 
     def init_conf_confusion(self, cm: ConfConfusionMatrix) -> None:
         self.track_loss.init_conf_confusion(cm)
