@@ -342,6 +342,12 @@ class v8PoseLoss(v8DetectionLoss):
         pred_distri = pred_distri.permute(0, 2, 1).contiguous()
         pred_kpts = pred_kpts.permute(0, 2, 1).contiguous()
 
+        batch_size = pred_scores.shape[0]
+        pred_kpts = pred_kpts.view(batch_size, -1, *self.kpt_shape)
+        if self.num_groups > 1:
+            pred_kpts = pred_kpts.repeat_interleave(self.num_groups, dim=1)
+        pred_kpts = pred_kpts.contiguous()
+
         dtype = pred_scores.dtype
         imgsz = torch.tensor(feats[0].shape[2:], device=self.device, dtype=dtype) * self.stride[0]  # image size (h,w)
         anchor_points, stride_tensor = make_anchors(feats, self.stride, 0.5)
@@ -350,7 +356,6 @@ class v8PoseLoss(v8DetectionLoss):
             anchor_points = anchor_points.repeat(self.num_groups, 1)
             stride_tensor = stride_tensor.repeat(self.num_groups, 1)
         # targets
-        batch_size = pred_scores.shape[0]
         batch_idx = batch['batch_idx'].view(-1, 1)
         targets = torch.cat((batch_idx, batch['cls'].view(-1, 1), batch['bboxes']), 1)
         targets = self.preprocess(targets.to(self.device), batch_size, scale_tensor=imgsz[[1, 0, 1, 0]])
