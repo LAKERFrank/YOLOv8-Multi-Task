@@ -233,7 +233,7 @@ class TrackNetConfigurableDataset(Dataset):
                 for fp in img_files]
         frames = np.array(frames)  # 轉換為 NumPy 陣列
 
-        background_remove = False
+        background_remove = True
 
         if background_remove:
             # 計算中位數影像，確保 dtype 為 float32
@@ -260,7 +260,7 @@ class TrackNetConfigurableDataset(Dataset):
             raise Exception("File corrupted: " + path)
 
     def __preprocess_csv(self, csv_file, fps, head_width_px):
-        return preprocess_csv(csv_file)
+        return preprocess_csvV4(csv_file)
     
     def __len__(self):
         return len(self.samples)
