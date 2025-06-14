@@ -1026,6 +1026,8 @@ class MultiTaskValidator(TrackNetValidator):
         self.pose_validator.args = self.args
         self.pose_validator.save_dir = self.save_dir
         self.pose_validator.on_plot = self.on_plot
+        # ensure pose metrics have dataset info
+        self.pose_validator.data = self.data
         self.pose_validator.init_metrics(model.pose if hasattr(model, 'pose') else model)
 
     def update_metrics(self, preds, batch, loss):
