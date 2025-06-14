@@ -19,6 +19,13 @@ class MultiTaskModel(DetectionModel):
         # Finalize the indices once the model structure has been created.
         self.detect_idx = len(self.model) - 2
         self.pose_idx = len(self.model) - 1
+        # Ensure both heads share the correct strides for anchor generation
+        strides = torch.tensor([8., 16., 32.])
+        if hasattr(self.model[self.pose_idx], "stride"):
+            self.model[self.pose_idx].stride = strides
+        if hasattr(self.model[self.detect_idx], "stride"):
+            self.model[self.detect_idx].stride = strides
+        self.stride = strides
 
     def _predict_once(self, x, profile=False, visualize=False):
         # Lazily determine detection and pose layer indices. These may not be
