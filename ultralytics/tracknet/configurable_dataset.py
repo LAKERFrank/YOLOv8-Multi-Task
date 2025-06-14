@@ -260,7 +260,7 @@ class TrackNetConfigurableDataset(Dataset):
             raise Exception("File corrupted: " + path)
 
     def __preprocess_csv(self, csv_file, fps, head_width_px):
-        return preprocess_csvV4(csv_file)
+        return preprocess_csvV4(csv_file, fps, head_width_px)
     
     def __len__(self):
         return len(self.samples)
