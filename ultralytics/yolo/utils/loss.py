@@ -330,10 +330,10 @@ class v8PoseLoss(v8DetectionLoss):
         feats, pred_kpts = preds if isinstance(preds[0], list) else preds[1]
         pred_distri_all, pred_scores = torch.cat(
             [xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2
-        ).split((self.reg_max * self.num_groups, self.nc), 1)
+        ).split((self.reg_max * self.feat_no, self.nc), 1)
         pred_distri, _ = (
-            pred_distri_all.split((self.reg_max * 4, self.reg_max * (self.num_groups - 4)), 1)
-            if self.num_groups > 4
+            pred_distri_all.split((self.reg_max * 4, self.reg_max * (self.feat_no - 4)), 1)
+            if self.feat_no > 4
             else (pred_distri_all, None)
         )
 
@@ -341,6 +341,12 @@ class v8PoseLoss(v8DetectionLoss):
         pred_scores = pred_scores.permute(0, 2, 1).contiguous()
         pred_distri = pred_distri.permute(0, 2, 1).contiguous()
         pred_kpts = pred_kpts.permute(0, 2, 1).contiguous()
+
+        batch_size = pred_scores.shape[0]
+        pred_kpts = pred_kpts.view(batch_size, -1, *self.kpt_shape)
+        if self.num_groups > 1:
+            pred_kpts = pred_kpts.repeat_interleave(self.num_groups, dim=1)
+        pred_kpts = pred_kpts.contiguous()
 
         dtype = pred_scores.dtype
         imgsz = torch.tensor(feats[0].shape[2:], device=self.device, dtype=dtype) * self.stride[0]  # image size (h,w)
@@ -350,7 +356,6 @@ class v8PoseLoss(v8DetectionLoss):
             anchor_points = anchor_points.repeat(self.num_groups, 1)
             stride_tensor = stride_tensor.repeat(self.num_groups, 1)
         # targets
-        batch_size = pred_scores.shape[0]
         batch_idx = batch['batch_idx'].view(-1, 1)
         targets = torch.cat((batch_idx, batch['cls'].view(-1, 1), batch['bboxes']), 1)
         targets = self.preprocess(targets.to(self.device), batch_size, scale_tensor=imgsz[[1, 0, 1, 0]])
@@ -377,14 +382,16 @@ class v8PoseLoss(v8DetectionLoss):
             loss[0], loss[4] = self.bbox_loss(pred_distri, pred_bboxes, anchor_points, target_bboxes, target_scores,
                                               target_scores_sum, fg_mask)
             keypoints = batch['keypoints'].to(self.device).float().clone()
+            keypoints = keypoints.view(-1, *self.kpt_shape)
             keypoints[..., 0] *= imgsz[1]
             keypoints[..., 1] *= imgsz[0]
             for i in range(batch_size):
                 if fg_mask[i].sum():
                     idx = target_gt_idx[i][fg_mask[i]]
-                    gt_kpt = keypoints[batch_idx.view(-1) == i][idx]  # (n, 51)
-                    gt_kpt[..., 0] /= stride_tensor[fg_mask[i]]
-                    gt_kpt[..., 1] /= stride_tensor[fg_mask[i]]
+                    gt_kpt = keypoints[batch_idx.view(-1) == i][idx].clone()  # (n, 17, 3)
+                    k_stride = stride_tensor[fg_mask[i]]
+                    gt_kpt[..., 0] /= k_stride[:, 0:1]
+                    gt_kpt[..., 1] /= k_stride[:, 1:2]
                     area = xyxy2xywh(target_bboxes[i][fg_mask[i]])[:, 2:].prod(1, keepdim=True)
                     pred_kpt = pred_kpts[i][fg_mask[i]]
                     kpt_mask = gt_kpt[..., 2] != 0
