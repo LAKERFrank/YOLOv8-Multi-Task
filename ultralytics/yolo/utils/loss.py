@@ -389,7 +389,8 @@ class v8PoseLoss(v8DetectionLoss):
                 if fg_mask[i].sum():
                     idx = target_gt_idx[i][fg_mask[i]]
                     gt_kpt = keypoints[batch_idx.view(-1) == i][idx].clone()  # (n, 17, 3)
-                    k_stride = stride_tensor[fg_mask[i]]  # (n,1)
+                    # stride_tensor is (n, 1); reshape to broadcast over keypoints
+                    k_stride = stride_tensor[fg_mask[i]].view(-1, 1, 1)
                     gt_kpt[..., :2] /= k_stride
                     area = xyxy2xywh(target_bboxes[i][fg_mask[i]])[:, 2:].prod(1, keepdim=True)
                     pred_kpt = pred_kpts[i][fg_mask[i]]
