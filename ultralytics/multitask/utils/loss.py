@@ -202,13 +202,13 @@ class TrackNetLossWithHit:
 
 # use p3 p4 p5
 class TrackNetLoss:
-    def __init__(self, model):  # model must be de-paralleled
+    def __init__(self, head, args):  # head is Detect() module
 
-        device = next(model.parameters()).device  # get model device
-        h = model.args  # hyperparameters
+        device = next(head.parameters()).device  # get model device
+        h = args  # hyperparameters
         self.hyp = h
 
-        m = model.model[-1]  # Detect() module
+        m = head  # Detect() module
         self.mse = nn.MSELoss(reduction='sum')
         self.FLM = FocalLossWithMask()
         self.stride = m.stride  # model strides
@@ -236,6 +236,7 @@ class TrackNetLoss:
 
         feats = preds[1] if isinstance(preds, tuple) else preds
 
+        img_h = batch['img'].shape[-2]
         for i, feat in enumerate(feats):
             pred_distri, pred_scores = feat.view(feat.shape[0], self.no, -1).split(
                 (self.reg_max * self.feat_no, self.nc), 1)
@@ -252,7 +253,14 @@ class TrackNetLoss:
 
             batch_target = batch['target'].to(self.device)
 
-            cell_num = int(640/self.stride[i])
+            stride = float(self.stride[i])
+            if stride <= 0:
+                stride = img_h / feat.shape[-2]
+                if isinstance(self.stride, torch.Tensor):
+                    self.stride[i] = stride
+                else:
+                    self.stride[i] = float(stride)
+            cell_num = feat.shape[-2]
             target_pos_distri = torch.zeros(b, self.num_groups, cell_num, cell_num, self.feat_no//2, device=self.device)
             mask_has_ball = torch.zeros(b, self.num_groups, cell_num, cell_num, device=self.device)
             cls_targets = torch.zeros(b, self.num_groups, cell_num, cell_num, 1, device=self.device)
@@ -263,11 +271,11 @@ class TrackNetLoss:
 
             for idx, _ in enumerate(batch_target):
                 # pred = [330 * cell_num * cell_num]
-                stride = self.stride[i]
+                stride_layer = stride
                 
                 for target_idx, target in enumerate(batch_target[idx]):
                     # target xy
-                    grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
+                    grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride_layer)
                     if grid_x >= 80 or grid_y >= 80:
                         LOGGER.warning(
                             f"grid out of range: {grid_x}, {grid_y}, {offset_x}, {offset_y}"
@@ -278,8 +286,8 @@ class TrackNetLoss:
                         center = 0.5
                         def clamp(x, min_value, max_value):
                             return max(min_value, min(x, max_value))
-                        t_x = (grid_x*stride+center*stride-target[2])*8/stride
-                        t_y = (grid_y*stride+center*stride-target[3])*8/stride
+                        t_x = (grid_x*stride_layer+center*stride_layer-target[2])*8/stride_layer
+                        t_y = (grid_y*stride_layer+center*stride_layer-target[3])*8/stride_layer
                         if abs(t_x) >= self.reg_max - 1 or abs(t_y) >= self.reg_max - 1:
                             LOGGER.warning(f"warning 超過可預測範圍: t_x: {t_x}, t_y: {t_y}")
                         if t_x >= 0:
@@ -299,8 +307,8 @@ class TrackNetLoss:
                         if (target[4] != 0 or target[5] != 0) and target_idx < len(batch_target[idx]) - 1 and batch_target[idx][target_idx + 1][1] == 1:
                             next_gtx = target[4]
                             next_gty = target[5]
-                            next_t_x = (grid_x*stride+center*stride-next_gtx)*8/stride
-                            next_t_y = (grid_y*stride+center*stride-next_gty)*8/stride
+                            next_t_x = (grid_x*stride_layer+center*stride_layer-next_gtx)*8/stride_layer
+                            next_t_y = (grid_y*stride_layer+center*stride_layer-next_gty)*8/stride_layer
 
                             if abs(next_t_x) >= self.reg_max - 1 or abs(next_t_y) >= self.reg_max - 1:
                                 # print(f"warning 超過可預測範圍: stride: {stride} next_t_x: {next_t_x}, next_t_y: {next_t_y}")

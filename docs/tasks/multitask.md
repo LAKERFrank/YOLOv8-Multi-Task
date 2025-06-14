@@ -53,3 +53,7 @@ its tensor shape:
 
 When creating custom heads or losses ensure that these values match between your
 configuration and the network so the outputs align with the targets.
+
+Note: Each loss function now receives the corresponding head module directly.
+For example `MultiTaskLoss` creates `TrackNetLoss(model.model[model.detect_idx], model.args)`
+and `v8PoseLoss(model.model[model.pose_idx], model.args)`.

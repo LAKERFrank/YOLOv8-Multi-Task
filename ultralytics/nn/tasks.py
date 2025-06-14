@@ -324,7 +324,7 @@ class PoseModel(DetectionModel):
         super().__init__(cfg=cfg, ch=ch, nc=nc, verbose=verbose)
 
     def init_criterion(self):
-        return v8PoseLoss(self)
+        return v8PoseLoss(self.model[-1], self.args)
 
     def _predict_augment(self, x):
         """Perform augmentations on input image x and return augmented inference."""
