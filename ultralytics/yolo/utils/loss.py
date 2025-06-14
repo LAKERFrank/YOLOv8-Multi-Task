@@ -382,14 +382,16 @@ class v8PoseLoss(v8DetectionLoss):
             loss[0], loss[4] = self.bbox_loss(pred_distri, pred_bboxes, anchor_points, target_bboxes, target_scores,
                                               target_scores_sum, fg_mask)
             keypoints = batch['keypoints'].to(self.device).float().clone()
+            keypoints = keypoints.view(-1, *self.kpt_shape)
             keypoints[..., 0] *= imgsz[1]
             keypoints[..., 1] *= imgsz[0]
             for i in range(batch_size):
                 if fg_mask[i].sum():
                     idx = target_gt_idx[i][fg_mask[i]]
-                    gt_kpt = keypoints[batch_idx.view(-1) == i][idx]  # (n, 51)
-                    gt_kpt[..., 0] /= stride_tensor[fg_mask[i]]
-                    gt_kpt[..., 1] /= stride_tensor[fg_mask[i]]
+                    gt_kpt = keypoints[batch_idx.view(-1) == i][idx].clone()  # (n, 17, 3)
+                    k_stride = stride_tensor[fg_mask[i]]
+                    gt_kpt[..., 0] /= k_stride[:, 0:1]
+                    gt_kpt[..., 1] /= k_stride[:, 1:2]
                     area = xyxy2xywh(target_bboxes[i][fg_mask[i]])[:, 2:].prod(1, keepdim=True)
                     pred_kpt = pred_kpts[i][fg_mask[i]]
                     kpt_mask = gt_kpt[..., 2] != 0
