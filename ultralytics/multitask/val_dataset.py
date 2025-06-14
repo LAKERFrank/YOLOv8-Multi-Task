@@ -463,3 +463,26 @@ class MultiTaskValDataset(Dataset):
                 new_batch["batch_idx"][i] += i
             new_batch["batch_idx"] = torch.cat(new_batch["batch_idx"], 0)
         return new_batch
+
+    @lru_cache(maxsize=10)
+    def __preprocess_img(self, path, pad_value=0):
+        img = self.open_image(path)
+        img = self.pad_to_square(img, pad_value)
+        img = cv2.resize(img, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
+        img.resize((1, 640, 640))
+        return img
+
+    def open_image(self, path):
+        """Open image file, convert to grayscale and resize to half size."""
+        img = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2GRAY)
+        h, w = img.shape
+        return cv2.resize(img, dsize=(w // 2, h // 2), interpolation=cv2.INTER_CUBIC)
+
+    def pad_to_square(self, img, pad_value=0):
+        """Adjust 2D tensor to square by padding pad_value."""
+        h, w = img.shape
+        dim_diff = np.abs(h - w)
+        pad1, pad2 = dim_diff // 2, dim_diff - dim_diff // 2
+        pad = (0, 0, pad1, pad2) if h > w else (pad1, pad2, 0, 0)
+        img = cv2.copyMakeBorder(img, *pad, borderType=cv2.BORDER_CONSTANT, value=pad_value)
+        return img

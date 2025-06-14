@@ -35,8 +35,9 @@ class MultiTaskModel(DetectionModel):
             x = m(x)
             y.append(x if m.i in self.save else None)
             if m.i == self.detect_idx:
-                outputs[0] = x
-        outputs[1] = x  # pose output is last
+                outputs[0] = x[0] if isinstance(x, tuple) else x
+                x = x[1] if isinstance(x, tuple) else x
+        outputs[1] = x[0] if isinstance(x, tuple) else x  # pose output is last
         return outputs
 
     def init_criterion(self):
