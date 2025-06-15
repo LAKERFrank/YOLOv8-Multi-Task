@@ -4,6 +4,7 @@ import torch
 
 from ultralytics.nn.tasks import DetectionModel
 from ultralytics.tracknet.utils.confusion_matrix import ConfConfusionMatrix
+from ultralytics.yolo.utils.tal import make_anchors
 from .utils.multi_task_loss import MultiTaskLoss
 
 
@@ -43,6 +44,9 @@ class MultiTaskModel(DetectionModel):
             y.append(x if m.i in self.save else None)
             if m.i == self.detect_idx:
                 outputs[0] = x
+                # ensure anchors exist for downstream pose head
+                if isinstance(x, (list, tuple)) and hasattr(m, "anchors") and not m.anchors.numel():
+                    m.anchors, m.strides = (a.transpose(0, 1) for a in make_anchors(x[1], m.stride, 0.5))
                 # propagate anchors and strides to pose head if available
                 pose_head = self.model[self.pose_idx]
                 if hasattr(m, "anchors") and m.anchors.numel():
