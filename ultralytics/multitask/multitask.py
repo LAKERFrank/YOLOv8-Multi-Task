@@ -44,9 +44,11 @@ class MultiTaskModel(DetectionModel):
             y.append(x if m.i in self.save else None)
             if m.i == self.detect_idx:
                 outputs[0] = x
+                # split detection predictions and feature maps
+                feat = x[1] if isinstance(x, tuple) else x
                 # ensure anchors exist for downstream pose head
-                if isinstance(x, (list, tuple)) and hasattr(m, "anchors") and not m.anchors.numel():
-                    m.anchors, m.strides = (a.transpose(0, 1) for a in make_anchors(x[1], m.stride, 0.5))
+                if hasattr(m, "anchors") and not m.anchors.numel():
+                    m.anchors, m.strides = (a.transpose(0, 1) for a in make_anchors(feat, m.stride, 0.5))
                 # propagate anchors and strides to pose head if available
                 pose_head = self.model[self.pose_idx]
                 if hasattr(m, "anchors") and m.anchors.numel():
@@ -54,6 +56,7 @@ class MultiTaskModel(DetectionModel):
                         pose_head.anchors = m.anchors
                     if hasattr(pose_head, "strides"):
                         pose_head.strides = m.strides
+                x = feat
         outputs[1] = x  # pose output is last
         return outputs
 
