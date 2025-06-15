@@ -381,6 +381,15 @@ class Pose(Detect):
         if self.training:
             return x, kpt
         pred_kpt = self.kpts_decode(bs, kpt)
+        if self.num_groups > 1:
+            if self.export:
+                if pred_kpt.shape[-1] != x.shape[-1]:
+                    pred_kpt = pred_kpt.repeat_interleave(self.num_groups, dim=2)
+            else:
+                det, feats = x
+                if pred_kpt.shape[-1] != det.shape[-1]:
+                    pred_kpt = pred_kpt.repeat_interleave(self.num_groups, dim=2)
+                x = (det, feats)
         return torch.cat([x, pred_kpt], 1) if self.export else (torch.cat([x[0], pred_kpt], 1), (x[1], kpt))
 
     def kpts_decode(self, bs, kpts):
