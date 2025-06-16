@@ -1017,6 +1017,14 @@ class MultiTaskValidator(TrackNetValidator):
             imgsz = batch['img'].shape[-2:]
             batch['ori_shape'] = [imgsz] * len(batch['img'])
             batch['ratio_pad'] = [((1.0, 1.0), (0.0, 0.0))] * len(batch['img'])
+        # ensure ratio_pad entries are standard tuples
+        if 'ratio_pad' in batch:
+            rp = []
+            for r in batch['ratio_pad']:
+                if isinstance(r, torch.Tensor):
+                    r = r.squeeze().tolist()
+                rp.append(r)
+            batch['ratio_pad'] = rp
         return batch
 
     def postprocess(self, preds):
