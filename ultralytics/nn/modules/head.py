@@ -219,13 +219,20 @@ class Detect(nn.Module):
                               1)
         if self.training:
             return x
+        if self.dynamic or self.shape != shape or not self.anchors.numel():
+            self.anchors, self.strides = (a.transpose(0, 1) for a in make_anchors(x, self.stride, 0.5))
+            self.shape = shape
+
+        x_cat = torch.cat([xi.view(shape[0], self.no, -1) for xi in x], 2)
+        box_dim = self.reg_max * self.feat_no
+        if self.export and self.format in ('saved_model', 'pb', 'tflite', 'edgetpu', 'tfjs'):  # avoid TF FlexSplitV ops
+            box = x_cat[:, :box_dim]
+            cls = x_cat[:, box_dim:]
         else:
-            x_cat = x[0].view(shape[0], self.no, -1)
-            current_dfl, next_dfl, cls = x_cat.split((self.reg_max * 4, self.reg_max * 4, self.nc), 1)
-            current = self.dfl(current_dfl)
-            next = self.dfl(next_dfl)
-            y = torch.cat((current, next, cls.sigmoid()), 1)
-            return (y, x)
+            box, cls = x_cat.split((box_dim, self.nc), 1)
+        dbox = dist2bbox(self.dfl(box), self.anchors.unsqueeze(0), xywh=True, dim=1) * self.strides
+        y = torch.cat((dbox, cls.sigmoid()), 1)
+        return y if self.export else (y, x)
             # feats = x[0].clone()
             # pred_distri, pred_scores = feats.view(self.no, -1).split(
             #     (reg_max * feat_no, nc), 0)
@@ -381,6 +388,15 @@ class Pose(Detect):
         if self.training:
             return x, kpt
         pred_kpt = self.kpts_decode(bs, kpt)
+        if self.num_groups > 1:
+            if self.export:
+                if pred_kpt.shape[-1] != x.shape[-1]:
+                    pred_kpt = pred_kpt.repeat_interleave(self.num_groups, dim=2)
+            else:
+                det, feats = x
+                if pred_kpt.shape[-1] != det.shape[-1]:
+                    pred_kpt = pred_kpt.repeat_interleave(self.num_groups, dim=2)
+                x = (det, feats)
         return torch.cat([x, pred_kpt], 1) if self.export else (torch.cat([x[0], pred_kpt], 1), (x[1], kpt))
 
     def kpts_decode(self, bs, kpts):
