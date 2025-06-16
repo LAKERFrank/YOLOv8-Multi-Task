@@ -1019,11 +1019,12 @@ class MultiTaskValidator(TrackNetValidator):
             batch['ratio_pad'] = [((1.0, 1.0), (0.0, 0.0))] * len(batch['img'])
         # ensure ratio_pad entries are standard tuples
         if 'ratio_pad' in batch:
+            from ultralytics.yolo.utils.ops import _normalize_ratio_pad
             rp = []
             for r in batch['ratio_pad']:
                 if isinstance(r, torch.Tensor):
                     r = r.squeeze().tolist()
-                rp.append(r)
+                rp.append(_normalize_ratio_pad(r))
             batch['ratio_pad'] = rp
         return batch
 
