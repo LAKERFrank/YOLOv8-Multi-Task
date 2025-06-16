@@ -48,17 +48,19 @@ class MultiTaskModel(DetectionModel):
                 feat = x[1] if isinstance(x, tuple) else x
                 # regenerate anchors from current feature shapes
                 if hasattr(m, "stride"):
-                    anchor_points, stride_tensor = make_anchors(feat, m.stride, 0.5)
+                    anchors_det, strides_det = make_anchors(feat, m.stride, 0.5)
+                    # propagate base anchors (without group repetition) to pose head
+                    anchors_pose, strides_pose = anchors_det.transpose(0, 1), strides_det.transpose(0, 1)
+                    # repeat for detection groups only when needed
                     if getattr(m, "num_groups", 1) > 1:
-                        anchor_points = anchor_points.repeat_interleave(m.num_groups, dim=0)
-                        stride_tensor = stride_tensor.repeat_interleave(m.num_groups, dim=0)
-                    anchors, strides = anchor_points.transpose(0, 1), stride_tensor.transpose(0, 1)
-                    m.anchors, m.strides = anchors, strides
+                        anchors_det = anchors_det.repeat_interleave(m.num_groups, dim=0)
+                        strides_det = strides_det.repeat_interleave(m.num_groups, dim=0)
+                    m.anchors, m.strides = anchors_det.transpose(0, 1), strides_det.transpose(0, 1)
                     pose_head = self.model[self.pose_idx]
                     if hasattr(pose_head, "anchors"):
-                        pose_head.anchors = anchors
+                        pose_head.anchors = anchors_pose
                     if hasattr(pose_head, "strides"):
-                        pose_head.strides = strides
+                        pose_head.strides = strides_pose
                 x = feat
         outputs[1] = x  # pose output is last
         return outputs
