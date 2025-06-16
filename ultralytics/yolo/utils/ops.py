@@ -92,6 +92,30 @@ def segment2box(segment, width=640, height=640):
         4, dtype=segment.dtype)  # xyxy
 
 
+def _normalize_ratio_pad(ratio_pad):
+    """Return ratio_pad in ``((gain_x, gain_y), (pad_x, pad_y))`` format."""
+    if ratio_pad is None:
+        return None
+    if isinstance(ratio_pad, torch.Tensor):
+        ratio_pad = ratio_pad.squeeze().tolist()
+    if isinstance(ratio_pad, (int, float)):
+        return ((1.0, 1.0), (float(ratio_pad), float(ratio_pad)))
+    if isinstance(ratio_pad, (list, tuple)):
+        flat = []
+        for v in ratio_pad:
+            if isinstance(v, (list, tuple)):
+                flat.extend(v)
+            else:
+                flat.append(v)
+        if len(flat) == 2:
+            g, p = flat
+            return ((float(g), float(g)), (float(p), float(p)))
+        if len(flat) >= 4:
+            return ((float(flat[0]), float(flat[1])),
+                    (float(flat[2]), float(flat[3] if len(flat) > 3 else flat[2])))
+    return ratio_pad
+
+
 def scale_boxes(img1_shape, boxes, img0_shape, ratio_pad=None, padding=True):
     """
     Rescales bounding boxes (in the format of xyxy) from the shape of the image they were originally specified in
@@ -109,6 +133,7 @@ def scale_boxes(img1_shape, boxes, img0_shape, ratio_pad=None, padding=True):
     Returns:
       boxes (torch.Tensor): The scaled bounding boxes, in the format of (x1, y1, x2, y2)
     """
+    ratio_pad = _normalize_ratio_pad(ratio_pad)
     if ratio_pad is None:  # calculate from img0_shape
         gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
         pad = round((img1_shape[1] - img0_shape[1] * gain) / 2 - 0.1), round(
@@ -332,6 +357,7 @@ def scale_image(masks, im0_shape, ratio_pad=None):
     im1_shape = masks.shape
     if im1_shape[:2] == im0_shape[:2]:
         return masks
+    ratio_pad = _normalize_ratio_pad(ratio_pad)
     if ratio_pad is None:  # calculate from im0_shape
         gain = min(im1_shape[0] / im0_shape[0], im1_shape[1] / im0_shape[1])  # gain  = old / new
         pad = (im1_shape[1] - im0_shape[1] * gain) / 2, (im1_shape[0] - im0_shape[0] * gain) / 2  # wh padding
@@ -682,6 +708,7 @@ def scale_coords(img1_shape, coords, img0_shape, ratio_pad=None, normalize=False
     Returns:
       coords (torch.Tensor): the segmented image.
     """
+    ratio_pad = _normalize_ratio_pad(ratio_pad)
     if ratio_pad is None:  # calculate from img0_shape
         gain = min(img1_shape[0] / img0_shape[0], img1_shape[1] / img0_shape[1])  # gain  = old / new
         pad = (img1_shape[1] - img0_shape[1] * gain) / 2, (img1_shape[0] - img0_shape[0] * gain) / 2  # wh padding
