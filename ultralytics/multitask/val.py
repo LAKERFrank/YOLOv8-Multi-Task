@@ -1032,6 +1032,9 @@ class MultiTaskValidator(TrackNetValidator):
 
     def update_metrics(self, preds, batch, loss):
         track_pred, pose_pred = preds
+        # detection head returns (preds, feats) during training/validation
+        if isinstance(track_pred, (tuple, list)):
+            track_pred = track_pred[0]
         super().update_metrics([None, [track_pred]], batch, loss)
         self.pose_validator.update_metrics(pose_pred, batch)
 
