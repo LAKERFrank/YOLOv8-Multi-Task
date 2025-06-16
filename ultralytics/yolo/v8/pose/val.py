@@ -78,8 +78,17 @@ class PoseValidator(DetectionValidator):
             predn = pred.clone()
             ops.scale_boxes(batch['img'][si].shape[1:], predn[:, :4], shape,
                             ratio_pad=batch['ratio_pad'][si])  # native-space pred
-            pred_kpts = predn[:, 6:].view(npr, nk, -1)
-            ops.scale_coords(batch['img'][si].shape[1:], pred_kpts, shape, ratio_pad=batch['ratio_pad'][si])
+            # keypoints are always located at the end of the predictions
+            pred_kpts = predn[:, -nk:].view(npr, nk, -1)
+            ratio_pad = batch['ratio_pad'][si]
+            # support ratio_pad formats like (gain, pad) or (gain_x, gain_y, pad_x, pad_y)
+            if isinstance(ratio_pad, (list, tuple)):
+                if len(ratio_pad) == 2 and not isinstance(ratio_pad[0], (list, tuple)):
+                    g, p = ratio_pad
+                    ratio_pad = ((g, g), p if isinstance(p, (list, tuple)) else (p, p))
+                elif len(ratio_pad) == 4:
+                    ratio_pad = ((ratio_pad[0], ratio_pad[1]), (ratio_pad[2], ratio_pad[3]))
+            ops.scale_coords(batch['img'][si].shape[1:], pred_kpts, shape, ratio_pad=ratio_pad)
 
             # Evaluate
             if nl:
