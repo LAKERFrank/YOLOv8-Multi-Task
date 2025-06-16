@@ -413,7 +413,11 @@ class Pose(Detect):
         ndim = self.kpt_shape[1]
         if self.export:  # required for TFLite export to avoid 'PLACEHOLDER_FOR_GREATER_OP_CODES' bug
             y = kpts.view(bs, *self.kpt_shape, -1)
-            a = (y[:, :, :2] * 2.0 + (self.anchors - 0.5)) * self.strides
+            anchors, strides = self.anchors, self.strides
+            if anchors.numel() and anchors.shape[-1] != y.shape[-1]:
+                g = anchors.shape[-1] // y.shape[-1]
+                anchors, strides = anchors[:, ::g], strides[:, ::g]
+            a = (y[:, :, :2] * 2.0 + (anchors - 0.5)) * strides
             if ndim == 3:
                 a = torch.cat((a, y[:, :, 2:3].sigmoid()), 2)
             return a.view(bs, self.nk, -1)
@@ -421,8 +425,12 @@ class Pose(Detect):
             y = kpts.clone()
             if ndim == 3:
                 y[:, 2::3].sigmoid_()  # inplace sigmoid
-            y[:, 0::ndim] = (y[:, 0::ndim] * 2.0 + (self.anchors[0] - 0.5)) * self.strides
-            y[:, 1::ndim] = (y[:, 1::ndim] * 2.0 + (self.anchors[1] - 0.5)) * self.strides
+            anchors, strides = self.anchors, self.strides
+            if anchors.numel() and anchors.shape[-1] != y.shape[-1]:
+                g = anchors.shape[-1] // y.shape[-1]
+                anchors, strides = anchors[:, ::g], strides[:, ::g]
+            y[:, 0::ndim] = (y[:, 0::ndim] * 2.0 + (anchors[0] - 0.5)) * strides
+            y[:, 1::ndim] = (y[:, 1::ndim] * 2.0 + (anchors[1] - 0.5)) * strides
             return y
 
 
