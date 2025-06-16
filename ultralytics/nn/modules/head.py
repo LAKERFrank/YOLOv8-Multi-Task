@@ -225,12 +225,17 @@ class Detect(nn.Module):
 
         x_cat = torch.cat([xi.view(shape[0], self.no, -1) for xi in x], 2)
         box_dim = self.reg_max * self.feat_no
-        if self.export and self.format in ('saved_model', 'pb', 'tflite', 'edgetpu', 'tfjs'):  # avoid TF FlexSplitV ops
+        if self.export and self.format in ('saved_model', 'pb', 'tflite', 'edgetpu', 'tfjs'):
             box = x_cat[:, :box_dim]
             cls = x_cat[:, box_dim:]
         else:
             box, cls = x_cat.split((box_dim, self.nc), 1)
-        dbox = dist2bbox(self.dfl(box), self.anchors.unsqueeze(0), xywh=True, dim=1) * self.strides
+
+        # first half of box_dim corresponds to current frame, second half to next
+        cur_box, next_box = box.split(box_dim // 2, 1)
+        cur_box = dist2bbox(self.dfl(cur_box), self.anchors.unsqueeze(0), xywh=True, dim=1)
+        next_box = dist2bbox(self.dfl(next_box), self.anchors.unsqueeze(0), xywh=True, dim=1)
+        dbox = torch.cat((cur_box, next_box), 1) * self.strides
         y = torch.cat((dbox, cls.sigmoid()), 1)
         return y if self.export else (y, x)
             # feats = x[0].clone()
