@@ -78,8 +78,20 @@ class PoseValidator(DetectionValidator):
             predn = pred.clone()
             ops.scale_boxes(batch['img'][si].shape[1:], predn[:, :4], shape,
                             ratio_pad=batch['ratio_pad'][si])  # native-space pred
-            pred_kpts = predn[:, 6:].view(npr, nk, -1)
-            ops.scale_coords(batch['img'][si].shape[1:], pred_kpts, shape, ratio_pad=batch['ratio_pad'][si])
+            # keypoints are always located at the end of the predictions
+            pred_kpts = predn[:, -nk:].view(npr, nk, -1)
+            ratio_pad = batch['ratio_pad'][si]
+            # support ratio_pad formats like (gain, pad) or (gain_x, gain_y, pad_x, pad_y)
+            if isinstance(ratio_pad, torch.Tensor):
+                ratio_pad = ratio_pad.squeeze().tolist()
+            if isinstance(ratio_pad, (list, tuple)):
+                flat = [float(x) if not isinstance(x, (list, tuple)) else float(x[0]) for x in ratio_pad]
+                if len(flat) == 2:
+                    g, p = flat
+                    ratio_pad = ((g, g), (p, p))
+                elif len(flat) == 4:
+                    ratio_pad = ((flat[0], flat[1]), (flat[2], flat[3]))
+            ops.scale_coords(batch['img'][si].shape[1:], pred_kpts, shape, ratio_pad=ratio_pad)
 
             # Evaluate
             if nl:
