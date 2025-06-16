@@ -1032,8 +1032,18 @@ class MultiTaskValidator(TrackNetValidator):
 
     def update_metrics(self, preds, batch, loss):
         track_pred, pose_pred = preds
-        super().update_metrics([None, [track_pred]], batch, loss)
-        self.pose_validator.update_metrics(pose_pred, batch)
+        # detection head returns (preds, feats) during training/validation
+        if isinstance(track_pred, tuple):
+            # use raw feature maps for tracking metrics
+            track_pred = track_pred[1]
+        super().update_metrics([None, track_pred], batch, loss)
+        # pose validator expects 1D batch indices
+        if isinstance(batch.get('batch_idx'), torch.Tensor) and batch['batch_idx'].ndim == 2:
+            batch_pose = batch.copy()
+            batch_pose['batch_idx'] = batch['batch_idx'].view(-1)
+        else:
+            batch_pose = batch
+        self.pose_validator.update_metrics(pose_pred, batch_pose)
 
     def finalize_metrics(self):
         super().finalize_metrics()
