@@ -1012,7 +1012,12 @@ class MultiTaskValidator(TrackNetValidator):
 
     def preprocess(self, batch):
         batch = super().preprocess(batch)
-        return self.pose_validator.preprocess(batch)
+        batch = self.pose_validator.preprocess(batch)
+        if 'ori_shape' not in batch:
+            imgsz = batch['img'].shape[-2:]
+            batch['ori_shape'] = [imgsz] * len(batch['img'])
+            batch['ratio_pad'] = [(1.0, 1.0)] * len(batch['img'])
+        return batch
 
     def postprocess(self, preds):
         track_pred, pose_pred = preds
