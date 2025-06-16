@@ -61,6 +61,8 @@ class MultiTaskModel(DetectionModel):
                         pose_head.anchors = anchors_pose
                     if hasattr(pose_head, "strides"):
                         pose_head.strides = strides_pose
+                    if hasattr(pose_head, "shape") and isinstance(feat, list) and feat:
+                        pose_head.shape = feat[0].shape
                 x = feat
         outputs[1] = x  # pose output is last
         return outputs
