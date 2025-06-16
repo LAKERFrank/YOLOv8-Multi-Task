@@ -220,7 +220,11 @@ class Detect(nn.Module):
         if self.training:
             return x
         if self.dynamic or self.shape != shape or not self.anchors.numel():
-            self.anchors, self.strides = (a.transpose(0, 1) for a in make_anchors(x, self.stride, 0.5))
+            anchor_points, stride_tensor = make_anchors(x, self.stride, 0.5)
+            if self.num_groups > 1:
+                anchor_points = anchor_points.repeat_interleave(self.num_groups, dim=0)
+                stride_tensor = stride_tensor.repeat_interleave(self.num_groups, dim=0)
+            self.anchors, self.strides = anchor_points.transpose(0, 1), stride_tensor.transpose(0, 1)
             self.shape = shape
 
         x_cat = torch.cat([xi.view(shape[0], self.no, -1) for xi in x], 2)
