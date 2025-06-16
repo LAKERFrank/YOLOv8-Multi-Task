@@ -43,8 +43,13 @@ class MultiTaskModel(DetectionModel):
             x = m(x)
             y.append(x if m.i in self.save else None)
             if m.i == self.detect_idx:
+<<<<<<< codex/fix-indexerror-in-kpts_decode
+                # keep both detection predictions and feature maps
+                outputs[0] = x
+=======
                 # detection output is first element, feature maps second
                 outputs[0] = x[0] if isinstance(x, tuple) else x
+>>>>>>> codex/fix-attributeerror-in-validation
                 feat = x[1] if isinstance(x, tuple) else x
                 # regenerate anchors from current feature shapes
                 if hasattr(m, "stride"):
