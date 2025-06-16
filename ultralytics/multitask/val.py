@@ -1016,7 +1016,11 @@ class MultiTaskValidator(TrackNetValidator):
         if 'ori_shape' not in batch:
             imgsz = batch['img'].shape[-2:]
             batch['ori_shape'] = [imgsz] * len(batch['img'])
+<<<<<<< codex/fix-indexerror-in-kpts_decode
             batch['ratio_pad'] = [((1.0, 1.0), (0.0, 0.0))] * len(batch['img'])
+=======
+            batch['ratio_pad'] = [(1.0, 1.0)] * len(batch['img'])
+>>>>>>> codex/fix-attributeerror-in-validation
         return batch
 
     def postprocess(self, preds):
