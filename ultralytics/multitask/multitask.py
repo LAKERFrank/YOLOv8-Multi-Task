@@ -45,8 +45,6 @@ class MultiTaskModel(DetectionModel):
             if m.i == self.detect_idx:
                 # keep both detection predictions and feature maps
                 outputs[0] = x
-                # keep both detection predictions and feature maps
-                outputs[0] = x
                 feat = x[1] if isinstance(x, tuple) else x
                 # regenerate anchors from current feature shapes
                 if hasattr(m, "stride"):

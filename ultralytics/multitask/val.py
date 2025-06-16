@@ -1034,7 +1034,8 @@ class MultiTaskValidator(TrackNetValidator):
         track_pred, pose_pred = preds
         # detection head returns (preds, feats) during training/validation
         if isinstance(track_pred, (tuple, list)):
-            track_pred = track_pred[0]
+            # use raw feature maps for tracking metrics
+            track_pred = track_pred[1]
         super().update_metrics([None, [track_pred]], batch, loss)
         self.pose_validator.update_metrics(pose_pred, batch)
 
