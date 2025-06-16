@@ -76,21 +76,11 @@ class PoseValidator(DetectionValidator):
             if self.args.single_cls:
                 pred[:, 5] = 0
             predn = pred.clone()
-            ops.scale_boxes(batch['img'][si].shape[1:], predn[:, :4], shape,
-                            ratio_pad=batch['ratio_pad'][si])  # native-space pred
+            from ultralytics.yolo.utils.ops import _normalize_ratio_pad
+            ratio_pad = _normalize_ratio_pad(batch['ratio_pad'][si])
+            ops.scale_boxes(batch['img'][si].shape[1:], predn[:, :4], shape, ratio_pad=ratio_pad)  # native-space pred
             # keypoints are always located at the end of the predictions
             pred_kpts = predn[:, -nk:].view(npr, nk, -1)
-            ratio_pad = batch['ratio_pad'][si]
-            # support ratio_pad formats like (gain, pad) or (gain_x, gain_y, pad_x, pad_y)
-            if isinstance(ratio_pad, torch.Tensor):
-                ratio_pad = ratio_pad.squeeze().tolist()
-            if isinstance(ratio_pad, (list, tuple)):
-                flat = [float(x) if not isinstance(x, (list, tuple)) else float(x[0]) for x in ratio_pad]
-                if len(flat) == 2:
-                    g, p = flat
-                    ratio_pad = ((g, g), (p, p))
-                elif len(flat) == 4:
-                    ratio_pad = ((flat[0], flat[1]), (flat[2], flat[3]))
             ops.scale_coords(batch['img'][si].shape[1:], pred_kpts, shape, ratio_pad=ratio_pad)
 
             # Evaluate
@@ -98,12 +88,11 @@ class PoseValidator(DetectionValidator):
                 height, width = batch['img'].shape[2:]
                 tbox = ops.xywh2xyxy(bbox) * torch.tensor(
                     (width, height, width, height), device=self.device)  # target boxes
-                ops.scale_boxes(batch['img'][si].shape[1:], tbox, shape,
-                                ratio_pad=batch['ratio_pad'][si])  # native-space labels
+                ops.scale_boxes(batch['img'][si].shape[1:], tbox, shape, ratio_pad=ratio_pad)  # native-space labels
                 tkpts = kpts.clone()
                 tkpts[..., 0] *= width
                 tkpts[..., 1] *= height
-                tkpts = ops.scale_coords(batch['img'][si].shape[1:], tkpts, shape, ratio_pad=batch['ratio_pad'][si])
+                tkpts = ops.scale_coords(batch['img'][si].shape[1:], tkpts, shape, ratio_pad=ratio_pad)
                 labelsn = torch.cat((cls, tbox), 1)  # native-space labels
                 correct_bboxes = self._process_batch(predn[:, :6], labelsn)
                 correct_kpts = self._process_batch(predn[:, :6], labelsn, pred_kpts, tkpts)

@@ -93,11 +93,13 @@ def segment2box(segment, width=640, height=640):
 
 
 def _normalize_ratio_pad(ratio_pad):
-    """Convert various ratio_pad formats to ``((gain_x, gain_y), (pad_x, pad_y))``."""
+    """Return ratio_pad in ``((gain_x, gain_y), (pad_x, pad_y))`` format."""
     if ratio_pad is None:
         return None
     if isinstance(ratio_pad, torch.Tensor):
         ratio_pad = ratio_pad.squeeze().tolist()
+    if isinstance(ratio_pad, (int, float)):
+        return ((1.0, 1.0), (float(ratio_pad), float(ratio_pad)))
     if isinstance(ratio_pad, (list, tuple)):
         flat = []
         for v in ratio_pad:
@@ -107,9 +109,10 @@ def _normalize_ratio_pad(ratio_pad):
                 flat.append(v)
         if len(flat) == 2:
             g, p = flat
-            return ((g, g), (p, p))
+            return ((float(g), float(g)), (float(p), float(p)))
         if len(flat) >= 4:
-            return ((flat[0], flat[1]), (flat[2], flat[3] if len(flat) > 3 else flat[2]))
+            return ((float(flat[0]), float(flat[1])),
+                    (float(flat[2]), float(flat[3] if len(flat) > 3 else flat[2])))
     return ratio_pad
 
 
