@@ -57,7 +57,8 @@ class DetectV1(nn.Module):
         else:
             box, cls = x_cat.split((self.reg_max * 4, self.nc), 1)
         anchors = self.anchors.to(box.device).unsqueeze(0)
-        dbox = dist2bbox(self.dfl(box), anchors, xywh=True, dim=1) * self.strides
+        strides = self.strides.to(box.device)
+        dbox = dist2bbox(self.dfl(box), anchors, xywh=True, dim=1) * strides
         y = torch.cat((dbox, cls.sigmoid()), 1)
         return y if self.export else (y, x)
 
@@ -239,9 +240,10 @@ class Detect(nn.Module):
         # first half of box_dim corresponds to current frame, second half to next
         cur_box, next_box = box.split(box_dim // 2, 1)
         anchors = self.anchors.to(box.device).unsqueeze(0)
+        strides = self.strides.to(box.device)
         cur_box = dist2bbox(self.dfl(cur_box), anchors, xywh=True, dim=1)
         next_box = dist2bbox(self.dfl(next_box), anchors, xywh=True, dim=1)
-        dbox = torch.cat((cur_box, next_box), 1) * self.strides
+        dbox = torch.cat((cur_box, next_box), 1) * strides
         y = torch.cat((dbox, cls.sigmoid()), 1)
         return y if self.export else (y, x)
             # feats = x[0].clone()
@@ -415,7 +417,8 @@ class Pose(Detect):
         ndim = self.kpt_shape[1]
         if self.export:  # required for TFLite export to avoid 'PLACEHOLDER_FOR_GREATER_OP_CODES' bug
             y = kpts.view(bs, *self.kpt_shape, -1)
-            anchors, strides = self.anchors, self.strides
+            anchors = self.anchors.to(y.device)
+            strides = self.strides.to(y.device)
             if anchors.numel() and anchors.shape[-1] != y.shape[-1]:
                 g = anchors.shape[-1] // y.shape[-1]
                 anchors, strides = anchors[:, ::g], strides[:, ::g]
@@ -427,7 +430,8 @@ class Pose(Detect):
             y = kpts.clone()
             if ndim == 3:
                 y[:, 2::3].sigmoid_()  # inplace sigmoid
-            anchors, strides = self.anchors, self.strides
+            anchors = self.anchors.to(y.device)
+            strides = self.strides.to(y.device)
             if anchors.numel() and anchors.shape[-1] != y.shape[-1]:
                 g = anchors.shape[-1] // y.shape[-1]
                 anchors, strides = anchors[:, ::g], strides[:, ::g]
