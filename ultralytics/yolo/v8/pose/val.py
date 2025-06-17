@@ -58,7 +58,8 @@ class PoseValidator(DetectionValidator):
             bbox = batch['bboxes'][idx]
             kpts = batch['keypoints'][idx]
             nl, npr = cls.shape[0], pred.shape[0]  # number of labels, predictions
-            nk = kpts.shape[1]  # number of keypoints
+            # number of keypoints as defined by the model configuration
+            nk = self.kpt_shape[0]
             shape = batch['ori_shape'][si]
             correct_kpts = torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device)  # init
             correct_bboxes = torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device)  # init
@@ -80,7 +81,8 @@ class PoseValidator(DetectionValidator):
             ratio_pad = _normalize_ratio_pad(batch['ratio_pad'][si])
             ops.scale_boxes(batch['img'][si].shape[1:], predn[:, :4], shape, ratio_pad=ratio_pad)  # native-space pred
             # keypoints are always located at the end of the predictions
-            pred_kpts = predn[:, -nk:].view(npr, nk, -1)
+            ndim = self.kpt_shape[1]
+            pred_kpts = predn[:, -(nk * ndim):].view(npr, nk, ndim)
             ops.scale_coords(batch['img'][si].shape[1:], pred_kpts, shape, ratio_pad=ratio_pad)
 
             # Evaluate
