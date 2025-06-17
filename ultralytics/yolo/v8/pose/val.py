@@ -91,10 +91,10 @@ class PoseValidator(DetectionValidator):
                 tbox = ops.xywh2xyxy(bbox) * torch.tensor(
                     (width, height, width, height), device=self.device)  # target boxes
                 ops.scale_boxes(batch['img'][si].shape[1:], tbox, shape, ratio_pad=ratio_pad)  # native-space labels
-                tkpts = kpts.clone()
-                tkpts[..., 0] *= width
-                tkpts[..., 1] *= height
-                tkpts = ops.scale_coords(batch['img'][si].shape[1:], tkpts, shape, ratio_pad=ratio_pad)
+            tkpts = kpts.clone().view(nl, nk, ndim)
+            tkpts[..., 0] *= width
+            tkpts[..., 1] *= height
+            ops.scale_coords(batch['img'][si].shape[1:], tkpts, shape, ratio_pad=ratio_pad)
                 labelsn = torch.cat((cls, tbox), 1)  # native-space labels
                 correct_bboxes = self._process_batch(predn[:, :6], labelsn)
                 correct_kpts = self._process_batch(predn[:, :6], labelsn, pred_kpts, tkpts)
@@ -116,8 +116,8 @@ class PoseValidator(DetectionValidator):
         Arguments:
             detections (array[N, 6]), x1, y1, x2, y2, conf, class
             labels (array[M, 5]), class, x1, y1, x2, y2
-            pred_kpts (array[N, 51]), 51 = 17 * 3
-            gt_kpts (array[N, 51])
+            pred_kpts (Tensor[N, K, D])
+            gt_kpts (Tensor[M, K, D])
         Returns:
             correct (array[N, 10]), for 10 IoU levels
         """
