@@ -91,10 +91,10 @@ class PoseValidator(DetectionValidator):
                 tbox = ops.xywh2xyxy(bbox) * torch.tensor(
                     (width, height, width, height), device=self.device)  # target boxes
                 ops.scale_boxes(batch['img'][si].shape[1:], tbox, shape, ratio_pad=ratio_pad)  # native-space labels
-            tkpts = kpts.clone().view(nl, nk, ndim)
-            tkpts[..., 0] *= width
-            tkpts[..., 1] *= height
-            ops.scale_coords(batch['img'][si].shape[1:], tkpts, shape, ratio_pad=ratio_pad)
+                tkpts = kpts.clone().view(nl, nk, ndim)
+                tkpts[..., 0] *= width
+                tkpts[..., 1] *= height
+                ops.scale_coords(batch['img'][si].shape[1:], tkpts, shape, ratio_pad=ratio_pad)
                 labelsn = torch.cat((cls, tbox), 1)  # native-space labels
                 correct_bboxes = self._process_batch(predn[:, :6], labelsn)
                 correct_kpts = self._process_batch(predn[:, :6], labelsn, pred_kpts, tkpts)
