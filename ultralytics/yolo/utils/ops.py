@@ -107,9 +107,15 @@ def _normalize_ratio_pad(ratio_pad):
                 flat.extend(v)
             else:
                 flat.append(v)
+        if len(flat) == 1:
+            p = flat[0]
+            return ((1.0, 1.0), (float(p), float(p)))
         if len(flat) == 2:
             g, p = flat
             return ((float(g), float(g)), (float(p), float(p)))
+        if len(flat) == 3:
+            g1, g2, p = flat
+            return ((float(g1), float(g2)), (float(p), float(p)))
         if len(flat) >= 4:
             return ((float(flat[0]), float(flat[1])),
                     (float(flat[2]), float(flat[3] if len(flat) > 3 else flat[2])))
