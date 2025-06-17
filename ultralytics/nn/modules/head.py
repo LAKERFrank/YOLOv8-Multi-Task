@@ -56,7 +56,8 @@ class DetectV1(nn.Module):
             cls = x_cat[:, self.reg_max * 4:]
         else:
             box, cls = x_cat.split((self.reg_max * 4, self.nc), 1)
-        dbox = dist2bbox(self.dfl(box), self.anchors.unsqueeze(0), xywh=True, dim=1) * self.strides
+        anchors = self.anchors.to(box.device).unsqueeze(0)
+        dbox = dist2bbox(self.dfl(box), anchors, xywh=True, dim=1) * self.strides
         y = torch.cat((dbox, cls.sigmoid()), 1)
         return y if self.export else (y, x)
 
@@ -237,8 +238,9 @@ class Detect(nn.Module):
 
         # first half of box_dim corresponds to current frame, second half to next
         cur_box, next_box = box.split(box_dim // 2, 1)
-        cur_box = dist2bbox(self.dfl(cur_box), self.anchors.unsqueeze(0), xywh=True, dim=1)
-        next_box = dist2bbox(self.dfl(next_box), self.anchors.unsqueeze(0), xywh=True, dim=1)
+        anchors = self.anchors.to(box.device).unsqueeze(0)
+        cur_box = dist2bbox(self.dfl(cur_box), anchors, xywh=True, dim=1)
+        next_box = dist2bbox(self.dfl(next_box), anchors, xywh=True, dim=1)
         dbox = torch.cat((cur_box, next_box), 1) * self.strides
         y = torch.cat((dbox, cls.sigmoid()), 1)
         return y if self.export else (y, x)
