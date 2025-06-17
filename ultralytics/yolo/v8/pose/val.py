@@ -58,7 +58,8 @@ class PoseValidator(DetectionValidator):
             bbox = batch['bboxes'][idx]
             kpts = batch['keypoints'][idx]
             nl, npr = cls.shape[0], pred.shape[0]  # number of labels, predictions
-            nk = kpts.shape[1]  # number of keypoints
+            # number of keypoints as defined by the model configuration
+            nk = self.kpt_shape[0]
             shape = batch['ori_shape'][si]
             correct_kpts = torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device)  # init
             correct_bboxes = torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device)  # init
