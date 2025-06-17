@@ -18,8 +18,8 @@
 
 # Root directory for images and labels
 path: ../datasets/multitask
-train: /storage/Multi/ultralytics/ultralytics/multitask/datasets/train/all_profession
-val: /storage/Multi/ultralytics/ultralytics/multitask/datasets/val/all_profession
+train: /storage/Multi/ultralytics/ultralytics/multitask/dataset/train/all_profession
+val: /storage/Multi/ultralytics/ultralytics/multitask/dataset/val/all_profession
 # test: images/test
 
 # Detection classes
