@@ -91,10 +91,10 @@ def inverse_transform(pred_x, pred_y, target_weight, target_hight):
     return
 
 
-def revert_coordinates(data, w=1280, h=480, target_size=640):
+def revert_coordinates(data, w=1280, h=720, target_size=640):
     """
     Reverts coordinates from resized-padded image (e.g., 640x640)
-    back to original image coordinates (e.g., 1280x480).
+    back to original image coordinates (e.g., 1280x720).
     
     Parameters:
     - data: (N, 6) tensor with (frame, visibility, x, y, dx, dy)
