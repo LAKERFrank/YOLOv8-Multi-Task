@@ -10,6 +10,8 @@ from ultralytics.tracknet.val_dataset import TrackNetValDataset
 from ultralytics.multitask.configurable_dataset import MultiTaskConfigurableDataset
 from ultralytics.multitask.val_dataset import MultiTaskValDataset
 from ultralytics.yolo.utils import DEFAULT_CFG, LOGGER, RANK
+from ultralytics.yolo.utils.plotting import Annotator
+from ultralytics.yolo.utils.ops import xywh2xyxy
 from ultralytics.yolo.utils.torch_utils import torch_distributed_zero_first
 from ultralytics.yolo.data import build_dataloader
 from ultralytics.yolo.v8.detect.train import DetectionTrainer
@@ -47,7 +49,39 @@ class TrackNetTrainer(DetectionTrainer):
         return ("\n" + "%11s" * (3 + len(self.loss_names))) % ("Epoch", "GPU_mem", *self.loss_names, "Size")
 
     def plot_training_samples(self, batch, ni):
-        pass
+        """Save a few annotated training images to the run directory."""
+        try:
+            import cv2
+        except Exception as e:
+            LOGGER.warning(f"visualization skipped: {e}")
+            return
+
+        dataset = self.train_loader.dataset
+        imgsz = getattr(dataset, "imgsz", 640)
+        batch_size = len(batch["img_files"])
+        for i in range(min(batch_size, 4)):
+            img_path = batch["img_files"][i][-1]
+            img = cv2.imread(str(img_path))
+            if img is None:
+                continue
+
+            annotator = Annotator(img, line_width=2)
+            ball = batch["target"][i, -1]
+            if ball[1] == 1:
+                bx, by = int(ball[2]), int(ball[3])
+                cv2.circle(annotator.im, (bx, by), 5, (0, 0, 255), -1)
+
+            if "batch_idx" in batch:
+                idx = batch["batch_idx"] == i
+                boxes = batch["bboxes"][idx] * imgsz
+                kpts = batch["keypoints"][idx] * imgsz
+                for box, kpt in zip(boxes, kpts):
+                    xyxy = xywh2xyxy(box.unsqueeze(0))[0].tolist()
+                    annotator.box_label(xyxy)
+                    annotator.kpts(kpt.view(-1, 3), shape=(imgsz, imgsz))
+
+            fname = self.save_dir / f"train_batch{ni}_{i}.jpg"
+            cv2.imwrite(str(fname), annotator.result())
 
     def plot_training_labels(self):
         pass
