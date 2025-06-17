@@ -14,8 +14,11 @@ Use the `yolo` command to train the model with both tracking and pose heads enab
 
 ```bash
 yolo train model=ultralytics/models/v8/multitask.yaml data=your_data.yaml \
-    epochs=100 imgsz=640 track=True pose=True
+    epochs=100 imgsz=640 track=True pose=True --plots
 ```
+
+The `--plots` flag saves a few annotated training images in the run directory so
+you can verify that ball labels and player keypoints line up correctly.
 
 The same can be achieved from Python:
 
@@ -23,7 +26,8 @@ The same can be achieved from Python:
 from ultralytics import YOLO
 
 model = YOLO('ultralytics/models/v8/multitask.yaml')
-model.train(data='your_data.yaml', epochs=100, imgsz=640, track=True, pose=True)
+model.train(data='your_data.yaml', epochs=100, imgsz=640, track=True, pose=True,
+            plots=True)
 ```
 
 ## Inference
