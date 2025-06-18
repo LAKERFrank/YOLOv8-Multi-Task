@@ -72,7 +72,8 @@ class TrackNetTrainer(DetectionTrainer):
                 cv2.circle(annotator.im, (bx, by), 5, (0, 0, 255), -1)
 
             if "batch_idx" in batch:
-                idx = batch["batch_idx"] == i
+                # Flatten mask to avoid shape mismatch when indexing tensors
+                idx = (batch["batch_idx"] == i).view(-1)
                 boxes = batch["bboxes"][idx] * imgsz
                 kpts = batch["keypoints"][idx] * imgsz
                 for box, kpt in zip(boxes, kpts):
