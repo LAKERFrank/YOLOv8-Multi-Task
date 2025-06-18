@@ -157,7 +157,7 @@ class TrackNetTestDataset(Dataset):
         """
         
         # Clone the data to ensure we don't modify the original tensor in-place
-        data_transformed = data
+        data_transformed = data.clone()
         
         # Determine padding
         max_dim = max(w, h)
