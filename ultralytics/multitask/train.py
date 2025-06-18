@@ -125,7 +125,9 @@ class MultiTaskTrainer(TrackNetTrainer):
                 # Flatten mask to avoid shape mismatch when indexing tensors
                 idx = (batch["batch_idx"] == i).view(-1)
                 boxes = batch["bboxes"][idx] * imgsz
-                kpts = batch["keypoints"][idx] * imgsz
+                kpts = batch["keypoints"][idx].clone()
+                kpts[:, 0::3] *= imgsz
+                kpts[:, 1::3] *= imgsz
                 for j, (box, kpt) in enumerate(zip(boxes, kpts)):
                     xyxy = xywh2xyxy(box.unsqueeze(0))[0].tolist()
                     annotator.box_label(xyxy)
