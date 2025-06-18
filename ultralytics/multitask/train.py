@@ -131,7 +131,9 @@ class MultiTaskTrainer(TrackNetTrainer):
                 pad = (max_dim - min(w1, h1)) // 2
                 scale_back = max_dim / imgsz
 
-                boxes = batch["bboxes"][idx].clone() * imgsz
+                boxes = batch["bboxes"][idx].clone()
+                boxes[:, 0::2] *= imgsz
+                boxes[:, 1::2] *= imgsz
                 boxes *= scale_back
                 if h1 < w1:
                     boxes[:, 1] -= pad
@@ -153,7 +155,7 @@ class MultiTaskTrainer(TrackNetTrainer):
 
                 for j, (box, kpt) in enumerate(zip(boxes, kpts)):
                     xyxy = xywh2xyxy(box.unsqueeze(0))[0].tolist()
-                    annotator.box_label(xyxy)
+                    annotator.box_label(xyxy, color=(0, 255, 0))
                     annotator.kpts(kpt.view(-1, 3), shape=(h0, w0))
                     LOGGER.info(
                         f"sample {ni}_{i} obj{j} box {xyxy} keypoints {kpt.view(-1, 3).tolist()}"
