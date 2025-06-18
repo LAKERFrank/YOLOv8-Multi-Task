@@ -126,32 +126,28 @@ class MultiTaskTrainer(TrackNetTrainer):
                 idx = (batch["batch_idx"] == i).view(-1)
 
                 h0, w0 = annotator.im.shape[:2]
-                w1, h1 = w0 // 2, h0 // 2
-                max_dim = max(w1, h1)
-                pad = (max_dim - min(w1, h1)) // 2
+                max_dim = max(w0, h0)
+                pad = (max_dim - min(w0, h0)) // 2
                 scale_back = max_dim / imgsz
 
                 boxes = batch["bboxes"][idx].clone()
                 boxes[:, 0::2] *= imgsz
                 boxes[:, 1::2] *= imgsz
                 boxes *= scale_back
-                if h1 < w1:
+                if h0 < w0:
                     boxes[:, 1] -= pad
                 else:
                     boxes[:, 0] -= pad
-                boxes *= 2
 
                 kpts = batch["keypoints"][idx].clone()
                 kpts[:, 0::3] *= imgsz
                 kpts[:, 1::3] *= imgsz
                 kpts[:, 0::3] *= scale_back
                 kpts[:, 1::3] *= scale_back
-                if h1 < w1:
+                if h0 < w0:
                     kpts[:, 1::3] -= pad
                 else:
                     kpts[:, 0::3] -= pad
-                kpts[:, 0::3] *= 2
-                kpts[:, 1::3] *= 2
 
                 for j, (box, kpt) in enumerate(zip(boxes, kpts)):
                     xyxy = xywh2xyxy(box.unsqueeze(0))[0].tolist()
