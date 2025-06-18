@@ -10,6 +10,8 @@ from ultralytics.tracknet.val_dataset import TrackNetValDataset
 from ultralytics.multitask.configurable_dataset import MultiTaskConfigurableDataset
 from ultralytics.multitask.val_dataset import MultiTaskValDataset
 from ultralytics.yolo.utils import DEFAULT_CFG, LOGGER, RANK
+from ultralytics.yolo.utils.plotting import Annotator
+from ultralytics.yolo.utils.ops import xywh2xyxy
 from ultralytics.yolo.utils.torch_utils import torch_distributed_zero_first
 from ultralytics.yolo.data import build_dataloader
 from ultralytics.yolo.v8.detect.train import DetectionTrainer
@@ -45,9 +47,6 @@ class TrackNetTrainer(DetectionTrainer):
         self.add_callback("print_confusion_matrix", self.tracknet_model.print_confusion_matrix())
         self.add_callback("init_conf_confusion", self.tracknet_model.init_conf_confusion())
         return ("\n" + "%11s" * (3 + len(self.loss_names))) % ("Epoch", "GPU_mem", *self.loss_names, "Size")
-
-    def plot_training_samples(self, batch, ni):
-        pass
 
     def plot_training_labels(self):
         pass
@@ -97,6 +96,46 @@ class MultiTaskTrainer(TrackNetTrainer):
         self.add_callback("print_confusion_matrix", self.model.print_confusion_matrix())
         self.add_callback("init_conf_confusion", self.model.init_conf_confusion())
         return ("\n" + "%11s" * (3 + len(self.loss_names))) % ("Epoch", "GPU_mem", *self.loss_names, "Size")
+
+    def plot_training_samples(self, batch, ni):
+        """Save annotated images and log coordinates during training."""
+        try:
+            import cv2
+        except Exception as e:
+            LOGGER.warning(f"visualization skipped: {e}")
+            return
+
+        dataset = self.train_loader.dataset
+        imgsz = getattr(dataset, "imgsz", 640)
+        batch_size = len(batch["img_files"])
+        for i in range(min(batch_size, 4)):
+            img_path = batch["img_files"][i][-1]
+            img = cv2.imread(str(img_path))
+            if img is None:
+                continue
+
+            annotator = Annotator(img, line_width=2)
+            ball = batch["target"][i, -1]
+            if ball[1] == 1:
+                bx, by = int(ball[2]), int(ball[3])
+                cv2.circle(annotator.im, (bx, by), 5, (0, 0, 255), -1)
+                LOGGER.info(f"sample {ni}_{i} ball ({bx}, {by})")
+
+            if "batch_idx" in batch:
+                # Flatten mask to avoid shape mismatch when indexing tensors
+                idx = (batch["batch_idx"] == i).view(-1)
+                boxes = batch["bboxes"][idx] * imgsz
+                kpts = batch["keypoints"][idx] * imgsz
+                for j, (box, kpt) in enumerate(zip(boxes, kpts)):
+                    xyxy = xywh2xyxy(box.unsqueeze(0))[0].tolist()
+                    annotator.box_label(xyxy)
+                    annotator.kpts(kpt.view(-1, 3), shape=(imgsz, imgsz))
+                    LOGGER.info(
+                        f"sample {ni}_{i} obj{j} box {xyxy} keypoints {kpt.view(-1, 3).tolist()}"
+                    )
+
+            fname = self.save_dir / f"train_batch{ni}_{i}.jpg"
+            cv2.imwrite(str(fname), annotator.result())
 
 
 def train(cfg=DEFAULT_CFG, use_python=False):
