@@ -106,12 +106,13 @@ def revert_coordinates(data, w=1280, h=480, target_size=640):
 
     # Remove padding
     if h < w:
-        data_reverted[indices, 1] -= pad1
+        data_reverted[indices, 3] -= pad1
+        data_reverted[indices, 5] -= pad1
     else:
-        data_reverted[indices, 0] -= pad1
+        data_reverted[indices, 2] -= pad1
+        data_reverted[indices, 4] -= pad1
 
     # Revert scaling
-    data_reverted[:, 0] /= scale_factor
-    data_reverted[:, 1] /= scale_factor
+    data_reverted[:, 2:6] /= scale_factor
 
     return data_reverted
