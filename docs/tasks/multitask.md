@@ -18,7 +18,9 @@ yolo train model=ultralytics/models/v8/multitask.yaml data=your_data.yaml \
 ```
 
 The `--plots` flag saves a few annotated training images in the run directory so
-you can verify that ball labels and player keypoints line up correctly.
+you can verify that ball labels and player keypoints line up correctly. When
+enabled, the trainer also logs the coordinates of each ball and player so you
+can double-check the targets.
 
 The same can be achieved from Python:
 
