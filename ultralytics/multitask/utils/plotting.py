@@ -140,11 +140,23 @@ def display_image_with_coordinates(img_tensor, target, pred, fileName, input_num
     plt.savefig(check_training_img_path+fileName, bbox_inches='tight')
     plt.close()
 
-def display_predict_image(img_tensor, preds, fileName, input_number = None, box_color = 'blue', target = None, label = None, save_dir = Path('.'), stride = 32, path = 'predict_val_img', next = True, only_ball = False, only_next = False, loss = None):
+def display_predict_image(img_tensor, preds, fileName, input_number=None,
+                          box_color='blue', target=None, label=None,
+                          save_dir=Path('.'), stride=32, path='predict_val_img',
+                          next=True, only_ball=False, only_next=False, loss=None,
+                          img_size=640):
     if isinstance(stride, torch.Tensor):
         stride = stride.item()  # 將 tensor 轉換為純數值
     # Convert the image tensor to numpy array
     img_array = img_tensor.cpu().numpy()
+
+    img_height, img_width = img_array.shape[:2]
+    scale_factor = 1.0
+    if img_size and img_width != img_size:
+        scale_factor = img_size / img_width
+        img_array = np.repeat(np.repeat(img_array, int(scale_factor), axis=0),
+                              int(scale_factor), axis=1)
+        img_height, img_width = img_array.shape[:2]
 
     # Create a figure and axes
     fig, ax = plt.subplots(1)
@@ -167,10 +179,11 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         # if distance <= 2:
         #     continue
 
-        x_coordinates *= stride
-        y_coordinates *= stride
-        current_x = x_coordinates+x*stride
-        current_y = y_coordinates+y*stride
+        stride_scaled = stride * scale_factor
+        x_coordinates *= stride_scaled
+        y_coordinates *= stride_scaled
+        current_x = x_coordinates + x * stride_scaled
+        current_y = y_coordinates + y * stride_scaled
 
         if isinstance(current_x, torch.Tensor):
             current_x = current_x.cpu().numpy()
@@ -188,8 +201,8 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         ln_conf = round(n_conf, 2)
 
         
-        current_nx = x_coordinates+nx*stride
-        current_ny = y_coordinates+ny*stride
+        current_nx = x_coordinates + nx * stride_scaled
+        current_ny = y_coordinates + ny * stride_scaled
 
         if isinstance(current_nx, torch.Tensor):
             current_nx = current_nx.cpu().numpy()
@@ -199,10 +212,15 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
         # next_x = current_x+dx*640
         # next_y = current_y+dy*640
         if not only_ball:
-            rect = patches.Rectangle(xy=(x_coordinates, y_coordinates), height=stride, width=stride, edgecolor=box_color, facecolor='none', linewidth=0.5)
+            rect = patches.Rectangle(xy=(x_coordinates, y_coordinates),
+                                     height=stride_scaled, width=stride_scaled,
+                                     edgecolor=box_color, facecolor='none', linewidth=0.5)
             ax.add_patch(rect)
         if not only_ball:
-            text = ax.text(x_coordinates+stride+1, y_coordinates+stride, f'{str(conf)}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
+            text = ax.text(x_coordinates + stride_scaled + 1,
+                           y_coordinates + stride_scaled,
+                           f'{str(conf)}',
+                           verticalalignment='bottom', horizontalalignment='left', fontsize=5)
             text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
                         patheffects.Normal()])
         
@@ -213,7 +231,9 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
             if next:
                 ax.scatter(current_nx, current_ny, s=1, c='green', marker='o')
     
-    label_text = ax.text(0, 0, f'{label}, {loss}, conf: {lconf}, n_conf:{ln_conf}', verticalalignment='bottom', horizontalalignment='left', fontsize=5)
+    label_text = ax.text(0, 0,
+                         f'{label}, {loss}, conf: {lconf}, n_conf:{ln_conf}',
+                         verticalalignment='bottom', horizontalalignment='left', fontsize=5)
     label_text.set_path_effects([patheffects.Stroke(linewidth=2, foreground=(1, 1, 1, 0.3)),
                        patheffects.Normal()])
     if target:
@@ -226,6 +246,10 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
             nx = nx.cpu().item()
         if isinstance(ny, torch.Tensor):
             ny = ny.cpu().item()
+        x *= scale_factor
+        y *= scale_factor
+        nx *= scale_factor
+        ny *= scale_factor
         ax.scatter(x, y, s=1, c='blue', marker='o')
         if x != nx or y != ny:
             ax.scatter(nx, ny, s=1, c='yellow', marker='o')
