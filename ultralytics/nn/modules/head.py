@@ -56,7 +56,9 @@ class DetectV1(nn.Module):
             cls = x_cat[:, self.reg_max * 4:]
         else:
             box, cls = x_cat.split((self.reg_max * 4, self.nc), 1)
-        dbox = dist2bbox(self.dfl(box), self.anchors.unsqueeze(0), xywh=True, dim=1) * self.strides
+        anchors = self.anchors.to(box.device).unsqueeze(0)
+        strides = self.strides.to(box.device)
+        dbox = dist2bbox(self.dfl(box), anchors, xywh=True, dim=1) * strides
         y = torch.cat((dbox, cls.sigmoid()), 1)
         return y if self.export else (y, x)
 
@@ -219,13 +221,31 @@ class Detect(nn.Module):
                               1)
         if self.training:
             return x
+        if self.dynamic or self.shape != shape or not self.anchors.numel():
+            anchor_points, stride_tensor = make_anchors(x, self.stride, 0.5)
+            if self.num_groups > 1:
+                anchor_points = anchor_points.repeat_interleave(self.num_groups, dim=0)
+                stride_tensor = stride_tensor.repeat_interleave(self.num_groups, dim=0)
+            self.anchors, self.strides = anchor_points.transpose(0, 1), stride_tensor.transpose(0, 1)
+            self.shape = shape
+
+        x_cat = torch.cat([xi.view(shape[0], self.no, -1) for xi in x], 2)
+        box_dim = self.reg_max * self.feat_no
+        if self.export and self.format in ('saved_model', 'pb', 'tflite', 'edgetpu', 'tfjs'):
+            box = x_cat[:, :box_dim]
+            cls = x_cat[:, box_dim:]
         else:
-            x_cat = x[0].view(shape[0], self.no, -1)
-            current_dfl, next_dfl, cls = x_cat.split((self.reg_max * 4, self.reg_max * 4, self.nc), 1)
-            current = self.dfl(current_dfl)
-            next = self.dfl(next_dfl)
-            y = torch.cat((current, next, cls.sigmoid()), 1)
-            return (y, x)
+            box, cls = x_cat.split((box_dim, self.nc), 1)
+
+        # first half of box_dim corresponds to current frame, second half to next
+        cur_box, next_box = box.split(box_dim // 2, 1)
+        anchors = self.anchors.to(box.device).unsqueeze(0)
+        strides = self.strides.to(box.device)
+        cur_box = dist2bbox(self.dfl(cur_box), anchors, xywh=True, dim=1)
+        next_box = dist2bbox(self.dfl(next_box), anchors, xywh=True, dim=1)
+        dbox = torch.cat((cur_box, next_box), 1) * strides
+        y = torch.cat((dbox, cls.sigmoid()), 1)
+        return y if self.export else (y, x)
             # feats = x[0].clone()
             # pred_distri, pred_scores = feats.view(self.no, -1).split(
             #     (reg_max * feat_no, nc), 0)
@@ -381,6 +401,15 @@ class Pose(Detect):
         if self.training:
             return x, kpt
         pred_kpt = self.kpts_decode(bs, kpt)
+        if self.num_groups > 1:
+            if self.export:
+                if pred_kpt.shape[-1] != x.shape[-1]:
+                    pred_kpt = pred_kpt.repeat_interleave(self.num_groups, dim=2)
+            else:
+                det, feats = x
+                if pred_kpt.shape[-1] != det.shape[-1]:
+                    pred_kpt = pred_kpt.repeat_interleave(self.num_groups, dim=2)
+                x = (det, feats)
         return torch.cat([x, pred_kpt], 1) if self.export else (torch.cat([x[0], pred_kpt], 1), (x[1], kpt))
 
     def kpts_decode(self, bs, kpts):
@@ -388,7 +417,12 @@ class Pose(Detect):
         ndim = self.kpt_shape[1]
         if self.export:  # required for TFLite export to avoid 'PLACEHOLDER_FOR_GREATER_OP_CODES' bug
             y = kpts.view(bs, *self.kpt_shape, -1)
-            a = (y[:, :, :2] * 2.0 + (self.anchors - 0.5)) * self.strides
+            anchors = self.anchors.to(y.device)
+            strides = self.strides.to(y.device)
+            if anchors.numel() and anchors.shape[-1] != y.shape[-1]:
+                g = anchors.shape[-1] // y.shape[-1]
+                anchors, strides = anchors[:, ::g], strides[:, ::g]
+            a = (y[:, :, :2] * 2.0 + (anchors - 0.5)) * strides
             if ndim == 3:
                 a = torch.cat((a, y[:, :, 2:3].sigmoid()), 2)
             return a.view(bs, self.nk, -1)
@@ -396,8 +430,13 @@ class Pose(Detect):
             y = kpts.clone()
             if ndim == 3:
                 y[:, 2::3].sigmoid_()  # inplace sigmoid
-            y[:, 0::ndim] = (y[:, 0::ndim] * 2.0 + (self.anchors[0] - 0.5)) * self.strides
-            y[:, 1::ndim] = (y[:, 1::ndim] * 2.0 + (self.anchors[1] - 0.5)) * self.strides
+            anchors = self.anchors.to(y.device)
+            strides = self.strides.to(y.device)
+            if anchors.numel() and anchors.shape[-1] != y.shape[-1]:
+                g = anchors.shape[-1] // y.shape[-1]
+                anchors, strides = anchors[:, ::g], strides[:, ::g]
+            y[:, 0::ndim] = (y[:, 0::ndim] * 2.0 + (anchors[0] - 0.5)) * strides
+            y[:, 1::ndim] = (y[:, 1::ndim] * 2.0 + (anchors[1] - 0.5)) * strides
             return y
 
 

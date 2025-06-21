@@ -17,10 +17,10 @@
 # ]
 
 # Root directory for images and labels
-path: ../datasets/multitask
-train: images/train
-val: images/val
-test: images/test
+path: ../ultralytics/ultralytics/multitask/dataset
+train: train/all_profession
+val: val/all_profession
+# test: images/test
 
 # Detection classes
 nc: 2

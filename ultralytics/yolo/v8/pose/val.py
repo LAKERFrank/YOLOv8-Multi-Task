@@ -58,7 +58,8 @@ class PoseValidator(DetectionValidator):
             bbox = batch['bboxes'][idx]
             kpts = batch['keypoints'][idx]
             nl, npr = cls.shape[0], pred.shape[0]  # number of labels, predictions
-            nk = kpts.shape[1]  # number of keypoints
+            # number of keypoints as defined by the model configuration
+            nk = self.kpt_shape[0]
             shape = batch['ori_shape'][si]
             correct_kpts = torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device)  # init
             correct_bboxes = torch.zeros(npr, self.niou, dtype=torch.bool, device=self.device)  # init
@@ -76,22 +77,24 @@ class PoseValidator(DetectionValidator):
             if self.args.single_cls:
                 pred[:, 5] = 0
             predn = pred.clone()
-            ops.scale_boxes(batch['img'][si].shape[1:], predn[:, :4], shape,
-                            ratio_pad=batch['ratio_pad'][si])  # native-space pred
-            pred_kpts = predn[:, 6:].view(npr, nk, -1)
-            ops.scale_coords(batch['img'][si].shape[1:], pred_kpts, shape, ratio_pad=batch['ratio_pad'][si])
+            from ultralytics.yolo.utils.ops import _normalize_ratio_pad
+            ratio_pad = _normalize_ratio_pad(batch['ratio_pad'][si])
+            ops.scale_boxes(batch['img'][si].shape[1:], predn[:, :4], shape, ratio_pad=ratio_pad)  # native-space pred
+            # keypoints are always located at the end of the predictions
+            ndim = self.kpt_shape[1]
+            pred_kpts = predn[:, -(nk * ndim):].view(npr, nk, ndim)
+            ops.scale_coords(batch['img'][si].shape[1:], pred_kpts, shape, ratio_pad=ratio_pad)
 
             # Evaluate
             if nl:
                 height, width = batch['img'].shape[2:]
                 tbox = ops.xywh2xyxy(bbox) * torch.tensor(
                     (width, height, width, height), device=self.device)  # target boxes
-                ops.scale_boxes(batch['img'][si].shape[1:], tbox, shape,
-                                ratio_pad=batch['ratio_pad'][si])  # native-space labels
-                tkpts = kpts.clone()
+                ops.scale_boxes(batch['img'][si].shape[1:], tbox, shape, ratio_pad=ratio_pad)  # native-space labels
+                tkpts = kpts.clone().view(nl, nk, ndim)
                 tkpts[..., 0] *= width
                 tkpts[..., 1] *= height
-                tkpts = ops.scale_coords(batch['img'][si].shape[1:], tkpts, shape, ratio_pad=batch['ratio_pad'][si])
+                ops.scale_coords(batch['img'][si].shape[1:], tkpts, shape, ratio_pad=ratio_pad)
                 labelsn = torch.cat((cls, tbox), 1)  # native-space labels
                 correct_bboxes = self._process_batch(predn[:, :6], labelsn)
                 correct_kpts = self._process_batch(predn[:, :6], labelsn, pred_kpts, tkpts)
@@ -113,8 +116,8 @@ class PoseValidator(DetectionValidator):
         Arguments:
             detections (array[N, 6]), x1, y1, x2, y2, conf, class
             labels (array[M, 5]), class, x1, y1, x2, y2
-            pred_kpts (array[N, 51]), 51 = 17 * 3
-            gt_kpts (array[N, 51])
+            pred_kpts (Tensor[N, K, D])
+            gt_kpts (Tensor[M, K, D])
         Returns:
             correct (array[N, 10]), for 10 IoU levels
         """
