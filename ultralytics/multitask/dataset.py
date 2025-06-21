@@ -439,9 +439,12 @@ class MultiTaskDataset(Dataset):
             kp_list = p.get("Keypoints", [])
             if not bbox or not kp_list:
                 continue
-            x1, y1 = bbox["X"], bbox["Y"]
-            x2 = x1 + bbox["Width"]
-            y2 = y1 + bbox["Height"]
+            cx, cy = bbox["X"], bbox["Y"]
+            bw, bh = bbox["Width"], bbox["Height"]
+            x1 = cx - bw / 2
+            y1 = cy - bh / 2
+            x2 = cx + bw / 2
+            y2 = cy + bh / 2
             points = self.transform_points([[x1, y1], [x2, y2]], w, h)
             x1, y1 = points[0]
             x2, y2 = points[1]
