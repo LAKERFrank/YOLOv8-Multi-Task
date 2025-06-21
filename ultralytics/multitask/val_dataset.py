@@ -337,6 +337,7 @@ class MultiTaskValDataset(Dataset):
         self.imgsz = imgsz
         self.prefix = prefix
         self.samples = []
+        self.idx = set()
 
         for video_dir in sorted(self.root_dir.iterdir()):
             ann_path = video_dir / "annotation.json"
@@ -352,10 +353,17 @@ class MultiTaskValDataset(Dataset):
                 key=lambda x: int(x.stem.split("_")[-1])
             )
 
+            if not img_files:
+                continue
+
+            img0 = cv2.cvtColor(cv2.imread(str(img_files[0])), cv2.COLOR_BGR2GRAY)
+            h, w = img0.shape
+
             for i in range(max(0, len(img_files) - self.num_input + 1)):
                 imgs = img_files[i : i + self.num_input]
                 info = [frame_map.get(int(p.stem.split("_")[-1]), {}) for p in imgs]
                 target = self.build_ball_target(info)
+                target = self.transform_coordinates(torch.from_numpy(target), w, h).numpy()
                 players = info[-1].get("Players", [])
                 self.samples.append({
                     "img_paths": [str(p) for p in imgs],
@@ -381,6 +389,25 @@ class MultiTaskValDataset(Dataset):
                 dx, dy = 0, 0
             target.append([f.get("Frame", 0), vis, bx, by, dx, dy, 0])
         return np.array(target, dtype=np.float32)
+
+    def transform_coordinates(self, data, w, h, target_size=640):
+        """Transform X/Y coordinates to padded+resized image space."""
+
+        data_transformed = data.clone()
+        max_dim = max(w, h)
+        pad_diff = max_dim - min(w, h)
+        pad1 = pad_diff // 2
+        indices_to_transform = (data[:, 2] != 0) | (data[:, 3] != 0)
+        if h < w:
+            data_transformed[indices_to_transform, 3] += pad1
+        else:
+            data_transformed[indices_to_transform, 2] += pad1
+        scale_factor = target_size / max_dim
+        data_transformed[:, 2] *= scale_factor
+        data_transformed[:, 3] *= scale_factor
+        data_transformed[:, 4] *= scale_factor
+        data_transformed[:, 5] *= scale_factor
+        return data_transformed
 
     def transform_points(self, pts, w, h):
         pts = np.array(pts, dtype=np.float32)
