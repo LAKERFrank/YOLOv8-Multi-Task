@@ -430,12 +430,12 @@ class TrackNetValidatorV4(BaseValidator):
                 metric = {}
                 x_coordinate = x*self.stride
                 y_coordinate = y*self.stride
-                
+
                 x = x_coordinate + (center-p_cell_x[int(y)][int(x)][0]+p_cell_x[int(y)][int(x)][1]*self.stride)
                 y = y_coordinate + (center-p_cell_y[int(y)][int(x)][0]+p_cell_y[int(y)][int(x)][1]*self.stride)
                 nx = x_coordinate + (center-p_cell_nx[int(y)][int(x)][0]+p_cell_nx[int(y)][int(x)][1]*self.stride)
                 ny = y_coordinate + (center-p_cell_ny[int(y)][int(x)][0]+p_cell_ny[int(y)][int(x)][1]*self.stride)
-                
+
                 metric["x"] = x * x_n
                 metric["y"] = y + y_offset
                 metric["conf"] = conf
@@ -444,7 +444,15 @@ class TrackNetValidatorV4(BaseValidator):
                 metric["ny"] = ny + y_offset
 
                 metrics.append(metric)
-                self.frame_10_metrics.append(metric)
+
+                metric_640 = {
+                    "x": x,
+                    "y": y,
+                    "conf": conf,
+                    "nx": nx,
+                    "ny": ny,
+                }
+                self.frame_10_metrics.append(metric_640)
             
             # 畫出來
             # for metric in metrics:
