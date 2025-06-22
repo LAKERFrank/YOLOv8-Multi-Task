@@ -2,7 +2,7 @@
 # YOLOv8 object detection model with P3-P5 outputs. For Usage examples see https://docs.ultralytics.com/tasks/detect
 
 # Parameters
-nc: 1  # number of classes
+nc: 2  # number of classes
 ch: 10
 kpt_shape: [17, 3]  # number of keypoints, number of dims (2 for x,y or 3 for x,y,visible)
 # feat_no: 8    # number of bbox feature sets per group
