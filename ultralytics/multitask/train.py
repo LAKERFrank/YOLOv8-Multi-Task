@@ -151,7 +151,7 @@ class MultiTaskTrainer(TrackNetTrainer):
 
                 for j, (box, kpt) in enumerate(zip(boxes, kpts)):
                     xyxy = xywh2xyxy(box.unsqueeze(0))[0].tolist()
-                    annotator.box_label(xyxy, color=(0, 255, 0))
+                    annotator.box_label(xyxy, color=(132, 193, 255))
                     annotator.kpts(kpt.view(-1, 3), shape=(h0, w0))
                     LOGGER.info(
                         f"sample {ni}_{i} obj{j} box {xyxy} keypoints {kpt.view(-1, 3).tolist()}"
