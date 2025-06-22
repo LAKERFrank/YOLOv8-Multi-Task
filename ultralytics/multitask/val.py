@@ -996,8 +996,9 @@ class TrackNetValidator(BaseValidator):
                 'threshold>0.8 rate':self.pred_ball_count/self.ball_count}
     
     def print_results(self):
-        """Print the results."""
-        print(self.get_stats())
+        """Print the results using the logger for better visibility."""
+        stats = self.get_stats()
+        LOGGER.info(stats)
 
     def get_desc(self):
         """Return a description for tqdm progress bar."""
