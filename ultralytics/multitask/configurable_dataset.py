@@ -348,7 +348,7 @@ class TrackNetConfigurableDataset(Dataset):
         img = self.open_image(path)
         img = self.pad_to_square(img, pad_value)
         img = cv2.resize(img, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
-        img.resize((1, 640, 640))
+        img = img.reshape(1, 640, 640)
         return img
 
     def open_image(self, path):
@@ -480,7 +480,7 @@ class MultiTaskConfigurableDataset(Dataset):
         img = self.open_image(path)
         img = self.pad_to_square(img, pad_value)
         img = cv2.resize(img, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
-        img.resize((1, 640, 640))
+        img = img.reshape(1, 640, 640)
         return img
 
     def open_image(self, path):
