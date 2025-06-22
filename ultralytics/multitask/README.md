@@ -68,5 +68,17 @@ edit the file directly or supply a custom YAML on the command line via the
 python multitask.py --data path/to/your_multitask.yaml
 ```
 
+## inference.py 範例
+
+訓練完成後，可以使用 `inference.py` 來對圖片或影片進行推論，
+指令與 YOLOv8 CLI 相同，需提供權重檔與輸入來源：
+
+```bash
+python inference.py --weights path/to/best.pt --source path/to/image.jpg --save --show
+```
+
+加上 `--track` 會啟用 tracking head，`--pose` 則啟用姿態估計。
+預設輸出會儲存於 `runs/predict` 目錄。
+
 ## TODO
 - 挑影片的方式目前是寫死的
