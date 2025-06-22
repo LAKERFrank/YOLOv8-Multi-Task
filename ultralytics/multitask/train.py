@@ -75,7 +75,7 @@ class MultiTaskTrainer(TrackNetTrainer):
         return build_dataloader(dataset, batch_size, workers, shuffle, rank, custom_sampler)
 
     def get_model(self, cfg=None, weights=None, verbose=True):
-        model = MultiTaskModel(cfg, verbose=verbose)
+        model = MultiTaskModel(cfg, nc=self.data["nc"], verbose=verbose)
         if weights:
             model.load(weights)
         return model
