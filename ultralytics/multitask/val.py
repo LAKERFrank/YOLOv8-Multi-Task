@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from ultralytics.tracknet.dataset import TrackNetDataset
 from ultralytics.tracknet.utils.nms import non_max_suppression
-from ultralytics.tracknet.utils.plotting import display_predict_image
+from ultralytics.multitask.utils.plotting import display_predict_image
 from ultralytics.multitask.utils.transform import (
     calculate_angle,
     calculate_dist,
@@ -794,11 +794,11 @@ class TrackNetValidator(BaseValidator):
                         stride = self.stride,
                         next=True,
                         loss=loss
-                        ) 
+                        )
             
                 if box_color == 'blue':
                     display_predict_image(
-                        batch_img[frame_idx],  
+                        batch_img[frame_idx],
                         metrics, 
                         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
                         box_color=box_color,
@@ -812,7 +812,7 @@ class TrackNetValidator(BaseValidator):
                         ) 
                 if box_color == 'yellow':
                     display_predict_image(
-                        batch_img[frame_idx],  
+                        batch_img[frame_idx],
                         metrics, 
                         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
                         box_color=box_color,

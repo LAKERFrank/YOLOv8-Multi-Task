@@ -458,7 +458,8 @@ class MultiTaskValDataset(Dataset):
         img_tensor = torch.from_numpy(img).float()
         target = torch.from_numpy(sample["target"])
 
-        last_img = self.open_image(sample["img_paths"][-1])
+        # last_img = self.open_image(sample["img_paths"][-1])
+        last_img = cv2.cvtColor(cv2.imread(sample["img_paths"][-1]), cv2.COLOR_BGR2GRAY)
         h, w = last_img.shape
         boxes, keypoints = self.process_players(sample["players"], w, h)
         cls = torch.zeros((len(boxes), 1), dtype=torch.float32)
