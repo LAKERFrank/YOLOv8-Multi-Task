@@ -1059,6 +1059,31 @@ class MultiTaskValidator(TrackNetValidator):
             batch_pose = batch
         self.pose_validator.update_metrics(pose_pred, batch_pose)
 
+    def update_metrics_once(self, batch_idx, preds, batch, loss=None):
+        """Update metrics for a single sample for both TrackNet and Pose heads."""
+        track_pred, pose_pred = preds
+        if isinstance(track_pred, tuple):
+            track_pred = track_pred[1]
+        super().update_metrics_once(batch_idx, track_pred,
+                                    batch['target'][batch_idx],
+                                    batch['img'][batch_idx], loss)
+
+        pose_pred_single = pose_pred[batch_idx]
+        mask = batch['batch_idx'].squeeze(-1) == batch_idx
+        batch_pose = {
+            'img': batch['img'][batch_idx:batch_idx + 1],
+            'bboxes': batch['bboxes'][mask],
+            'cls': batch['cls'][mask],
+            'keypoints': batch['keypoints'][mask],
+            'batch_idx': torch.zeros_like(batch['cls'][mask]),
+            'img_files': [batch['img_files'][batch_idx]],
+        }
+        if 'ori_shape' in batch:
+            batch_pose['ori_shape'] = [batch['ori_shape'][batch_idx]]
+        if 'ratio_pad' in batch:
+            batch_pose['ratio_pad'] = [batch['ratio_pad'][batch_idx]]
+        self.pose_validator.update_metrics([pose_pred_single], batch_pose)
+
     def finalize_metrics(self):
         super().finalize_metrics()
         self.pose_validator.finalize_metrics()
