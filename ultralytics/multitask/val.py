@@ -1059,7 +1059,7 @@ class MultiTaskValidator(TrackNetValidator):
             batch_pose = batch
         self.pose_validator.update_metrics(pose_pred, batch_pose)
 
-    def update_metrics_once(self, batch_idx, preds, batch, loss=None):
+    def update_metrics_for_sample(self, batch_idx, preds, batch, loss=None):
         """Update metrics for a single sample for both TrackNet and Pose heads."""
         track_pred, pose_pred = preds
         if isinstance(track_pred, tuple):
