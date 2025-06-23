@@ -1,0 +1,10 @@
+---
+# 以 yolov8n.yaml 為底，只列出需要改動的行
+in_channels: 11                # 1+10 = 11
+nc: 2                           # 兩類：shuttlecock, person
+names: [shuttlecock, person]
+kpt_shape: [17, 3]              # 17 個 keypoints (x, y, v)
+depth_multiple: 0.33            # 以下保持原 yolov8n
+width_multiple: 0.25
+# 其餘 backbone／neck／head 結構照抄官方 yaml 即可
+---
