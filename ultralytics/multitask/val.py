@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from ultralytics.tracknet.dataset import TrackNetDataset
 from ultralytics.tracknet.utils.nms import non_max_suppression
-from ultralytics.tracknet.utils.plotting import display_predict_image
+from ultralytics.multitask.utils.plotting import display_predict_image
 from ultralytics.multitask.utils.transform import (
     calculate_angle,
     calculate_dist,
@@ -794,11 +794,11 @@ class TrackNetValidator(BaseValidator):
                         stride = self.stride,
                         next=True,
                         loss=loss
-                        ) 
+                        )
             
                 if box_color == 'blue':
                     display_predict_image(
-                        batch_img[frame_idx],  
+                        batch_img[frame_idx],
                         metrics, 
                         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
                         box_color=box_color,
@@ -812,7 +812,7 @@ class TrackNetValidator(BaseValidator):
                         ) 
                 if box_color == 'yellow':
                     display_predict_image(
-                        batch_img[frame_idx],  
+                        batch_img[frame_idx],
                         metrics, 
                         'val_'+formatted_date+'_'+ str(int(batch_target[frame_idx][0])),
                         box_color=box_color,
@@ -1012,7 +1012,21 @@ class MultiTaskValidator(TrackNetValidator):
 
     def preprocess(self, batch):
         batch = super().preprocess(batch)
-        return self.pose_validator.preprocess(batch)
+        batch = self.pose_validator.preprocess(batch)
+        if 'ori_shape' not in batch:
+            imgsz = batch['img'].shape[-2:]
+            batch['ori_shape'] = [imgsz] * len(batch['img'])
+            batch['ratio_pad'] = [((1.0, 1.0), (0.0, 0.0))] * len(batch['img'])
+        # ensure ratio_pad entries are standard tuples
+        if 'ratio_pad' in batch:
+            from ultralytics.yolo.utils.ops import _normalize_ratio_pad
+            rp = []
+            for r in batch['ratio_pad']:
+                if isinstance(r, torch.Tensor):
+                    r = r.squeeze().tolist()
+                rp.append(_normalize_ratio_pad(r))
+            batch['ratio_pad'] = rp
+        return batch
 
     def postprocess(self, preds):
         track_pred, pose_pred = preds
@@ -1032,8 +1046,18 @@ class MultiTaskValidator(TrackNetValidator):
 
     def update_metrics(self, preds, batch, loss):
         track_pred, pose_pred = preds
-        super().update_metrics([None, [track_pred]], batch, loss)
-        self.pose_validator.update_metrics(pose_pred, batch)
+        # detection head returns (preds, feats) during training/validation
+        if isinstance(track_pred, tuple):
+            # use raw feature maps for tracking metrics
+            track_pred = track_pred[1]
+        super().update_metrics([None, track_pred], batch, loss)
+        # pose validator expects 1D batch indices
+        if isinstance(batch.get('batch_idx'), torch.Tensor) and batch['batch_idx'].ndim == 2:
+            batch_pose = batch.copy()
+            batch_pose['batch_idx'] = batch['batch_idx'].view(-1)
+        else:
+            batch_pose = batch
+        self.pose_validator.update_metrics(pose_pred, batch_pose)
 
     def finalize_metrics(self):
         super().finalize_metrics()

@@ -226,7 +226,10 @@ def check_det_dataset(dataset, autodownload=True):
     path = Path(extract_dir or data.get('path') or Path(data.get('yaml_file', '')).parent)  # dataset root
 
     if not path.is_absolute():
-        path = (DATASETS_DIR / path).resolve()
+        candidate = (DATASETS_DIR / path).resolve()
+        if not candidate.exists():
+            candidate = (Path(data.get('yaml_file', '')).parent / path).resolve()
+        path = candidate
     data['path'] = path  # download scripts
     for k in 'train', 'val', 'test':
         if data.get(k):  # prepend path

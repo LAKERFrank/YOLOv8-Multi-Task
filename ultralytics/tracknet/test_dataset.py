@@ -157,7 +157,7 @@ class TrackNetTestDataset(Dataset):
         """
         
         # Clone the data to ensure we don't modify the original tensor in-place
-        data_transformed = data
+        data_transformed = data.clone()
         
         # Determine padding
         max_dim = max(w, h)
@@ -212,7 +212,7 @@ class TrackNetTestDataset(Dataset):
     def __preprocess_img(self, path, pad_value=0):
         img = self.open_image(path)
         img = self.pad_to_square(img, pad_value)
-        img.resize((1, 640, 640))
+        img = img.reshape(1, 640, 640)
         return img
 
     def open_image(self, path):

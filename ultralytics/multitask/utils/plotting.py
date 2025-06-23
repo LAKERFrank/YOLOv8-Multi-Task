@@ -153,6 +153,7 @@ def display_predict_image(img_tensor, preds, fileName, input_number = None, box_
     ax.imshow(img_array, cmap='gray')
 
     img_height, img_width = img_array.shape[:2]
+    # print(f'img_height: {img_height}, img_width: {img_width}, stride: {stride}')
     lconf, ln_conf = 0, 0
     for pred in preds:
         x_coordinates = pred["grid_x"]

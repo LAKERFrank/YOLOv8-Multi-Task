@@ -293,7 +293,7 @@ class TrackNetConfigurableDataset(Dataset):
         """
         
         # Clone the data to ensure we don't modify the original tensor in-place
-        data_transformed = data
+        data_transformed = data.clone()
         
         # Determine padding
         max_dim = max(w, h)
@@ -351,7 +351,7 @@ class TrackNetConfigurableDataset(Dataset):
         img = self.open_image(path)
         img = self.pad_to_square(img, pad_value)
         img = cv2.resize(img, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
-        img.resize((1, 640, 640))
+        img = img.reshape(1, 640, 640)
         return img
 
     def open_image(self, path):
