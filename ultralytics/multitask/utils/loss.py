@@ -810,11 +810,15 @@ class FocalLossWithMask(nn.Module):
 
     # OHEM
     def top_k_sampling(self, loss, labels, negative_ratio=3.0):
-        """
-        Hard Negative Mining: Selects the hardest negative examples based on the loss.
-        """
-        pos_mask = labels > 0
-        num_pos = pos_mask.sum(dim=1, keepdim=True)
+        """Select hardest negatives using online hard example mining."""
+        if labels.dim() == 3:
+            pos_mask_single = labels[..., 1] > 0 if labels.size(-1) == 2 else labels.any(dim=-1)
+            pos_mask = pos_mask_single.unsqueeze(-1).expand_as(labels)
+        else:
+            pos_mask_single = labels > 0
+            pos_mask = pos_mask_single
+
+        num_pos = pos_mask_single.sum(dim=1, keepdim=True)
         num_neg = negative_ratio * num_pos
 
         loss_for_sort = loss.clone()
@@ -822,11 +826,9 @@ class FocalLossWithMask(nn.Module):
         _, indices = loss_for_sort.sort(dim=1, descending=True)
 
         neg_mask = torch.zeros_like(labels, dtype=torch.bool)
-        for i in range(loss.size(0)):  
+        for i in range(loss.size(0)):
             num_neg_samples = int(num_neg[i].item()) if int(num_neg[i].item()) != 0 else int(negative_ratio)
-            # num_neg_samples = 640
-            # num_neg_samples = int(num_neg[i].item())
-            neg_mask[i, indices[i, :num_neg_samples]] = True 
+            neg_mask[i, indices[i, :num_neg_samples]] = True
 
         return pos_mask | neg_mask
 
