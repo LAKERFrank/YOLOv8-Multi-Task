@@ -996,8 +996,9 @@ class TrackNetValidator(BaseValidator):
                 'threshold>0.8 rate':self.pred_ball_count/self.ball_count}
     
     def print_results(self):
-        """Print the results."""
-        print(self.get_stats())
+        """Print the results using the logger for better visibility."""
+        stats = self.get_stats()
+        LOGGER.info(stats)
 
     def get_desc(self):
         """Return a description for tqdm progress bar."""
@@ -1038,6 +1039,8 @@ class MultiTaskValidator(TrackNetValidator):
         self.pose_validator.dataloader = self.dataloader
         self.pose_validator.device = self.device
         self.pose_validator.args = self.args
+        # ensure confusion matrix is populated for player metrics
+        self.pose_validator.args.plots = True
         self.pose_validator.save_dir = self.save_dir
         self.pose_validator.on_plot = self.on_plot
         # ensure pose metrics have dataset info
@@ -1059,14 +1062,54 @@ class MultiTaskValidator(TrackNetValidator):
             batch_pose = batch
         self.pose_validator.update_metrics(pose_pred, batch_pose)
 
+    def update_metrics_for_sample(self, batch_idx, preds, batch, loss=None):
+        """Update metrics for a single sample for both TrackNet and Pose heads."""
+        track_pred, pose_pred = preds
+        if isinstance(track_pred, tuple):
+            track_pred = track_pred[1]
+        super().update_metrics_once(batch_idx, track_pred,
+                                    batch['target'][batch_idx],
+                                    batch['img'][batch_idx], loss)
+
+        pose_pred_single = pose_pred[batch_idx]
+        mask = batch['batch_idx'].squeeze(-1) == batch_idx
+        batch_pose = {
+            'img': batch['img'][batch_idx:batch_idx + 1],
+            'bboxes': batch['bboxes'][mask],
+            'cls': batch['cls'][mask],
+            'keypoints': batch['keypoints'][mask],
+            'batch_idx': torch.zeros_like(batch['cls'][mask]),
+            'img_files': [batch['img_files'][batch_idx]],
+        }
+        if 'ori_shape' in batch:
+            batch_pose['ori_shape'] = [batch['ori_shape'][batch_idx]]
+        if 'ratio_pad' in batch:
+            batch_pose['ratio_pad'] = [batch['ratio_pad'][batch_idx]]
+        self.pose_validator.update_metrics([pose_pred_single], batch_pose)
+
     def finalize_metrics(self):
         super().finalize_metrics()
         self.pose_validator.finalize_metrics()
 
+    def _player_counts(self):
+        """Return TP, FP and FN counts from the pose confusion matrix."""
+        cm = getattr(self.pose_validator, 'confusion_matrix', None)
+        if cm is None:
+            return 0, 0, 0
+        m = cm.matrix
+        # exclude background column/row which is last index
+        tp = np.diag(m)[:-1].sum()
+        fp = m.sum(1)[:-1].sum() - tp
+        fn = m.sum(0)[:-1].sum() - tp
+        return int(tp), int(fp), int(fn)
+
     def get_stats(self):
         stats = super().get_stats()
         pose_stats = self.pose_validator.get_stats()
-        return {**stats, **{f"pose_{k}": v for k, v in pose_stats.items()}}
+        tp, fp, fn = self._player_counts()
+        pose_summary = {f"pose_{k}": v for k, v in pose_stats.items()}
+        pose_summary.update({"player_TP": tp, "player_FP": fp, "player_FN": fn})
+        return {**stats, **pose_summary}
 
     def print_results(self):
         super().print_results()
