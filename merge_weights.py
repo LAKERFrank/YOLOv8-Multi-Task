@@ -87,7 +87,7 @@ def main():
     args = ap.parse_args()
 
     sd_a, sd_b = load_sd(args.ckpt_a), load_sd(args.ckpt_b)
-    model = YOLO(args.yaml).model
+    model = YOLO(args.yaml, task="pose").model
     sd_new = model.state_dict()
 
     merged = merge_backbone(sd_a, sd_b, FIRST_KEY)
