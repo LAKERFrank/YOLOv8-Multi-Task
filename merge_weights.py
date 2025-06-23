@@ -35,18 +35,23 @@ DETECT_B_KEYS = ["model.24.cv2.bias", "model.24.cv3.bias", "model.24.cv4.bias"]
 
 
 def auto_detect_keys(*sds):
-    """Derive classification conv/bias names from checkpoint state dicts."""
+    """Return detect conv/bias key names present in *all* state dicts."""
     pattern = re.compile(r"model\.(\d+)\.cv3\.\d+\.2\.weight$")
-    indices = {}
+    sets = []
     for sd in sds:
+        idx_map = {}
         for k in sd:
             m = pattern.match(k)
             if m:
-                indices.setdefault(int(m.group(1)), set()).add(k)
-    if not indices:
-        return DETECT_W_KEYS, DETECT_B_KEYS
-    idx = max(indices)
-    ws = sorted(indices[idx])
+                idx_map.setdefault(int(m.group(1)), set()).add(k)
+        if not idx_map:
+            return DETECT_W_KEYS, DETECT_B_KEYS
+        idx = max(idx_map)
+        sets.append(set(idx_map[idx]))
+    common = set.intersection(*sets)
+    if not common:
+        common = sets[0]
+    ws = sorted(common)
     bs = [k.replace("weight", "bias") for k in ws]
     return ws, bs
 # =====================================
