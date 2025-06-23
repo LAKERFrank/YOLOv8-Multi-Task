@@ -13,11 +13,11 @@ merge_weights.py
          - index 1 = person      ：取 A 的 cls[0] (因 A 僅有一類 person)
     4. Pose Head (kpt) 全取 A
 使用方式：
-    python merge_weights.py \
-        --ckpt_a weights/pose_ch1.pt \
-        --ckpt_b weights/tracknet10ch.pt \
+    python3 merge_weights.py \
+        --ckpt_a ./ultralytics/multitask/weights/yolov8n-pose.pt \
+        --ckpt_b ./ultralytics/multitask/weights/tracknet1000.pt \
         --yaml   ultralytics/models/v8/yolov8_multi_11ch.yaml \
-        --save   weights/yolov8_multi_11ch_merged.pt
+        --save   ./ultralytics/multitask/weights/multi_11ch_merged.pt
 """
 from pathlib import Path
 import argparse, torch, yaml
