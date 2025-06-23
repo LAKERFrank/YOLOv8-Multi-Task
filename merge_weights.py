@@ -20,7 +20,10 @@ merge_weights.py
         --save   ./ultralytics/multitask/weights/multi_11ch_merged.pt
 """
 from pathlib import Path
-import argparse, re, torch, yaml
+import argparse
+import re
+import torch
+import yaml
 from ultralytics import YOLO
 
 
@@ -32,25 +35,19 @@ DETECT_B_KEYS = ["model.24.cv2.bias", "model.24.cv3.bias", "model.24.cv4.bias"]
 
 
 def auto_detect_keys(sd):
-    """Guess detect head keys from a state dict if defaults are missing."""
-    pattern = re.compile(r"model\.(\d+)\.cv([234]).*\.weight")
+    """Derive classification conv/bias names from a checkpoint state dict."""
+    pattern = re.compile(r"model\.(\d+)\.cv[34]\.\d+\.2\.weight$")
     indices = {}
     for k in sd:
         m = pattern.match(k)
-        if m and not k.endswith("bn.weight") and not k.endswith("bn.bias"):
-            idx, cv = int(m.group(1)), f"cv{m.group(2)}"
-            indices.setdefault(idx, {}).setdefault(cv, []).append(k)
+        if m:
+            indices.setdefault(int(m.group(1)), []).append(k)
     if not indices:
         return DETECT_W_KEYS, DETECT_B_KEYS
     idx = max(indices)
-    w_keys, b_keys = [], []
-    for cv in ("cv2", "cv3", "cv4"):
-        ws = sorted([k for k in indices.get(idx, {}).get(cv, []) if k.endswith("weight")])
-        bs = sorted([k.replace("weight", "bias") for k in ws if k.replace("weight", "bias") in sd])
-        if ws:
-            w_keys.append(ws[-1])
-            b_keys.append(bs[-1] if bs else ws[-1].replace("weight", "bias"))
-    return w_keys, b_keys
+    ws = sorted(indices[idx])
+    bs = [k.replace("weight", "bias") for k in ws]
+    return ws, bs
 # =====================================
 
 def load_sd(path: str) -> dict:
@@ -90,24 +87,17 @@ def merge_backbone(sd_a, sd_b, first_key, target_shape):
 
 # ---------- Detect head 2 類分類 slice 重排 ----------
 def rebuild_cls_weight(w_a, w_b, target_shape):
-    """Rebuild classification weights to two classes and match target shape."""
-    oc, ic = target_shape[0], target_shape[1]
-    result = torch.zeros(oc, ic, 1, 1)
-    result[0] = _pad_trim(w_b[0], ic, dim=0)  # shuttlecock
-    result[1] = _pad_trim(w_a[0], ic, dim=0)  # person
-    tail = _pad_trim(w_b[2:], oc - 2, dim=0)
-    tail = _pad_trim(tail, ic, dim=1)
-    result[2 : 2 + tail.shape[0]] = tail
-    return result
+    """Stack track and pose classification weights to match new shape."""
+    oc, ic = target_shape[:2]
+    wb = _pad_trim(w_b, ic, dim=1)
+    wa = _pad_trim(w_a, ic, dim=1)
+    merged = torch.cat([wb, wa], dim=0)
+    return _pad_trim(merged, oc, dim=0)
 
 def rebuild_cls_bias(b_a, b_b, target_shape):
     oc = target_shape[0]
-    result = torch.zeros(oc)
-    result[0] = b_b[0].clone()  # shuttlecock
-    result[1] = b_a[0].clone()  # person
-    tail = _pad_trim(b_b[2:], oc - 2, dim=0)
-    result[2 : 2 + tail.shape[0]] = tail
-    return result
+    merged = torch.cat([b_b, b_a])
+    return _pad_trim(merged, oc, dim=0)
 
 def merge_heads(sd_a, sd_b, merged, sd_ref):
     for wk, bk in zip(DETECT_W_KEYS, DETECT_B_KEYS):
