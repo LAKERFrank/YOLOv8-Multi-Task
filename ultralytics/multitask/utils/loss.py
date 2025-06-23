@@ -810,11 +810,15 @@ class FocalLossWithMask(nn.Module):
 
     # OHEM
     def top_k_sampling(self, loss, labels, negative_ratio=3.0):
-        """
-        Hard Negative Mining: Selects the hardest negative examples based on the loss.
-        """
-        pos_mask = labels > 0
-        num_pos = pos_mask.sum(dim=1, keepdim=True)
+        """Select hardest negatives using online hard example mining."""
+        if labels.dim() == 3:
+            pos_mask_single = labels[..., 1] > 0 if labels.size(-1) == 2 else labels.any(dim=-1)
+            pos_mask = pos_mask_single.unsqueeze(-1).expand_as(labels)
+        else:
+            pos_mask_single = labels > 0
+            pos_mask = pos_mask_single
+
+        num_pos = pos_mask_single.sum(dim=1, keepdim=True)
         num_neg = negative_ratio * num_pos
 
         loss_for_sort = loss.clone()
@@ -822,17 +826,20 @@ class FocalLossWithMask(nn.Module):
         _, indices = loss_for_sort.sort(dim=1, descending=True)
 
         neg_mask = torch.zeros_like(labels, dtype=torch.bool)
-        for i in range(loss.size(0)):  
+        for i in range(loss.size(0)):
             num_neg_samples = int(num_neg[i].item()) if int(num_neg[i].item()) != 0 else int(negative_ratio)
-            # num_neg_samples = 640
-            # num_neg_samples = int(num_neg[i].item())
-            neg_mask[i, indices[i, :num_neg_samples]] = True 
+            neg_mask[i, indices[i, :num_neg_samples]] = True
 
         return pos_mask | neg_mask
 
     def forward(self, pred, label, gamma=2, alpha=0.75, negative_ratio=3.0):
         """Calculates and updates confusion matrix for object detection/classification tasks."""
         assert torch.all((label == 0) | (label == 1)), f"`label` contains invalid values: {label.unique()}"
+
+        # Expand binary labels to match prediction shape if necessary
+        if pred.shape[-1] == 2 and label.shape[-1] == 1:
+            label = torch.cat((1 - label, label), dim=-1)
+
         loss = F.binary_cross_entropy_with_logits(pred, label, reduction='none')
         assert (loss >= 0).all(), f"`loss` contains negative values. Min: {loss.min()}, Max: {loss.max()}"
 
