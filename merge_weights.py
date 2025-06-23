@@ -20,7 +20,10 @@ merge_weights.py
         --save   ./ultralytics/multitask/weights/multi_11ch_merged.pt
 """
 from pathlib import Path
-import argparse, torch, yaml
+import argparse
+import re
+import torch
+import yaml
 from ultralytics import YOLO
 
 
@@ -28,20 +31,52 @@ from ultralytics import YOLO
 FIRST_KEY = "model.0.conv.weight"   # 第一層 conv
 # detect head conv/bias (yolov8n: cv2/3/4)；若用 s/m/l/x 請確認層號
 DETECT_W_KEYS = ["model.24.cv2.weight", "model.24.cv3.weight", "model.24.cv4.weight"]
-DETECT_B_KEYS = ["model.24.cv2.bias",   "model.24.cv3.bias",   "model.24.cv4.bias"]
+DETECT_B_KEYS = ["model.24.cv2.bias", "model.24.cv3.bias", "model.24.cv4.bias"]
+
+
+def auto_detect_keys(sd):
+    """Derive classification conv/bias names from a checkpoint state dict."""
+    pattern = re.compile(r"model\.(\d+)\.cv[34]\.\d+\.2\.weight$")
+    indices = {}
+    for k in sd:
+        m = pattern.match(k)
+        if m:
+            indices.setdefault(int(m.group(1)), []).append(k)
+    if not indices:
+        return DETECT_W_KEYS, DETECT_B_KEYS
+    idx = max(indices)
+    ws = sorted(indices[idx])
+    bs = [k.replace("weight", "bias") for k in ws]
+    return ws, bs
 # =====================================
 
 def load_sd(path: str) -> dict:
     ckpt = torch.load(path, map_location="cpu")
     return ckpt["model"].state_dict() if isinstance(ckpt, dict) and "model" in ckpt else ckpt
 
-def concat_first(w_a, w_b):
-    """ dim=1 concat: (C_out, 1,3,3) + (C_out, 10,3,3) -> (C_out, 11,3,3) """
-    return torch.cat([w_a, w_b], dim=1)
+def _pad_trim(t: torch.Tensor, size: int, dim: int = 0) -> torch.Tensor:
+    """Pad with zeros or trim tensor along dim to match size."""
+    if t.shape[dim] == size:
+        return t.clone()
+    if t.shape[dim] > size:
+        return t.narrow(dim, 0, size).clone()
+    shape = list(t.shape)
+    shape[dim] = size
+    out = torch.zeros(*shape, device=t.device, dtype=t.dtype)
+    slices = [slice(None)] * t.ndim
+    slices[dim] = slice(0, t.shape[dim])
+    out[tuple(slices)] = t
+    return out
 
-def merge_backbone(sd_a, sd_b, first_key):
-    merged = {k: v.clone() for k, v in sd_b.items()}           # 先複製 B
-    merged[first_key] = concat_first(sd_a[first_key], sd_b[first_key])
+
+def concat_first(w_a, w_b, target_ic):
+    """Concatenate first conv weights and match expected input channels."""
+    merged = torch.cat([w_a, w_b], dim=1)
+    return _pad_trim(merged, target_ic, dim=1)
+
+def merge_backbone(sd_a, sd_b, first_key, target_shape):
+    merged = {k: v.clone() for k, v in sd_b.items()}  # 先複製 B
+    merged[first_key] = concat_first(sd_a[first_key], sd_b[first_key], target_shape[1])
     # 其餘 shape 相同取平均
     for k in sd_a:
         if k == first_key or k in DETECT_W_KEYS + DETECT_B_KEYS:
@@ -51,26 +86,23 @@ def merge_backbone(sd_a, sd_b, first_key):
     return merged
 
 # ---------- Detect head 2 類分類 slice 重排 ----------
-def rebuild_cls_weight(w_a, w_b):
-    # w_a: A 的 detect conv weight，cls slice 只有 1 (person)
-    # w_b: B 的 detect conv weight，cls slice 只有 1 (shuttlecock)
-    nc_new, in_c = 2, w_b.shape[1]
-    new_cls = torch.zeros(nc_new, in_c, 1, 1)
-    new_cls[0] = w_b[0].clone()   # shuttlecock
-    new_cls[1] = w_a[0].clone()   # person
-    tail = w_b[nc_new:]           # bbox/obj/dfl/...
-    return torch.cat([new_cls, tail], dim=0)
+def rebuild_cls_weight(w_a, w_b, target_shape):
+    """Stack track and pose classification weights to match new shape."""
+    oc, ic = target_shape[:2]
+    wb = _pad_trim(w_b, ic, dim=1)
+    wa = _pad_trim(w_a, ic, dim=1)
+    merged = torch.cat([wb, wa], dim=0)
+    return _pad_trim(merged, oc, dim=0)
 
-def rebuild_cls_bias(b_a, b_b):
-    new_cls = torch.zeros(2)
-    new_cls[0] = b_b[0].clone()   # shuttlecock
-    new_cls[1] = b_a[0].clone()   # person
-    return torch.cat([new_cls, b_b[2:]], dim=0)  # 同上 tail
+def rebuild_cls_bias(b_a, b_b, target_shape):
+    oc = target_shape[0]
+    merged = torch.cat([b_b, b_a])
+    return _pad_trim(merged, oc, dim=0)
 
-def merge_heads(sd_a, sd_b, merged):
+def merge_heads(sd_a, sd_b, merged, sd_ref):
     for wk, bk in zip(DETECT_W_KEYS, DETECT_B_KEYS):
-        merged[wk] = rebuild_cls_weight(sd_a[wk], sd_b[wk])
-        merged[bk] = rebuild_cls_bias(sd_a[bk],  sd_b[bk])
+        merged[wk] = rebuild_cls_weight(sd_a[wk], sd_b[wk], sd_ref[wk].shape)
+        merged[bk] = rebuild_cls_bias(sd_a[bk], sd_b[bk], sd_ref[bk].shape)
     # Pose 專屬 (包含 'kpt' 關鍵字) → 全取 A
     for k in sd_a:
         if "kpt" in k:
@@ -98,11 +130,17 @@ def main():
         )
 
     sd_a, sd_b = load_sd(args.ckpt_a), load_sd(args.ckpt_b)
+
+    global DETECT_W_KEYS, DETECT_B_KEYS
+    if DETECT_W_KEYS[0] not in sd_a or DETECT_W_KEYS[0] not in sd_b:
+        DETECT_W_KEYS, DETECT_B_KEYS = auto_detect_keys(sd_b)
+        print(f"Auto-detected detect keys: {DETECT_W_KEYS}")
+
     model = YOLO(args.yaml, task="pose").model
     sd_new = model.state_dict()
 
-    merged = merge_backbone(sd_a, sd_b, FIRST_KEY)
-    merged = merge_heads(sd_a, sd_b, merged)
+    merged = merge_backbone(sd_a, sd_b, FIRST_KEY, sd_new[FIRST_KEY].shape)
+    merged = merge_heads(sd_a, sd_b, merged, sd_new)
 
     sd_new.update(merged)
     model.load_state_dict(sd_new, strict=False)
