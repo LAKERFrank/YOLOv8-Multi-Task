@@ -833,6 +833,11 @@ class FocalLossWithMask(nn.Module):
     def forward(self, pred, label, gamma=2, alpha=0.75, negative_ratio=3.0):
         """Calculates and updates confusion matrix for object detection/classification tasks."""
         assert torch.all((label == 0) | (label == 1)), f"`label` contains invalid values: {label.unique()}"
+
+        # Expand binary labels to match prediction shape if necessary
+        if pred.shape[-1] == 2 and label.shape[-1] == 1:
+            label = torch.cat((1 - label, label), dim=-1)
+
         loss = F.binary_cross_entropy_with_logits(pred, label, reduction='none')
         assert (loss >= 0).all(), f"`loss` contains negative values. Min: {loss.min()}, Max: {loss.max()}"
 
