@@ -400,8 +400,9 @@ class TrackNetValidatorV4(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
         
-        each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
+        num_groups = pred_probs.numel() // (self.cell_num * self.cell_num)
+        each_probs = pred_probs.view(num_groups, self.cell_num, self.cell_num)
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(num_groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
         for frame_idx in range(10):
             p_cell_x = each_pos_x[frame_idx]
@@ -608,8 +609,9 @@ class TrackNetValidator(BaseValidator):
         cls_targets = cls_targets.view(self.num_groups*self.cell_num*self.cell_num, 1)
         mask_has_ball = mask_has_ball.view(self.num_groups*self.cell_num*self.cell_num).bool()
 
-        each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
+        num_groups = pred_probs.numel() // (self.cell_num * self.cell_num)
+        each_probs = pred_probs.view(num_groups, self.cell_num, self.cell_num)
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(num_groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
         # 計算 hit v2 效果
         # 先填充 hit 前後兩幀
@@ -1280,8 +1282,9 @@ class TrackNetValidatorV2(BaseValidator):
         mask_fast_hit_ball = (mask_fast_ball.bool()|mask_hit_ball_v2.bool()).float()
         self.fast_hit_count += mask_fast_hit_ball.sum()
 
-        each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y = pred_pos.view(10, self.cell_num, self.cell_num, 2).split([1, 1], dim=3)
+        num_groups = pred_probs.numel() // (self.cell_num * self.cell_num)
+        each_probs = pred_probs.view(num_groups, self.cell_num, self.cell_num)
+        each_pos_x, each_pos_y = pred_pos.view(num_groups, self.cell_num, self.cell_num, 2).split([1, 1], dim=3)
 
         # 計算 hit v2 效果
         # 先填充 hit 前後兩幀
