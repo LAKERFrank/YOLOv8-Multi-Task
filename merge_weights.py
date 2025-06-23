@@ -20,7 +20,7 @@ merge_weights.py
         --save   ./ultralytics/multitask/weights/multi_11ch_merged.pt
 """
 from pathlib import Path
-import argparse, torch, yaml
+import argparse, re, torch, yaml
 from ultralytics import YOLO
 
 
@@ -28,7 +28,29 @@ from ultralytics import YOLO
 FIRST_KEY = "model.0.conv.weight"   # 第一層 conv
 # detect head conv/bias (yolov8n: cv2/3/4)；若用 s/m/l/x 請確認層號
 DETECT_W_KEYS = ["model.24.cv2.weight", "model.24.cv3.weight", "model.24.cv4.weight"]
-DETECT_B_KEYS = ["model.24.cv2.bias",   "model.24.cv3.bias",   "model.24.cv4.bias"]
+DETECT_B_KEYS = ["model.24.cv2.bias", "model.24.cv3.bias", "model.24.cv4.bias"]
+
+
+def auto_detect_keys(sd):
+    """Guess detect head keys from a state dict if defaults are missing."""
+    pattern = re.compile(r"model\.(\d+)\.cv([234]).*\.weight")
+    indices = {}
+    for k in sd:
+        m = pattern.match(k)
+        if m and not k.endswith("bn.weight") and not k.endswith("bn.bias"):
+            idx, cv = int(m.group(1)), f"cv{m.group(2)}"
+            indices.setdefault(idx, {}).setdefault(cv, []).append(k)
+    if not indices:
+        return DETECT_W_KEYS, DETECT_B_KEYS
+    idx = max(indices)
+    w_keys, b_keys = [], []
+    for cv in ("cv2", "cv3", "cv4"):
+        ws = sorted([k for k in indices.get(idx, {}).get(cv, []) if k.endswith("weight")])
+        bs = sorted([k.replace("weight", "bias") for k in ws if k.replace("weight", "bias") in sd])
+        if ws:
+            w_keys.append(ws[-1])
+            b_keys.append(bs[-1] if bs else ws[-1].replace("weight", "bias"))
+    return w_keys, b_keys
 # =====================================
 
 def load_sd(path: str) -> dict:
@@ -98,6 +120,12 @@ def main():
         )
 
     sd_a, sd_b = load_sd(args.ckpt_a), load_sd(args.ckpt_b)
+
+    global DETECT_W_KEYS, DETECT_B_KEYS
+    if DETECT_W_KEYS[0] not in sd_a or DETECT_W_KEYS[0] not in sd_b:
+        DETECT_W_KEYS, DETECT_B_KEYS = auto_detect_keys(sd_b)
+        print(f"Auto-detected detect keys: {DETECT_W_KEYS}")
+
     model = YOLO(args.yaml, task="pose").model
     sd_new = model.state_dict()
 
