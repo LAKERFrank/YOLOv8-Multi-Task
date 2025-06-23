@@ -77,11 +77,11 @@ class TrackNetValidatorV3(BaseValidator):
         self.ball_count = 0
         self.pred_ball_count = 0
         device = device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.reg_max = 16
+        self.reg_max = getattr(model, 'reg_max', 16)
+        self.feat_no = getattr(model, 'feat_no', 2)
+        self.nc = getattr(model, 'nc', 1)
+        self.no = self.reg_max * self.feat_no + self.nc
         self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
-        self.no = 35
-        self.feat_no = 2
-        self.nc = 1
         self.dxdy_no = 2
     
     def update_metrics(self, preds, batch):
@@ -321,11 +321,11 @@ class TrackNetValidatorV4(BaseValidator):
         self.ball_count = 0
         self.pred_ball_count = 0
         device = device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.reg_max = 16
+        self.reg_max = getattr(model, 'reg_max', 16)
+        self.feat_no = getattr(model, 'feat_no', 8)
+        self.nc = getattr(model, 'nc', 1)
+        self.no = self.reg_max * self.feat_no + self.nc
         self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
-        self.feat_no = 8
-        self.nc = 1
-        self.no = 16*self.feat_no+self.nc
 
         self.fast_count = 0
         self.hit_count = 0
@@ -529,11 +529,11 @@ class TrackNetValidator(BaseValidator):
         self.ball_count = 0
         self.pred_ball_count = 0
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.reg_max = 16
+        self.reg_max = getattr(model, 'reg_max', 16)
+        self.feat_no = getattr(model, 'feat_no', 8)
+        self.nc = getattr(model, 'nc', 1)
+        self.no = self.reg_max * self.feat_no + self.nc
         self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
-        self.feat_no = 8
-        self.nc = 1
-        self.no = 16*self.feat_no+self.nc
 
         # 一顆球半徑 = 2 pixel (640*640)
         self.tolerance2 = 2.0 # 50% 距離容忍度
@@ -1148,11 +1148,11 @@ class TrackNetValidatorV2(BaseValidator):
         self.ball_count = 0
         self.pred_ball_count = 0
         device = device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.reg_max = 20
+        self.reg_max = getattr(model, 'reg_max', 20)
+        self.feat_no = getattr(model, 'feat_no', 2)
+        self.nc = getattr(model, 'nc', 1)
+        self.no = self.reg_max * self.feat_no + self.nc
         self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
-        self.no = 33
-        self.feat_no = 2
-        self.nc = 1
 
         self.fast_count = 0
         self.hit_count = 0
