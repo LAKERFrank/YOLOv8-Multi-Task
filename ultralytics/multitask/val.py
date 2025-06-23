@@ -113,7 +113,7 @@ class TrackNetValidatorV3(BaseValidator):
         pred_dxdy = torch.tanh(pred_dxdy)
 
         pred_probs = torch.sigmoid(pred_scores)
-        num_groups = pred_probs.numel() // (self.cell_num * self.cell_num)
+        num_groups = pred_distri.shape[0] // (self.cell_num * self.cell_num)
 
         a, c = pred_distri.shape
         feat_no = c // self.reg_max
@@ -402,8 +402,8 @@ class TrackNetValidatorV4(BaseValidator):
 
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
-        
-        num_groups = pred_probs.numel() // (self.cell_num * self.cell_num)
+
+        num_groups = pred_distri.shape[0] // (self.cell_num * self.cell_num)
         each_probs = pred_probs.view(num_groups, self.cell_num, self.cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(num_groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
@@ -584,7 +584,7 @@ class TrackNetValidator(BaseValidator):
         pred_distri = pred_distri.permute(1, 0).contiguous()
 
         pred_probs = torch.sigmoid(pred_scores)
-        num_groups = pred_probs.numel() // (self.cell_num * self.cell_num)
+        num_groups = pred_distri.shape[0] // (self.cell_num * self.cell_num)
 
         a, c = pred_distri.shape
         feat_no = c // self.reg_max
@@ -1213,7 +1213,7 @@ class TrackNetValidatorV2(BaseValidator):
         pred_distri = pred_distri.permute(1, 0).contiguous()
 
         pred_probs = torch.sigmoid(pred_scores)
-        num_groups = pred_probs.numel() // (self.cell_num * self.cell_num)
+        num_groups = pred_distri.shape[0] // (self.cell_num * self.cell_num)
 
         a, c = pred_distri.shape
         feat_no = c // self.reg_max
