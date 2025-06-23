@@ -77,10 +77,21 @@ def rebuild_cls_weight(w_a, w_b):
     # w_a: A 的 detect conv weight，cls slice 只有 1 (person)
     # w_b: B 的 detect conv weight，cls slice 只有 1 (shuttlecock)
     nc_new, in_c = 2, w_b.shape[1]
+
+    def match_channels(t, c):
+        """Pad or trim tensor in dim0 to length c."""
+        if t.shape[0] == c:
+            return t.clone()
+        if t.shape[0] > c:
+            return t[:c].clone()
+        out = torch.zeros(c, *t.shape[1:], device=t.device, dtype=t.dtype)
+        out[: t.shape[0]] = t
+        return out
+
     new_cls = torch.zeros(nc_new, in_c, 1, 1)
-    new_cls[0] = w_b[0].clone()   # shuttlecock
-    new_cls[1] = w_a[0].clone()   # person
-    tail = w_b[nc_new:]           # bbox/obj/dfl/...
+    new_cls[0] = match_channels(w_b[0], in_c)  # shuttlecock
+    new_cls[1] = match_channels(w_a[0], in_c)  # person
+    tail = w_b[nc_new:]  # bbox/obj/dfl/...
     return torch.cat([new_cls, tail], dim=0)
 
 def rebuild_cls_bias(b_a, b_b):
