@@ -16,11 +16,11 @@ merge_weights.py
     python merge_weights.py \
         --ckpt_a weights/pose_ch1.pt \
         --ckpt_b weights/tracknet10ch.pt \
-        --yaml   config/yolov8_multi_11ch.yaml \
+        --yaml   ultralytics/models/v8/yolov8_multi_11ch.yaml \
         --save   weights/yolov8_multi_11ch_merged.pt
 """
 from pathlib import Path
-import argparse, torch
+import argparse, torch, yaml
 from ultralytics import YOLO
 
 
@@ -82,9 +82,20 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--ckpt_a", required=True)
     ap.add_argument("--ckpt_b", required=True)
-    ap.add_argument("--yaml",   required=True)
+    ap.add_argument(
+        "--yaml",
+        required=True,
+        help="Path to the model YAML (e.g. ultralytics/models/v8/yolov8_multi_11ch.yaml)",
+    )
     ap.add_argument("--save",   default="merged.pt")
     args = ap.parse_args()
+
+    with open(args.yaml, "r", encoding="utf-8") as f:
+        cfg_dict = yaml.safe_load(f)
+    if not (isinstance(cfg_dict, dict) and "backbone" in cfg_dict and "head" in cfg_dict):
+        raise ValueError(
+            f"{args.yaml} does not appear to be a model config file with 'backbone' and 'head'."
+        )
 
     sd_a, sd_b = load_sd(args.ckpt_a), load_sd(args.ckpt_b)
     model = YOLO(args.yaml, task="pose").model
