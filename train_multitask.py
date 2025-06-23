@@ -45,7 +45,8 @@ def main() -> None:
     """開始訓練。"""
     args = parse_args()
 
-    model = TrackNet(args.model)
+    overrides = {"model": args.model}
+    model = TrackNet(overrides)
     model.train(
         data=args.data,
         epochs=args.epochs,
