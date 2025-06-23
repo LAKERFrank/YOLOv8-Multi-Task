@@ -155,6 +155,7 @@ weights/
 *.torchscript
 *.tflite
 *.h5
+*.csv
 *_saved_model/
 *_web_model/
 *_openvino_model/
