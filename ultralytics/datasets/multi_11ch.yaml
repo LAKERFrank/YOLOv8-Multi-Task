@@ -1,9 +1,45 @@
----
-# 以 yolov8n.yaml 為底，只列出需要改動的行
-in_channels: 11                # 1+10 = 11
-nc: 2                           # 兩類：shuttlecock, person
-names: [shuttlecock, person]
-kpt_shape: [17, 3]              # 17 個 keypoints (x, y, v)
-depth_multiple: 0.33            # 以下保持原 yolov8n
-width_multiple: 0.25
-# 其餘 backbone／neck／head 結構照抄官方 yaml 即可
+# ---
+# # 以 yolov8n.yaml 為底，只列出需要改動的行
+# in_channels: 11                # 1+10 = 11
+# nc: 2                           # 兩類：shuttlecock, person
+# names: [shuttlecock, person]
+# kpt_shape: [17, 3]              # 17 個 keypoints (x, y, v)
+# depth_multiple: 0.33            # 以下保持原 yolov8n
+# width_multiple: 0.25
+# # 其餘 backbone／neck／head 結構照抄官方 yaml 即可
+
+# Root directory for images and labels
+path: ../ultralytics/ultralytics/multitask/dataset
+train: images/train
+val: images/val
+test: images/test
+
+# Detection classes
+nc: 2
+names:
+  0: shettlecock
+  1: person
+
+# Pose configuration
+kpt_shape: [17, 3]
+flip_idx: [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]
+skeleton:
+  - [16, 14]
+  - [14, 12]
+  - [17, 15]
+  - [15, 13]
+  - [12, 13]
+  - [6, 12]
+  - [7, 13]
+  - [6, 7]
+  - [6, 8]
+  - [7, 9]
+  - [8, 10]
+  - [9, 11]
+  - [2, 3]
+  - [1, 2]
+  - [1, 3]
+  - [2, 4]
+  - [3, 5]
+  - [4, 6]
+  - [5, 7]
