@@ -20,6 +20,8 @@ class TrackNetConfigurableDataset(Dataset):
     def __init__(self, root_dir, num_input=10, transform=None, prefix=''):
 
         self.match_mog2 = {}
+        if not os.path.isdir(root_dir):
+            raise FileNotFoundError(f"Dataset directory not found: {root_dir}")
         self.root_dir = root_dir
         self.transform = transform
         self.num_input = num_input
@@ -41,9 +43,13 @@ class TrackNetConfigurableDataset(Dataset):
 
         image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
+        matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
+        if not matches:
+            raise FileNotFoundError(f"No match directories found in {self.root_dir}")
+
         # Traverse all matches
         last_len = 0
-        for match_name in glob("*/", root_dir=root_dir):
+        for match_name in matches:
             match_name = match_name.strip('/')
 
             match_dir_path = os.path.join(root_dir, match_name)
@@ -60,6 +66,12 @@ class TrackNetConfigurableDataset(Dataset):
                     self.read_match(match_name, pbar)
             print(f"Total samples for {match_name}: {len(self.samples)-last_len}\n")
             last_len = len(self.samples)
+
+        if len(self.samples) == 0:
+            raise FileNotFoundError(
+                f'No training samples found in {self.root_dir}. ' \
+                'Please verify the dataset files and annotations.'
+            )
 
 
     def read_match(self, match_name, pbar):

@@ -19,6 +19,8 @@ class TrackNetValDataset(Dataset):
     def __init__(self, root_dir, num_input=10, transform=None, prefix=''):
         self.match_mog2 = {}
         self.total_ball = 0
+        if not os.path.isdir(root_dir):
+            raise FileNotFoundError(f"Dataset directory not found: {root_dir}")
         self.root_dir = root_dir
         self.transform = transform
         self.num_input = num_input
@@ -29,9 +31,13 @@ class TrackNetValDataset(Dataset):
 
         image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
+        matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
+        if not matches:
+            raise FileNotFoundError(f"No match directories found in {self.root_dir}")
+
         self.pbar = tqdm(total=image_count, miniters=1, smoothing=1)
         # Traverse all matches
-        for match_name in glob("*/", root_dir=root_dir):
+        for match_name in matches:
             match_name = match_name.strip('/')
 
             match_dir_path = os.path.join(root_dir, match_name)
@@ -42,6 +48,11 @@ class TrackNetValDataset(Dataset):
 
             self.read_match(match_name)
         self.pbar.close()
+        if len(self.samples) == 0:
+            raise FileNotFoundError(
+                f'No validation samples found in {self.root_dir}. '
+                'Please verify the dataset files and annotations.'
+            )
 
     def read_match(self, match_name):
         metadata_path = os.path.join(self.root_dir, match_name, 'metadata.json')
