@@ -11,17 +11,19 @@ import torch
 
 class TrackNetTrainer(DetectionTrainer):
     def build_dataset(self, img_path, mode='train', batch=None):
-        # generator = torch.Generator().manual_seed(42)
-        # dataset = TrackNetConfigurableDataset(root_dir=img_path)
-        # train_size = int(0.8 * len(dataset))  # 70% 的數據作為訓練集
-        # val_size = len(dataset) - train_size  # 剩下的 30% 作為驗證集
-        # train_dataset, val_dataset = random_split(dataset, [train_size, val_size], generator)
+        """Build TrackNet datasets using the model's expected channel count."""
+
+        # Determine required input channels from the loaded model if available.
+        try:
+            num_input = int(getattr(self.model, 'yaml', {}).get('ch', 10))
+        except Exception:
+            num_input = 10
 
         if mode == 'train':
-            dataset = TrackNetConfigurableDataset(root_dir=img_path)
+            dataset = TrackNetConfigurableDataset(root_dir=img_path, num_input=num_input)
             return dataset
         else:
-            dataset = TrackNetValDataset(root_dir=img_path)
+            dataset = TrackNetValDataset(root_dir=img_path, num_input=num_input)
             return dataset
 
     def get_model(self, cfg=None, weights=None, verbose=True):
