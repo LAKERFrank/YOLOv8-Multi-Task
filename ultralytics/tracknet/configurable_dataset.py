@@ -44,8 +44,13 @@ class TrackNetConfigurableDataset(Dataset):
         image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
         matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
-        flat_images = sorted(glob('*.png', root_dir=root_dir) +
-                            glob('*.jpg', root_dir=root_dir))
+        flat_images = sorted(
+            glob('*.png', root_dir=root_dir) +
+            glob('*.jpg', root_dir=root_dir) +
+            glob('*.jpeg', root_dir=root_dir) +
+            glob('*.PNG', root_dir=root_dir) +
+            glob('*.JPG', root_dir=root_dir) +
+            glob('*.JPEG', root_dir=root_dir))
         if not matches and flat_images:
             self.flat_dataset = True
             self._load_flat_dataset(flat_images)
@@ -295,6 +300,9 @@ class TrackNetConfigurableDataset(Dataset):
             frames = [cv2.imread(os.path.join(self.root_dir, match_name, 'frame', video_name, fp), cv2.IMREAD_GRAYSCALE).astype(np.float32)
                       for fp in img_files]
         frames = np.array(frames)  # 轉換為 NumPy 陣列
+
+        if len(frames) == 0:
+            raise FileNotFoundError(f'No images loaded for cache generation: {img_files}')
 
         background_remove = False
 

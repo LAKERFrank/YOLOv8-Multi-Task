@@ -28,8 +28,13 @@ class TrackNetDataset(Dataset):
         image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
         matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
-        flat_images = sorted(glob('*.png', root_dir=root_dir) +
-                            glob('*.jpg', root_dir=root_dir))
+        flat_images = sorted(
+            glob('*.png', root_dir=root_dir) +
+            glob('*.jpg', root_dir=root_dir) +
+            glob('*.jpeg', root_dir=root_dir) +
+            glob('*.PNG', root_dir=root_dir) +
+            glob('*.JPG', root_dir=root_dir) +
+            glob('*.JPEG', root_dir=root_dir))
         if not matches and flat_images:
             self.flat_dataset = True
             self._load_flat_dataset(flat_images)
@@ -274,9 +279,14 @@ class TrackNetDataset(Dataset):
 
         # generate cache
         if getattr(self, 'flat_dataset', False):
-            images = [self.__preprocess_img(os.path.join(self.root_dir, img_file)) for img_file in img_files]
+            images = [self.__preprocess_img(os.path.join(self.root_dir, img_file))
+                      for img_file in img_files]
         else:
             images = [self.__preprocess_img(os.path.join(self.root_dir, match_name, 'frame', video_name, img_file)) for img_file in img_files]
+
+        if len(images) == 0:
+            raise FileNotFoundError(f'No images loaded for cache generation: {img_files}')
+
         img = np.concatenate(images, 0)
 
         np.save(npy_path, img)
