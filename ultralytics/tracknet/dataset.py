@@ -28,7 +28,8 @@ class TrackNetDataset(Dataset):
         image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
         matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
-        flat_images = sorted(glob(os.path.join(root_dir, '*.png')) + glob(os.path.join(root_dir, '*.jpg')))
+        flat_images = sorted(glob('*.png', root_dir=root_dir) +
+                            glob('*.jpg', root_dir=root_dir))
         if not matches and flat_images:
             self.flat_dataset = True
             self._load_flat_dataset(flat_images)
@@ -225,7 +226,7 @@ class TrackNetDataset(Dataset):
                         parts = line.strip().split()
                         if parts and int(float(parts[0])) == 0 and len(parts) >= 3:
                             x_norm, y_norm = float(parts[1]), float(parts[2])
-                            vis = 1
+                            vis = int(float(parts[3])) if len(parts) >= 4 else 1
                             break
             X = x_norm * w
             Y = y_norm * h
