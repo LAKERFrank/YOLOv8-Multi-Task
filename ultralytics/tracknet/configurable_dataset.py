@@ -12,14 +12,16 @@ import torch.nn.functional as F
 from tqdm import tqdm
 from functools import lru_cache
 from glob import glob
+from concurrent.futures import ThreadPoolExecutor
 
 from ultralytics.tracknet.utils.preprocess import preprocess_csvV4
 from ultralytics.tracknet.utils.preprocess import preprocess_csv
 
 class TrackNetConfigurableDataset(Dataset):
-    def __init__(self, root_dir, num_input=10, transform=None, prefix=''):
+    def __init__(self, root_dir, num_input=10, transform=None, prefix='', cache_threads=1):
 
         self.match_mog2 = {}
+        self.cache_threads = max(int(cache_threads), 1)
         if not os.path.isdir(root_dir):
             raise FileNotFoundError(f"Dataset directory not found: {root_dir}")
         self.root_dir = root_dir
@@ -292,13 +294,19 @@ class TrackNetConfigurableDataset(Dataset):
         if os.path.isfile(npy_path):
             return
 
-        # generate cache
-        if getattr(self, 'flat_dataset', False):
-            frames = [cv2.imread(os.path.join(self.root_dir, fp), cv2.IMREAD_GRAYSCALE).astype(np.float32)
-                      for fp in img_files]
+        # generate cache using optional multithreading
+        def read_frame(fp):
+            if getattr(self, 'flat_dataset', False):
+                path = os.path.join(self.root_dir, fp)
+            else:
+                path = os.path.join(self.root_dir, match_name, 'frame', video_name, fp)
+            return cv2.imread(path, cv2.IMREAD_GRAYSCALE).astype(np.float32)
+
+        if self.cache_threads > 1 and len(img_files) > 1:
+            with ThreadPoolExecutor(max_workers=self.cache_threads) as ex:
+                frames = list(ex.map(read_frame, img_files))
         else:
-            frames = [cv2.imread(os.path.join(self.root_dir, match_name, 'frame', video_name, fp), cv2.IMREAD_GRAYSCALE).astype(np.float32)
-                      for fp in img_files]
+            frames = [read_frame(fp) for fp in img_files]
         frames = np.array(frames)  # 轉換為 NumPy 陣列
 
         if len(frames) == 0:
@@ -314,12 +322,17 @@ class TrackNetConfigurableDataset(Dataset):
             processed_frames = (frames - median_frame).astype(np.float32)
         else:
             processed_frames = frames
-        images = []
-        for i, processed_frame in enumerate(processed_frames):
-            img = self.pad_to_square(processed_frame)
+        def process_frame(proc_frame):
+            img = self.pad_to_square(proc_frame)
             img = cv2.resize(img, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
             img = np.expand_dims(img, axis=0)
-            images.append(img)
+            return img
+
+        if self.cache_threads > 1 and len(processed_frames) > 1:
+            with ThreadPoolExecutor(max_workers=self.cache_threads) as ex:
+                images = list(ex.map(process_frame, processed_frames))
+        else:
+            images = [process_frame(f) for f in processed_frames]
         img = np.concatenate(images, 0)
 
         np.save(npy_path, img)

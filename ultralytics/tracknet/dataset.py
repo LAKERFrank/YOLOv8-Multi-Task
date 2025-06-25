@@ -11,9 +11,10 @@ import torch.nn.functional as F
 from tqdm import tqdm
 from functools import lru_cache
 from glob import glob
+from concurrent.futures import ThreadPoolExecutor
 
 class TrackNetDataset(Dataset):
-    def __init__(self, root_dir, num_input=10, transform=None, prefix=''):
+    def __init__(self, root_dir, num_input=10, transform=None, prefix='', cache_threads=1):
 
         if not os.path.isdir(root_dir):
             raise FileNotFoundError(f"Dataset directory not found: {root_dir}")
@@ -22,6 +23,7 @@ class TrackNetDataset(Dataset):
         self.num_input = num_input
         self.samples = []
         self.prefix = prefix
+        self.cache_threads = max(int(cache_threads), 1)
 
         self.idx = set()
 
@@ -277,12 +279,19 @@ class TrackNetDataset(Dataset):
         if os.path.isfile(npy_path):
             return
 
-        # generate cache
-        if getattr(self, 'flat_dataset', False):
-            images = [self.__preprocess_img(os.path.join(self.root_dir, img_file))
-                      for img_file in img_files]
+        # generate cache using optional multithreading
+        def process(fp):
+            if getattr(self, 'flat_dataset', False):
+                path = os.path.join(self.root_dir, fp)
+            else:
+                path = os.path.join(self.root_dir, match_name, 'frame', video_name, fp)
+            return self.__preprocess_img(path)
+
+        if self.cache_threads > 1 and len(img_files) > 1:
+            with ThreadPoolExecutor(max_workers=self.cache_threads) as ex:
+                images = list(ex.map(process, img_files))
         else:
-            images = [self.__preprocess_img(os.path.join(self.root_dir, match_name, 'frame', video_name, img_file)) for img_file in img_files]
+            images = [process(fp) for fp in img_files]
 
         if len(images) == 0:
             raise FileNotFoundError(f'No images loaded for cache generation: {img_files}')
