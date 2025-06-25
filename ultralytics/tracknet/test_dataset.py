@@ -28,6 +28,11 @@ class TrackNetTestDataset(Dataset):
         image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
         matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
+        flat_images = sorted(glob(os.path.join(root_dir, '*.png')) + glob(os.path.join(root_dir, '*.jpg')))
+        if not matches and flat_images:
+            self.flat_dataset = True
+            self._load_flat_dataset(flat_images)
+            return
         if not matches:
             raise FileNotFoundError(f"No match directories found in {self.root_dir}")
 
@@ -87,6 +92,21 @@ class TrackNetTestDataset(Dataset):
 
             self.pbar.update(self.num_input-1)
 
+    def _load_flat_dataset(self, image_files):
+        label_dir = self.root_dir.replace(os.sep + 'images' + os.sep, os.sep + 'labels' + os.sep)
+        if not os.path.isdir(label_dir):
+            raise FileNotFoundError(f"Labels directory not found for flat dataset: {label_dir}")
+
+        first = self.open_image(os.path.join(self.root_dir, image_files[0]))
+        h, w = first.shape
+
+        for i in range(len(image_files) - (self.num_input - 1)):
+            frames = image_files[i:i + self.num_input]
+            npy_path = self.img_cache_dir('flat', 'seq', frames)
+            self.samples.append({'match_name': 'flat', 'video_name': 'seq', 'cache_npy': npy_path,
+                                 'img_files': frames})
+            self.img_cache('flat', 'seq', frames, npy_path)
+
     def img_cache_dir(self, match_name, video_name, img_files):
         s = '|'.join([match_name]+[video_name]+img_files)
         filename = hashlib.sha1(s.encode('utf-8')).hexdigest()
@@ -106,7 +126,10 @@ class TrackNetTestDataset(Dataset):
             return
 
         # generate cache
-        images = [self.__preprocess_img(os.path.join(self.root_dir, match_name, 'frame', video_name, img_file)) for img_file in img_files]
+        if getattr(self, 'flat_dataset', False):
+            images = [self.__preprocess_img(os.path.join(self.root_dir, img_file)) for img_file in img_files]
+        else:
+            images = [self.__preprocess_img(os.path.join(self.root_dir, match_name, 'frame', video_name, img_file)) for img_file in img_files]
         img = np.concatenate(images, 0)
 
         np.save(npy_path, img)
@@ -149,7 +172,10 @@ class TrackNetTestDataset(Dataset):
 
         img = torch.from_numpy(img).float()
 
-        img_files = [f"{self.root_dir}/../{im}" for im in d['img_files']]
+        if getattr(self, 'flat_dataset', False):
+            img_files = [os.path.join(self.root_dir, im) for im in d['img_files']]
+        else:
+            img_files = [f"{self.root_dir}/../{im}" for im in d['img_files']]
 
         return {"img": img, "img_files": img_files}
 

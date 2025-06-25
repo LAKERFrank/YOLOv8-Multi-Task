@@ -28,6 +28,11 @@ class TrackNetDataset(Dataset):
         image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
         matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
+        flat_images = sorted(glob(os.path.join(root_dir, '*.png')) + glob(os.path.join(root_dir, '*.jpg')))
+        if not matches and flat_images:
+            self.flat_dataset = True
+            self._load_flat_dataset(flat_images)
+            return
         if not matches:
             raise FileNotFoundError(f"No match directories found in {self.root_dir}")
 
@@ -199,7 +204,54 @@ class TrackNetDataset(Dataset):
 
             #         self.img_cache(match_name, video_name, frames, npy_path)
 
-            self.pbar.update(self.num_input-1)
+        self.pbar.update(self.num_input-1)
+
+    def _load_flat_dataset(self, image_files):
+        """Load dataset arranged as images/ and labels/ folders."""
+        label_dir = self.root_dir.replace(os.sep + 'images' + os.sep, os.sep + 'labels' + os.sep)
+        if not os.path.isdir(label_dir):
+            raise FileNotFoundError(f"Labels directory not found for flat dataset: {label_dir}")
+
+        first = self.open_image(os.path.join(self.root_dir, image_files[0]))
+        h, w = first.shape
+
+        records = []
+        for idx, f in enumerate(image_files):
+            label_file = os.path.join(label_dir, os.path.splitext(os.path.basename(f))[0] + '.txt')
+            vis, x_norm, y_norm = 0, 0.0, 0.0
+            if os.path.isfile(label_file):
+                with open(label_file) as lf:
+                    for line in lf:
+                        parts = line.strip().split()
+                        if parts and int(float(parts[0])) == 0 and len(parts) >= 3:
+                            x_norm, y_norm = float(parts[1]), float(parts[2])
+                            vis = 1
+                            break
+            X = x_norm * w
+            Y = y_norm * h
+            records.append([idx, vis, X, Y])
+
+        for i in range(len(records) - 1):
+            dx = -(records[i][2] - records[i + 1][2])
+            dy = -(records[i][3] - records[i + 1][3])
+            records[i].extend([dx, dy])
+        records[-1].extend([0.0, 0.0])
+        for r in records:
+            r.append(0)
+
+        for i in range(len(records) - (self.num_input - 1)):
+            frames = image_files[i:i + self.num_input]
+            target = np.array(records[i:i + self.num_input], dtype=np.float32)
+            target = self.transform_coordinates(target, w, h)
+            npy_path = self.img_cache_dir('flat', 'seq', frames)
+            self.samples.append({
+                'match_name': 'flat',
+                'video_name': 'seq',
+                'cache_npy': npy_path,
+                'img_files': frames,
+                'target': target,
+            })
+            self.img_cache('flat', 'seq', frames, npy_path)
 
     def img_cache_dir(self, match_name, video_name, img_files):
         s = '|'.join([match_name]+[video_name]+img_files)
@@ -220,7 +272,10 @@ class TrackNetDataset(Dataset):
             return
 
         # generate cache
-        images = [self.__preprocess_img(os.path.join(self.root_dir, match_name, 'frame', video_name, img_file)) for img_file in img_files]
+        if getattr(self, 'flat_dataset', False):
+            images = [self.__preprocess_img(os.path.join(self.root_dir, img_file)) for img_file in img_files]
+        else:
+            images = [self.__preprocess_img(os.path.join(self.root_dir, match_name, 'frame', video_name, img_file)) for img_file in img_files]
         img = np.concatenate(images, 0)
 
         np.save(npy_path, img)
@@ -264,7 +319,10 @@ class TrackNetDataset(Dataset):
         img = torch.from_numpy(img).float()
         target = torch.from_numpy(d['target'])
 
-        img_files = [f"{self.root_dir}/../{im}" for im in d['img_files']]
+        if getattr(self, 'flat_dataset', False):
+            img_files = [os.path.join(self.root_dir, im) for im in d['img_files']]
+        else:
+            img_files = [f"{self.root_dir}/../{im}" for im in d['img_files']]
 
         return {"img": img, "target": target, "img_files": img_files}
 
