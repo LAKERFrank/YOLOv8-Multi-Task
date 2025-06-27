@@ -82,6 +82,8 @@ class TrackNetLossWithHit:
             
             mask_has_ball = torch.zeros_like(target_pos)
             for target_idx, target in enumerate(batch_target[idx]):
+                if target_idx >= self.num_groups:
+                    break
                 if target[6] == 1:
                     grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
                     hit_targets[target_idx, grid_y, grid_x] = 1
@@ -209,7 +211,7 @@ class TrackNetLoss:
         self.no = m.no
         self.reg_max = m.reg_max
         self.feat_no = m.feat_no
-        self.num_groups = 10
+        self.num_groups = int(getattr(model, 'yaml', {}).get('ch', 10))
         self.device = device
 
         self.use_dfl = m.reg_max > 1
@@ -266,6 +268,8 @@ class TrackNetLoss:
                 stride = self.stride[i]
                 
                 for target_idx, target in enumerate(batch_target[idx]):
+                    if target_idx >= self.num_groups:
+                        break
                     # target xy
                     grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
                     if grid_x >= 80 or grid_y >= 80:
@@ -406,8 +410,10 @@ class TrackNetLossV5:
         for idx, _ in enumerate(batch_target):
             # pred = [330 * cell_num * cell_num]
             stride = self.stride[0]
-            
+
             for target_idx, target in enumerate(batch_target[idx]):
+                if target_idx >= self.num_groups:
+                    break
                 # target xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
                 # 找出快球 => 慢球, 慢球 => 快球
@@ -576,8 +582,10 @@ class TrackNetLossV4:
         for idx, _ in enumerate(batch_target):
             # pred = [330 * 20 * 20]
             stride = self.stride[0]
-            
+
             for target_idx, target in enumerate(batch_target[idx]):
+                if target_idx >= self.num_groups:
+                    break
                 # target xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
                 # 找出快球 => 慢球, 慢球 => 快球
@@ -744,8 +752,10 @@ class TrackNetLossV3:
         for idx, _ in enumerate(batch_target):
             # pred = [330 * 20 * 20]
             stride = self.stride[0]
-            
+
             for target_idx, target in enumerate(batch_target[idx]):
+                if target_idx >= self.num_groups:
+                    break
                 if target[1] == 1:
                     # xy
                     grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
