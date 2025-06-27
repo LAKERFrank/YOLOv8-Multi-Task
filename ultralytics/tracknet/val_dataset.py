@@ -17,12 +17,16 @@ from ultralytics.tracknet.utils.preprocess import preprocess_csvV4
 from ultralytics.tracknet.utils.preprocess import preprocess_csv
 
 class TrackNetValDataset(Dataset):
-    def __init__(self, root_dir, num_input=10, transform=None, prefix='', cache_threads=1):
+    def __init__(self, root_dir, num_input=10, transform=None, prefix='', cache_threads=1, mode='val'):
         self.match_mog2 = {}
         self.total_ball = 0
         self.cache_threads = max(int(cache_threads), 1)
         if not os.path.isdir(root_dir):
-            raise FileNotFoundError(f"Dataset directory not found: {root_dir}")
+            alt = os.path.join(root_dir, 'images', mode)
+            if os.path.isdir(alt):
+                root_dir = alt
+            else:
+                raise FileNotFoundError(f"Dataset directory not found: {root_dir}")
         self.root_dir = root_dir
         self.transform = transform
         self.num_input = num_input

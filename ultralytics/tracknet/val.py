@@ -28,7 +28,7 @@ class TrackNetValidatorV3(BaseValidator):
     
     def get_dataloader(self, dataset_path, batch_size):
         """For TrackNet, we can use the provided TrackNetDataset to get the dataloader."""
-        dataset = TrackNetDataset(root_dir=dataset_path)
+        dataset = TrackNetDataset(root_dir=dataset_path, mode='val')
         return build_dataloader(dataset, batch_size, self.args.workers, shuffle=False, rank=-1)
     
     def preprocess_batch(self, batch):
@@ -1571,7 +1571,7 @@ class TrackNetValidatorWithHit(BaseValidator):
     
     def get_dataloader(self, dataset_path, batch_size):
         """For TrackNet, we can use the provided TrackNetDataset to get the dataloader."""
-        dataset = TrackNetDataset(root_dir=dataset_path)
+        dataset = TrackNetDataset(root_dir=dataset_path, mode='val')
         return build_dataloader(dataset, batch_size, self.args.workers, shuffle=False, rank=-1)
     
     def preprocess_batch(self, batch):
