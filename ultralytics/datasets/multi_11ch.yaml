@@ -4,6 +4,10 @@ train: images/train
 val: images/val
 test: images/test
 
+# Input configuration
+# The dataset contains 11 grayscale frames stacked as channels.
+in_channels: 11
+
 # Detection classes
 nc: 2
 names:
