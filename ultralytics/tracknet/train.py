@@ -13,9 +13,9 @@ class TrackNetTrainer(DetectionTrainer):
     def build_dataset(self, img_path, mode='train', batch=None):
         """Build TrackNet datasets using the model's expected channel count."""
 
-        # Determine required input channels from the loaded model if available.
+        # Determine required sequence length from the detection head
         try:
-            num_input = int(getattr(self.model, 'yaml', {}).get('ch', 10))
+            num_input = int(getattr(self.model.model[-1], 'num_groups', 10))
         except Exception:
             num_input = 10
 
