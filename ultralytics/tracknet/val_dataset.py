@@ -131,6 +131,13 @@ class TrackNetValDataset(Dataset):
         if not os.path.isdir(label_dir):
             raise FileNotFoundError(f"Labels directory not found for flat dataset: {label_dir}")
 
+        image_files = sorted(image_files)
+        if len(image_files) < self.num_input:
+            raise FileNotFoundError(
+                f"Flat dataset {self.root_dir} contains {len(image_files)} images, "
+                f"but {self.num_input} are required"
+            )
+
         first = self.open_image(os.path.join(self.root_dir, image_files[0]))
         h, w = first.shape
 
