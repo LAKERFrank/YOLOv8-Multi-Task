@@ -231,9 +231,11 @@ class TrackNetLoss:
         for i, feat in enumerate(feats):
             channels = feat.shape[1]
             if channels % self.no != 0:
+                expected_cls = self.no - self.reg_max * self.feat_no
                 raise ValueError(
-                    f"Invalid output channels {channels}, expected a multiple of {self.no}. "
-                    "Ensure dataset 'nc' matches the model configuration." )
+                    f"Invalid output channels {channels}. Got 'nc'={self.nc} and no={self.no} (" \
+                    f"expected cls channels {expected_cls}). Check that the dataset "
+                    "and model configuration use the same number of classes." )
 
             pred_distri, pred_scores = feat.view(feat.shape[0], self.no, -1).split(
                 (self.reg_max * self.feat_no, self.nc), 1)
