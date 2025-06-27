@@ -226,7 +226,7 @@ class TrackNetLoss:
     def __call__(self, preds, batch):
         loss = torch.zeros(2, device=self.device)
 
-        feats = preds[1] if isinstance(preds, tuple) else preds
+        feats = preds[0] if isinstance(preds, tuple) else preds
 
         for i, feat in enumerate(feats):
             channels = feat.shape[1]
@@ -377,7 +377,7 @@ class TrackNetLossV5:
         self.confusion_class = confusion_class
 
     def __call__(self, preds, batch):
-        feats = preds[1] if isinstance(preds, tuple) else preds
+        feats = preds[0] if isinstance(preds, tuple) else preds
         pred_distri, pred_scores = torch.cat([xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2).split(
             (self.reg_max * self.feat_no, self.nc), 1)
         
@@ -548,7 +548,7 @@ class TrackNetLossV4:
         self.confusion_class = confusion_class
 
     def __call__(self, preds, batch):
-        feats = preds[1] if isinstance(preds, tuple) else preds
+        feats = preds[0] if isinstance(preds, tuple) else preds
         pred_distri, pred_scores = torch.cat([xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2).split(
             (self.reg_max * self.feat_no, self.nc), 1)
         
@@ -719,7 +719,7 @@ class TrackNetLossV3:
         self.confusion_class = confusion_class
 
     def __call__(self, preds, batch):
-        feats = preds[1] if isinstance(preds, tuple) else preds
+        feats = preds[0] if isinstance(preds, tuple) else preds
         pred_distri, pred_scores, pred_dxdy = torch.cat([xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2).split(
             (self.reg_max * self.feat_no, self.nc, self.dxdy_no), 1)
         
