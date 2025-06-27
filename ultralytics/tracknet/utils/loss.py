@@ -229,6 +229,12 @@ class TrackNetLoss:
         feats = preds[1] if isinstance(preds, tuple) else preds
 
         for i, feat in enumerate(feats):
+            channels = feat.shape[1]
+            if channels % self.no != 0:
+                raise ValueError(
+                    f"Invalid output channels {channels}, expected a multiple of {self.no}. "
+                    "Ensure dataset 'nc' matches the model configuration." )
+
             pred_distri, pred_scores = feat.view(feat.shape[0], self.no, -1).split(
                 (self.reg_max * self.feat_no, self.nc), 1)
             
