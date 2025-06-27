@@ -271,8 +271,9 @@ class BaseTrainer:
 
     def update_sampler_weights(self):
         LOGGER.info("Running per-sample forward pass (batch size=1) to update sampling weights...")
-        # 將模型設定為 eval 模式並關閉梯度
-        self.model.eval()
+        # Run forward passes in training mode so loss computation uses the correct path
+        was_training = self.model.training
+        self.model.train()
         temp_loader = torch.utils.data.DataLoader(
             self.train_loader.dataset,
             batch_size=1,
@@ -347,6 +348,8 @@ class BaseTrainer:
             self.trainset, batch_size=self.batch_size, rank=RANK, mode='train', custom_sampler=new_sampler
         )
         LOGGER.info("DataLoader updated with new weighted sampler based on per-sample losses.")
+        if not was_training:
+            self.model.eval()
 
     def _do_train(self, world_size=1):
         """Train completed, evaluate and plot if specified by arguments."""
