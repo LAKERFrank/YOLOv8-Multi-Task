@@ -13,11 +13,8 @@ class TrackNetTrainer(DetectionTrainer):
     def build_dataset(self, img_path, mode='train', batch=None):
         """Build TrackNet datasets using the model's expected channel count."""
 
-        # Determine required sequence length from the detection head
-        try:
-            num_input = int(getattr(self.model.model[-1], 'num_groups', 10))
-        except Exception:
-            num_input = 10
+        # Determine required sequence length from dataset configuration
+        num_input = int(self.data.get('in_channels', 10))
 
         if mode == 'train':
             dataset = TrackNetConfigurableDataset(root_dir=img_path, num_input=num_input)
@@ -27,7 +24,8 @@ class TrackNetTrainer(DetectionTrainer):
             return dataset
 
     def get_model(self, cfg=None, weights=None, verbose=True):
-        self.tracknet_model = TrackNetV4Model(cfg, ch=10, nc=self.data['nc'], verbose=verbose and RANK == -1)
+        in_ch = int(self.data.get('in_channels', 10))
+        self.tracknet_model = TrackNetV4Model(cfg, ch=in_ch, nc=self.data['nc'], verbose=verbose and RANK == -1)
         if weights:
             self.tracknet_model.load(weights)
         return self.tracknet_model
