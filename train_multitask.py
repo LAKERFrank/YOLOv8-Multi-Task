@@ -43,6 +43,12 @@ def parse_args() -> argparse.Namespace:
         default=3,
         help="凍結最前層數量",
     )
+    parser.add_argument(
+        "--use-resampler",
+        type=bool,
+        default=True,
+        help="是否於每個 epoch 使用 resampler",
+    )
     return parser.parse_args()
 
 
@@ -61,6 +67,7 @@ def main() -> None:
         optimizer=args.optimizer,
         batch=args.batch,
         freeze_layers=args.freeze_layers,
+        use_resampler=args.use_resampler,
     )
 
 
