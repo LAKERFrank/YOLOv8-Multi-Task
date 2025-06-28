@@ -89,6 +89,11 @@ class TrackNetConfigurableDataset(Dataset):
                                 self.samples = self.samples[:keep]
 
 
+        if 0 < self.fraction < 1.0:
+            keep = max(1, int(len(self.samples) * self.fraction))
+            self.samples = self.samples[:keep]
+
+
         if len(self.samples) == 0:
             raise FileNotFoundError(
                 f'No training samples found in {self.root_dir}. ' \
