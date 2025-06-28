@@ -381,7 +381,8 @@ class Pose(Detect):
         """Perform forward pass through YOLO model and return predictions."""
         bs = x[0].shape[0]  # batch size
         if not self.training and (self.anchors.numel() == 0 or self.shape != x[0].shape):
-            self.anchors, self.strides = (y.transpose(0, 1) for y in make_anchors(x, self.stride, 0.5))
+            # generate anchors only for the detection level used during inference
+            self.anchors, self.strides = (y.transpose(0, 1) for y in make_anchors([x[0]], self.stride[:1], 0.5))
             self.shape = x[0].shape
         kpt = self.cv4[0](x[0]).view(bs, self.nk, -1)  # only use first level like Detect
         x = self.detect(self, x)
