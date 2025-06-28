@@ -36,6 +36,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default=0, help="使用的裝置")
     parser.add_argument("--lr0", type=float, default=0.01, help="初始學習率")
     parser.add_argument("--optimizer", default="SGD", help="最佳化器")
+    parser.add_argument("--batch", type=int, default=32, help="批次大小")
     parser.add_argument(
         "--freeze-layers",
         type=int,
@@ -58,6 +59,7 @@ def main() -> None:
         device=args.device,
         lr0=args.lr0,
         optimizer=args.optimizer,
+        batch=args.batch,
         freeze_layers=args.freeze_layers,
     )
 
