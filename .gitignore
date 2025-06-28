@@ -139,7 +139,7 @@ dmypy.json
 
 # datasets and projects
 datasets/
-dataset
+dataset/
 runs/
 wandb/
 
