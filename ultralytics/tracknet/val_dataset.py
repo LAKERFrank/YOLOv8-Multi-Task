@@ -22,11 +22,7 @@ class TrackNetValDataset(Dataset):
         self.total_ball = 0
         self.cache_threads = max(int(cache_threads), 1)
         self.fraction = float(fraction)
-        max_samples = float('inf')
-        image_count = len(glob(os.path.join(root_dir, "*/", "frame/", "*/", "*.png")))
-        if 0 < self.fraction < 1.0:
-            max_samples = max(1, int(image_count * self.fraction))
-        self.max_samples = max_samples
+
         if not os.path.isdir(root_dir):
             alt = os.path.join(root_dir, 'images', mode)
             if os.path.isdir(alt):
@@ -41,8 +37,6 @@ class TrackNetValDataset(Dataset):
 
         self.idx = set()
 
-        image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
-
         matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
         flat_images = sorted(
             glob('*.png', root_dir=root_dir) +
@@ -51,6 +45,16 @@ class TrackNetValDataset(Dataset):
             glob('*.PNG', root_dir=root_dir) +
             glob('*.JPG', root_dir=root_dir) +
             glob('*.JPEG', root_dir=root_dir))
+
+        if matches:
+            image_count = len(glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.png')))
+        else:
+            image_count = len(flat_images)
+
+        max_samples = float('inf')
+        if 0 < self.fraction < 1.0:
+            max_samples = max(1, int(image_count * self.fraction))
+        self.max_samples = max_samples
         if not matches and flat_images:
             self.flat_dataset = True
             self._load_flat_dataset(flat_images)
