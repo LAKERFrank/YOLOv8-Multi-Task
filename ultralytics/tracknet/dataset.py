@@ -291,6 +291,8 @@ class TrackNetDataset(Dataset):
             r.append(0)
 
         for i in range(len(records) - (self.num_input - 1)):
+            if len(self.samples) >= self.max_samples:
+                return
             frames = image_files[i:i + self.num_input]
             target = np.array(records[i:i + self.num_input], dtype=np.float32)
             target = self.transform_coordinates(target, w, h)
