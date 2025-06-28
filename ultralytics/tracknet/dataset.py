@@ -33,9 +33,11 @@ class TrackNetDataset(Dataset):
 
         self.idx = set()
 
-        image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
-
-        matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
+        matches = [
+            m.strip("/")
+            for m in glob("*/", root_dir=root_dir)
+            if os.path.isdir(os.path.join(root_dir, m, "frame"))
+        ]
         flat_images = sorted(
             glob('*.png', root_dir=root_dir) +
             glob('*.jpg', root_dir=root_dir) +
@@ -43,6 +45,23 @@ class TrackNetDataset(Dataset):
             glob('*.PNG', root_dir=root_dir) +
             glob('*.JPG', root_dir=root_dir) +
             glob('*.JPEG', root_dir=root_dir))
+
+        if matches:
+            image_count = len(
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.png')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.jpg')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.jpeg')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.PNG')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.JPG')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.JPEG'))
+            )
+        else:
+            image_count = len(flat_images)
+
+        max_samples = float('inf')
+        if 0 < self.fraction < 1.0:
+            max_samples = max(1, int(image_count * self.fraction))
+        self.max_samples = max_samples
         if not matches and flat_images:
             self.flat_dataset = True
             self._load_flat_dataset(flat_images)
@@ -54,19 +73,22 @@ class TrackNetDataset(Dataset):
                          +(image_count-self.num_input*3+1), miniters=1, smoothing=1)
         # Traverse all matches
         for match_name in matches:
+            if len(self.samples) >= self.max_samples:
+                break
             match_name = match_name.strip('/')
 
             match_dir_path = os.path.join(root_dir, match_name)
-            
+
             # Check if it is a match directory
             if not os.path.isdir(match_dir_path):
                 continue
 
             self.read_match(match_name)
+            if len(self.samples) >= self.max_samples:
+                break
         self.pbar.close()
-        if 0 < self.fraction < 1.0:
-            keep = max(1, int(len(self.samples) * self.fraction))
-            self.samples = self.samples[:keep]
+        if self.max_samples != float('inf'):
+            self.samples = self.samples[: self.max_samples]
 
         if len(self.samples) == 0:
             raise FileNotFoundError(
@@ -101,6 +123,8 @@ class TrackNetDataset(Dataset):
 
             # Create sliding windows of num_input frames
             for i in range(len(img_files) - (self.num_input-1)):
+                if len(self.samples) >= self.max_samples:
+                    return
                 self.pbar.update(1)
 
                 frames = img_files[i: i + self.num_input]
@@ -135,6 +159,8 @@ class TrackNetDataset(Dataset):
             
             # 降低 FPS 120 => 60
             for i in range(len(img_files) - (self.num_input*2-1)):
+                if len(self.samples) >= self.max_samples:
+                    return
                 self.pbar.update(1)
 
                 frames = img_files[i: i + self.num_input*2: 2]
@@ -265,6 +291,8 @@ class TrackNetDataset(Dataset):
             r.append(0)
 
         for i in range(len(records) - (self.num_input - 1)):
+            if len(self.samples) >= self.max_samples:
+                return
             frames = image_files[i:i + self.num_input]
             target = np.array(records[i:i + self.num_input], dtype=np.float32)
             target = self.transform_coordinates(target, w, h)
