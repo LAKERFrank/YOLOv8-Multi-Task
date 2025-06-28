@@ -383,7 +383,7 @@ class Pose(Detect):
         if not self.training and (self.anchors.numel() == 0 or self.shape != x[0].shape):
             self.anchors, self.strides = (y.transpose(0, 1) for y in make_anchors(x, self.stride, 0.5))
             self.shape = x[0].shape
-        kpt = torch.cat([self.cv4[i](x[i]).view(bs, self.nk, -1) for i in range(self.nl)], -1)  # (bs, 17*3, h*w)
+        kpt = self.cv4[0](x[0]).view(bs, self.nk, -1)  # only use first level like Detect
         x = self.detect(self, x)
         if self.training:
             return x, kpt
