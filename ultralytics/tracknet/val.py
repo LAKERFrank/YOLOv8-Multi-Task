@@ -28,7 +28,7 @@ class TrackNetValidatorV3(BaseValidator):
     
     def get_dataloader(self, dataset_path, batch_size):
         """For TrackNet, we can use the provided TrackNetDataset to get the dataloader."""
-        dataset = TrackNetDataset(root_dir=dataset_path)
+        dataset = TrackNetDataset(root_dir=dataset_path, mode='val')
         return build_dataloader(dataset, batch_size, self.args.workers, shuffle=False, rank=-1)
     
     def preprocess_batch(self, batch):
@@ -53,7 +53,7 @@ class TrackNetValidatorV3(BaseValidator):
         """Initialize some metrics."""
         # Placeholder for any metrics you might want to use.
         self.stride = 32
-        self.num_groups = 10
+        self.num_groups = getattr(model.model[-1], 'num_groups', 10)
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -121,6 +121,8 @@ class TrackNetValidatorV3(BaseValidator):
         target_mov = torch.zeros(self.num_groups, 20, 20, 2, device=self.device)
 
         for target_idx, target in enumerate(batch_target):
+            if target_idx >= self.num_groups:
+                break
             if target[1] == 1:
                 # xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], self.stride)
@@ -585,6 +587,8 @@ class TrackNetValidator(BaseValidator):
         cls_targets = torch.zeros(self.num_groups, self.cell_num, self.cell_num, 1, device=self.device)
         
         for target_idx, target in enumerate(batch_target):
+            if target_idx >= self.num_groups:
+                break
             grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], self.stride)
             if grid_x >= 80:
                 print(grid_x, grid_y, offset_x, offset_y)
@@ -1145,6 +1149,8 @@ class TrackNetValidatorV2(BaseValidator):
         mask_hit_ball_v2 = torch.zeros(self.num_groups, 1, device=self.device)
 
         for target_idx, target in enumerate(batch_target):
+            if target_idx >= self.num_groups:
+                break
             grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], self.stride)
 
             # 找出快球 => 慢球, 慢球 => 快球
@@ -1571,7 +1577,7 @@ class TrackNetValidatorWithHit(BaseValidator):
     
     def get_dataloader(self, dataset_path, batch_size):
         """For TrackNet, we can use the provided TrackNetDataset to get the dataloader."""
-        dataset = TrackNetDataset(root_dir=dataset_path)
+        dataset = TrackNetDataset(root_dir=dataset_path, mode='val')
         return build_dataloader(dataset, batch_size, self.args.workers, shuffle=False, rank=-1)
     
     def preprocess_batch(self, batch):
@@ -1641,6 +1647,8 @@ class TrackNetValidatorWithHit(BaseValidator):
         if len(batch_target.shape) == 3:
             batch_target = batch_target[0]
         for idx, target in enumerate(batch_target):
+            if idx >= self.num_groups:
+                break
             if target[1] == 1:
                 # xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)

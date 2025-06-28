@@ -93,6 +93,13 @@ def build_yolo_dataset(cfg, img_path, batch, data, mode='train', rect=False, str
 def build_dataloader(dataset, batch, workers, shuffle=True, rank=-1, custom_sampler=None):
     """Return an InfiniteDataLoader or DataLoader for training or validation set."""
     batch = min(batch, len(dataset))
+    if len(dataset) == 0 or batch <= 0:
+        root = getattr(dataset, 'root_dir', getattr(dataset, 'root', getattr(dataset, 'img_path', '')))
+        if root and not os.path.exists(root):
+            raise FileNotFoundError(f'Dataset path not found: {root}')
+        raise ValueError(
+            f'No images found in dataset at {root}. Please check your data paths and annotations.'
+        )
     nd = torch.cuda.device_count()  # number of CUDA devices
     nw = min([os.cpu_count() // max(nd, 1), batch if batch > 1 else 0, workers])  # number of workers
     if custom_sampler is not None:

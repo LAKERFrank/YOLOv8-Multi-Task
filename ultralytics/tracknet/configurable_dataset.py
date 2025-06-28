@@ -12,14 +12,22 @@ import torch.nn.functional as F
 from tqdm import tqdm
 from functools import lru_cache
 from glob import glob
+from concurrent.futures import ThreadPoolExecutor
 
 from ultralytics.tracknet.utils.preprocess import preprocess_csvV4
 from ultralytics.tracknet.utils.preprocess import preprocess_csv
 
 class TrackNetConfigurableDataset(Dataset):
-    def __init__(self, root_dir, num_input=10, transform=None, prefix=''):
+    def __init__(self, root_dir, num_input=10, transform=None, prefix='', cache_threads=1, mode='train'):
 
         self.match_mog2 = {}
+        self.cache_threads = max(int(cache_threads), 1)
+        if not os.path.isdir(root_dir):
+            alt = os.path.join(root_dir, 'images', mode)
+            if os.path.isdir(alt):
+                root_dir = alt
+            else:
+                raise FileNotFoundError(f"Dataset directory not found: {root_dir}")
         self.root_dir = root_dir
         self.transform = transform
         self.num_input = num_input
@@ -41,9 +49,24 @@ class TrackNetConfigurableDataset(Dataset):
 
         image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
+        matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
+        flat_images = sorted(
+            glob('*.png', root_dir=root_dir) +
+            glob('*.jpg', root_dir=root_dir) +
+            glob('*.jpeg', root_dir=root_dir) +
+            glob('*.PNG', root_dir=root_dir) +
+            glob('*.JPG', root_dir=root_dir) +
+            glob('*.JPEG', root_dir=root_dir))
+        if not matches and flat_images:
+            self.flat_dataset = True
+            self._load_flat_dataset(flat_images)
+            return
+        if not matches:
+            raise FileNotFoundError(f"No match directories found in {self.root_dir}")
+
         # Traverse all matches
         last_len = 0
-        for match_name in glob("*/", root_dir=root_dir):
+        for match_name in matches:
             match_name = match_name.strip('/')
 
             match_dir_path = os.path.join(root_dir, match_name)
@@ -60,6 +83,12 @@ class TrackNetConfigurableDataset(Dataset):
                     self.read_match(match_name, pbar)
             print(f"Total samples for {match_name}: {len(self.samples)-last_len}\n")
             last_len = len(self.samples)
+
+        if len(self.samples) == 0:
+            raise FileNotFoundError(
+                f'No training samples found in {self.root_dir}. ' \
+                'Please verify the dataset files and annotations.'
+            )
 
 
     def read_match(self, match_name, pbar):
@@ -167,6 +196,54 @@ class TrackNetConfigurableDataset(Dataset):
                 
                 self.path_counts[match_name] = self.path_counts[match_name] - min_len
                 pbar.update(min_len)
+
+    def _load_flat_dataset(self, image_files):
+        label_dir = self.root_dir.replace(os.sep + 'images' + os.sep, os.sep + 'labels' + os.sep)
+        if not os.path.isdir(label_dir):
+            raise FileNotFoundError(f"Labels directory not found for flat dataset: {label_dir}")
+
+        image_files = sorted(image_files)
+        if len(image_files) < self.num_input:
+            raise FileNotFoundError(
+                f"Flat dataset {self.root_dir} contains {len(image_files)} images, "
+                f"but {self.num_input} are required"
+            )
+
+        first = self.open_image(os.path.join(self.root_dir, image_files[0]))
+        h, w = first.shape
+
+        records = []
+        for idx, f in enumerate(image_files):
+            label_file = os.path.join(label_dir, os.path.splitext(os.path.basename(f))[0] + '.txt')
+            vis, x_norm, y_norm = 0, 0.0, 0.0
+            if os.path.isfile(label_file):
+                with open(label_file) as lf:
+                    for line in lf:
+                        parts = line.strip().split()
+                        if parts and int(float(parts[0])) == 0 and len(parts) >= 3:
+                            x_norm, y_norm = float(parts[1]), float(parts[2])
+                            vis = int(float(parts[3])) if len(parts) >= 4 else 1
+                            break
+            X = x_norm * w
+            Y = y_norm * h
+            records.append([idx, vis, X, Y])
+
+        for i in range(len(records) - 1):
+            dx = -(records[i][2] - records[i + 1][2])
+            dy = -(records[i][3] - records[i + 1][3])
+            records[i].extend([dx, dy])
+        records[-1].extend([0.0, 0.0])
+        for r in records:
+            r.append(0)
+
+        for i in range(len(records) - (self.num_input - 1)):
+            frames = image_files[i:i + self.num_input]
+            target = np.array(records[i:i + self.num_input], dtype=np.float32)
+            target = self.transform_coordinates(target, w, h)
+            npy_path = self.img_cache_dir('flat', 'seq', frames)
+            self.samples.append({'match_name': 'flat', 'video_name': 'seq', 'cache_npy': npy_path,
+                                 'img_files': frames, 'target': target})
+            self.img_cache('flat', 'seq', frames, npy_path)
     def get_valid_downsample_steps(self, original_fps: int, min_fps: int) -> list[int]:
         return [step for step in range(2, original_fps + 1) if original_fps / step >= min_fps]
 
@@ -228,10 +305,23 @@ class TrackNetConfigurableDataset(Dataset):
         if os.path.isfile(npy_path):
             return
 
-        # generate cache
-        frames = [cv2.imread(os.path.join(self.root_dir, match_name, 'frame', video_name, fp), cv2.IMREAD_GRAYSCALE).astype(np.float32) 
-                for fp in img_files]
+        # generate cache using optional multithreading
+        def read_frame(fp):
+            if getattr(self, 'flat_dataset', False):
+                path = os.path.join(self.root_dir, fp)
+            else:
+                path = os.path.join(self.root_dir, match_name, 'frame', video_name, fp)
+            return cv2.imread(path, cv2.IMREAD_GRAYSCALE).astype(np.float32)
+
+        if self.cache_threads > 1 and len(img_files) > 1:
+            with ThreadPoolExecutor(max_workers=self.cache_threads) as ex:
+                frames = list(ex.map(read_frame, img_files))
+        else:
+            frames = [read_frame(fp) for fp in img_files]
         frames = np.array(frames)  # 轉換為 NumPy 陣列
+
+        if len(frames) == 0:
+            raise FileNotFoundError(f'No images loaded for cache generation: {img_files}')
 
         background_remove = False
 
@@ -243,12 +333,17 @@ class TrackNetConfigurableDataset(Dataset):
             processed_frames = (frames - median_frame).astype(np.float32)
         else:
             processed_frames = frames
-        images = []
-        for i, processed_frame in enumerate(processed_frames):
-            img = self.pad_to_square(processed_frame)
+        def process_frame(proc_frame):
+            img = self.pad_to_square(proc_frame)
             img = cv2.resize(img, dsize=(640, 640), interpolation=cv2.INTER_CUBIC)
             img = np.expand_dims(img, axis=0)
-            images.append(img)
+            return img
+
+        if self.cache_threads > 1 and len(processed_frames) > 1:
+            with ThreadPoolExecutor(max_workers=self.cache_threads) as ex:
+                images = list(ex.map(process_frame, processed_frames))
+        else:
+            images = [process_frame(f) for f in processed_frames]
         img = np.concatenate(images, 0)
 
         np.save(npy_path, img)
@@ -275,7 +370,10 @@ class TrackNetConfigurableDataset(Dataset):
         img = torch.from_numpy(img).float()
         target = torch.from_numpy(d['target'])
 
-        img_files = [f"{self.root_dir}/{d['match_name']}/frame/{d['video_name']}/{im}" for im in d['img_files']]
+        if getattr(self, 'flat_dataset', False):
+            img_files = [os.path.join(self.root_dir, im) for im in d['img_files']]
+        else:
+            img_files = [f"{self.root_dir}/{d['match_name']}/frame/{d['video_name']}/{im}" for im in d['img_files']]
 
         return {"img": img, "target": target, "img_files": img_files}
 

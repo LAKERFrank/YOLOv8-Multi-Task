@@ -82,6 +82,8 @@ class TrackNetLossWithHit:
             
             mask_has_ball = torch.zeros_like(target_pos)
             for target_idx, target in enumerate(batch_target[idx]):
+                if target_idx >= self.num_groups:
+                    break
                 if target[6] == 1:
                     grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
                     hit_targets[target_idx, grid_y, grid_x] = 1
@@ -209,7 +211,7 @@ class TrackNetLoss:
         self.no = m.no
         self.reg_max = m.reg_max
         self.feat_no = m.feat_no
-        self.num_groups = 10
+        self.num_groups = getattr(model.model[-1], 'num_groups', 10)
         self.device = device
 
         self.use_dfl = m.reg_max > 1
@@ -226,9 +228,17 @@ class TrackNetLoss:
     def __call__(self, preds, batch):
         loss = torch.zeros(2, device=self.device)
 
-        feats = preds[1] if isinstance(preds, tuple) else preds
+        feats = preds[0] if isinstance(preds, tuple) else preds
 
         for i, feat in enumerate(feats):
+            channels = feat.shape[1]
+            if channels % self.no != 0:
+                expected_cls = self.no - self.reg_max * self.feat_no
+                raise ValueError(
+                    f"Invalid output channels {channels}. Got 'nc'={self.nc} and no={self.no} (" \
+                    f"expected cls channels {expected_cls}). Check that the dataset "
+                    "and model configuration use the same number of classes." )
+
             pred_distri, pred_scores = feat.view(feat.shape[0], self.no, -1).split(
                 (self.reg_max * self.feat_no, self.nc), 1)
             
@@ -258,6 +268,8 @@ class TrackNetLoss:
                 stride = self.stride[i]
                 
                 for target_idx, target in enumerate(batch_target[idx]):
+                    if target_idx >= self.num_groups:
+                        break
                     # target xy
                     grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
                     if grid_x >= 80 or grid_y >= 80:
@@ -369,7 +381,7 @@ class TrackNetLossV5:
         self.confusion_class = confusion_class
 
     def __call__(self, preds, batch):
-        feats = preds[1] if isinstance(preds, tuple) else preds
+        feats = preds[0] if isinstance(preds, tuple) else preds
         pred_distri, pred_scores = torch.cat([xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2).split(
             (self.reg_max * self.feat_no, self.nc), 1)
         
@@ -398,8 +410,10 @@ class TrackNetLossV5:
         for idx, _ in enumerate(batch_target):
             # pred = [330 * cell_num * cell_num]
             stride = self.stride[0]
-            
+
             for target_idx, target in enumerate(batch_target[idx]):
+                if target_idx >= self.num_groups:
+                    break
                 # target xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
                 # 找出快球 => 慢球, 慢球 => 快球
@@ -540,7 +554,7 @@ class TrackNetLossV4:
         self.confusion_class = confusion_class
 
     def __call__(self, preds, batch):
-        feats = preds[1] if isinstance(preds, tuple) else preds
+        feats = preds[0] if isinstance(preds, tuple) else preds
         pred_distri, pred_scores = torch.cat([xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2).split(
             (self.reg_max * self.feat_no, self.nc), 1)
         
@@ -568,8 +582,10 @@ class TrackNetLossV4:
         for idx, _ in enumerate(batch_target):
             # pred = [330 * 20 * 20]
             stride = self.stride[0]
-            
+
             for target_idx, target in enumerate(batch_target[idx]):
+                if target_idx >= self.num_groups:
+                    break
                 # target xy
                 grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
                 # 找出快球 => 慢球, 慢球 => 快球
@@ -711,7 +727,7 @@ class TrackNetLossV3:
         self.confusion_class = confusion_class
 
     def __call__(self, preds, batch):
-        feats = preds[1] if isinstance(preds, tuple) else preds
+        feats = preds[0] if isinstance(preds, tuple) else preds
         pred_distri, pred_scores, pred_dxdy = torch.cat([xi.view(feats[0].shape[0], self.no, -1) for xi in feats], 2).split(
             (self.reg_max * self.feat_no, self.nc, self.dxdy_no), 1)
         
@@ -736,8 +752,10 @@ class TrackNetLossV3:
         for idx, _ in enumerate(batch_target):
             # pred = [330 * 20 * 20]
             stride = self.stride[0]
-            
+
             for target_idx, target in enumerate(batch_target[idx]):
+                if target_idx >= self.num_groups:
+                    break
                 if target[1] == 1:
                     # xy
                     grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], stride)
@@ -792,9 +810,13 @@ class FocalLossWithMask(nn.Module):
 
     # OHEM
     def top_k_sampling(self, loss, labels, negative_ratio=3.0):
-        """
-        Hard Negative Mining: Selects the hardest negative examples based on the loss.
-        """
+        """Select the hardest negative samples for focal loss."""
+
+        if loss.ndim == 3:
+            loss = loss[..., 1]
+        if labels.ndim == 3:
+            labels = labels[..., 1]
+
         pos_mask = labels > 0
         num_pos = pos_mask.sum(dim=1, keepdim=True)
         num_neg = negative_ratio * num_pos
@@ -804,16 +826,18 @@ class FocalLossWithMask(nn.Module):
         _, indices = loss_for_sort.sort(dim=1, descending=True)
 
         neg_mask = torch.zeros_like(labels, dtype=torch.bool)
-        for i in range(loss.size(0)):  
+        for i in range(loss.size(0)):
             num_neg_samples = int(num_neg[i].item()) if int(num_neg[i].item()) != 0 else int(negative_ratio)
-            # num_neg_samples = 640
-            # num_neg_samples = int(num_neg[i].item())
-            neg_mask[i, indices[i, :num_neg_samples]] = True 
+            neg_mask[i, indices[i, :num_neg_samples]] = True
 
         return pos_mask | neg_mask
 
     def forward(self, pred, label, gamma=2, alpha=0.75, negative_ratio=3.0):
         """Calculates and updates confusion matrix for object detection/classification tasks."""
+        # If label is (B, N, 1) but pred is (B, N, 2), expand label to one-hot
+        if label.shape[-1] == 1 and pred.shape[-1] == 2:
+            label = torch.cat([1 - label, label], dim=-1)
+
         assert torch.all((label == 0) | (label == 1)), f"`label` contains invalid values: {label.unique()}"
         loss = F.binary_cross_entropy_with_logits(pred, label, reduction='none')
         assert (loss >= 0).all(), f"`loss` contains negative values. Min: {loss.min()}, Max: {loss.max()}"
@@ -847,7 +871,7 @@ class FocalLossWithMask(nn.Module):
 
         w = (alpha/(1-alpha))
 
-        loss = loss * relevant_mask.float()
+        loss = loss * relevant_mask.unsqueeze(-1).float()
 
         # loss[FN_mask] *= negative_ratio*20*w
         # loss[FP_mask & ~may_has_ball] *= negative_ratio*15*w

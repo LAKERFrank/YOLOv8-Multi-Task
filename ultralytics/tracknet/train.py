@@ -11,21 +11,21 @@ import torch
 
 class TrackNetTrainer(DetectionTrainer):
     def build_dataset(self, img_path, mode='train', batch=None):
-        # generator = torch.Generator().manual_seed(42)
-        # dataset = TrackNetConfigurableDataset(root_dir=img_path)
-        # train_size = int(0.8 * len(dataset))  # 70% 的數據作為訓練集
-        # val_size = len(dataset) - train_size  # 剩下的 30% 作為驗證集
-        # train_dataset, val_dataset = random_split(dataset, [train_size, val_size], generator)
+        """Build TrackNet datasets using the model's expected channel count."""
+
+        # Determine required sequence length from dataset configuration
+        num_input = int(self.data.get('in_channels', 10))
 
         if mode == 'train':
-            dataset = TrackNetConfigurableDataset(root_dir=img_path)
+            dataset = TrackNetConfigurableDataset(root_dir=img_path, num_input=num_input, mode='train')
             return dataset
         else:
-            dataset = TrackNetValDataset(root_dir=img_path)
+            dataset = TrackNetValDataset(root_dir=img_path, num_input=num_input, mode='val')
             return dataset
 
     def get_model(self, cfg=None, weights=None, verbose=True):
-        self.tracknet_model = TrackNetV4Model(cfg, ch=10, nc=self.data['nc'], verbose=verbose and RANK == -1)
+        in_ch = int(self.data.get('in_channels', 10))
+        self.tracknet_model = TrackNetV4Model(cfg, ch=in_ch, nc=self.data['nc'], verbose=verbose and RANK == -1)
         if weights:
             self.tracknet_model.load(weights)
         return self.tracknet_model

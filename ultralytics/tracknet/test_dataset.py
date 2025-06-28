@@ -11,23 +11,42 @@ import torch.nn.functional as F
 from tqdm import tqdm
 from functools import lru_cache
 from glob import glob
+from concurrent.futures import ThreadPoolExecutor
 
 class TrackNetTestDataset(Dataset):
-    def __init__(self, root_dir, num_input=10, transform=None, prefix=''):
+    def __init__(self, root_dir, num_input=10, transform=None, prefix='', cache_threads=1):
 
+        if not os.path.isdir(root_dir):
+            raise FileNotFoundError(f"Dataset directory not found: {root_dir}")
         self.root_dir = root_dir
         self.transform = transform
         self.num_input = num_input
         self.samples = []
         self.prefix = prefix
+        self.cache_threads = max(int(cache_threads), 1)
 
         self.idx = set()
 
         image_count = len(glob(os.path.join(self.root_dir, "*/", "frame/", "*/", "*.png")))
 
+        matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
+        flat_images = sorted(
+            glob('*.png', root_dir=root_dir) +
+            glob('*.jpg', root_dir=root_dir) +
+            glob('*.jpeg', root_dir=root_dir) +
+            glob('*.PNG', root_dir=root_dir) +
+            glob('*.JPG', root_dir=root_dir) +
+            glob('*.JPEG', root_dir=root_dir))
+        if not matches and flat_images:
+            self.flat_dataset = True
+            self._load_flat_dataset(flat_images)
+            return
+        if not matches:
+            raise FileNotFoundError(f"No match directories found in {self.root_dir}")
+
         self.pbar = tqdm(total=image_count, miniters=1, smoothing=1)
         # Traverse all matches
-        for match_name in glob("*/", root_dir=root_dir):
+        for match_name in matches:
             match_name = match_name.strip('/')
 
             match_dir_path = os.path.join(root_dir, match_name)
@@ -38,6 +57,11 @@ class TrackNetTestDataset(Dataset):
 
             self.read_match(match_name)
         self.pbar.close()
+        if len(self.samples) == 0:
+            raise FileNotFoundError(
+                f'No test samples found in {self.root_dir}. '
+                'Please verify the dataset files and annotations.'
+            )
 
     def read_match(self, match_name):
         video_dir = os.path.join(self.root_dir, match_name, 'video')
@@ -76,6 +100,28 @@ class TrackNetTestDataset(Dataset):
 
             self.pbar.update(self.num_input-1)
 
+    def _load_flat_dataset(self, image_files):
+        label_dir = self.root_dir.replace(os.sep + 'images' + os.sep, os.sep + 'labels' + os.sep)
+        if not os.path.isdir(label_dir):
+            raise FileNotFoundError(f"Labels directory not found for flat dataset: {label_dir}")
+
+        image_files = sorted(image_files)
+        if len(image_files) < self.num_input:
+            raise FileNotFoundError(
+                f"Flat dataset {self.root_dir} contains {len(image_files)} images, "
+                f"but {self.num_input} are required"
+            )
+
+        first = self.open_image(os.path.join(self.root_dir, image_files[0]))
+        h, w = first.shape
+
+        for i in range(len(image_files) - (self.num_input - 1)):
+            frames = image_files[i:i + self.num_input]
+            npy_path = self.img_cache_dir('flat', 'seq', frames)
+            self.samples.append({'match_name': 'flat', 'video_name': 'seq', 'cache_npy': npy_path,
+                                 'img_files': frames})
+            self.img_cache('flat', 'seq', frames, npy_path)
+
     def img_cache_dir(self, match_name, video_name, img_files):
         s = '|'.join([match_name]+[video_name]+img_files)
         filename = hashlib.sha1(s.encode('utf-8')).hexdigest()
@@ -94,8 +140,23 @@ class TrackNetTestDataset(Dataset):
         if os.path.isfile(npy_path):
             return
 
-        # generate cache
-        images = [self.__preprocess_img(os.path.join(self.root_dir, match_name, 'frame', video_name, img_file)) for img_file in img_files]
+        # generate cache using optional multithreading
+        def process(fp):
+            if getattr(self, 'flat_dataset', False):
+                path = os.path.join(self.root_dir, fp)
+            else:
+                path = os.path.join(self.root_dir, match_name, 'frame', video_name, fp)
+            return self.__preprocess_img(path)
+
+        if self.cache_threads > 1 and len(img_files) > 1:
+            with ThreadPoolExecutor(max_workers=self.cache_threads) as ex:
+                images = list(ex.map(process, img_files))
+        else:
+            images = [process(fp) for fp in img_files]
+
+        if len(images) == 0:
+            raise FileNotFoundError(f'No images loaded for cache generation: {img_files}')
+
         img = np.concatenate(images, 0)
 
         np.save(npy_path, img)
@@ -138,7 +199,10 @@ class TrackNetTestDataset(Dataset):
 
         img = torch.from_numpy(img).float()
 
-        img_files = [f"{self.root_dir}/../{im}" for im in d['img_files']]
+        if getattr(self, 'flat_dataset', False):
+            img_files = [os.path.join(self.root_dir, im) for im in d['img_files']]
+        else:
+            img_files = [f"{self.root_dir}/../{im}" for im in d['img_files']]
 
         return {"img": img, "img_files": img_files}
 
