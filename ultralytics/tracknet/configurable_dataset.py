@@ -49,7 +49,11 @@ class TrackNetConfigurableDataset(Dataset):
 
         self.idx = set()
 
-        matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
+        matches = [
+            m.strip("/")
+            for m in glob("*/", root_dir=root_dir)
+            if os.path.isdir(os.path.join(root_dir, m, "frame"))
+        ]
         flat_images = sorted(
             glob('*.png', root_dir=root_dir) +
             glob('*.jpg', root_dir=root_dir) +
@@ -59,7 +63,14 @@ class TrackNetConfigurableDataset(Dataset):
             glob('*.JPEG', root_dir=root_dir))
 
         if matches:
-            image_count = len(glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.png')))
+            image_count = len(
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.png')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.jpg')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.jpeg')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.PNG')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.JPG')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.JPEG'))
+            )
         else:
             image_count = len(flat_images)
 
@@ -88,7 +99,14 @@ class TrackNetConfigurableDataset(Dataset):
                 continue
 
             if match_name in self.path_counts:
-                image_count = len(glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*/", "*.png")))
+                image_count = len(
+                    glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*", "*.png")) +
+                    glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*", "*.jpg")) +
+                    glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*", "*.jpeg")) +
+                    glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*", "*.PNG")) +
+                    glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*", "*.JPG")) +
+                    glob(os.path.join(self.root_dir, f"{match_name}/", "frame/", "*", "*.JPEG"))
+                )
                 total_samples = image_count
 
                 with tqdm(total=total_samples, desc=f"Processing {match_name}", miniters=1, smoothing=1) as pbar:

@@ -33,7 +33,11 @@ class TrackNetDataset(Dataset):
 
         self.idx = set()
 
-        matches = [m.strip('/') for m in glob("*/", root_dir=root_dir) if os.path.isdir(os.path.join(root_dir, m))]
+        matches = [
+            m.strip("/")
+            for m in glob("*/", root_dir=root_dir)
+            if os.path.isdir(os.path.join(root_dir, m, "frame"))
+        ]
         flat_images = sorted(
             glob('*.png', root_dir=root_dir) +
             glob('*.jpg', root_dir=root_dir) +
@@ -43,7 +47,14 @@ class TrackNetDataset(Dataset):
             glob('*.JPEG', root_dir=root_dir))
 
         if matches:
-            image_count = len(glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.png')))
+            image_count = len(
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.png')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.jpg')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.jpeg')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.PNG')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.JPG')) +
+                glob(os.path.join(self.root_dir, '*', 'frame', '*', '*.JPEG'))
+            )
         else:
             image_count = len(flat_images)
 
