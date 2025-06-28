@@ -371,7 +371,11 @@ class Pose(Detect):
         self.detect = Detect.forward
 
         c4 = max(ch[0] // 4, self.nk)
-        self.cv4 = nn.ModuleList(nn.Sequential(Conv(x, c4, 3), Conv(c4, c4, 3), nn.Conv2d(c4, self.nk, 1)) for x in ch)
+        # match detection head which predicts `num_groups` sets of outputs per cell
+        self.cv4 = nn.ModuleList(
+            nn.Sequential(Conv(x, c4, 3), Conv(c4, c4, 3), nn.Conv2d(c4, self.nk * self.num_groups, 1))
+            for x in ch
+        )
 
     def forward(self, x):
         """Perform forward pass through YOLO model and return predictions."""
