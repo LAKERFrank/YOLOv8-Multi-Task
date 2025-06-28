@@ -452,7 +452,8 @@ class BaseTrainer:
 
             self.lr = {f'lr/pg{ir}': x['lr'] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers
 
-            self.scheduler.step()
+            if last_opt_step >= 0:
+                self.scheduler.step()
             self.run_callbacks('on_train_epoch_end')
 
             if RANK in (-1, 0):
