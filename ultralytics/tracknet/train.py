@@ -17,10 +17,12 @@ class TrackNetTrainer(DetectionTrainer):
         num_input = int(self.data.get('in_channels', 10))
 
         if mode == 'train':
-            dataset = TrackNetConfigurableDataset(root_dir=img_path, num_input=num_input, mode='train')
+            dataset = TrackNetConfigurableDataset(root_dir=img_path, num_input=num_input, mode='train',
+                                                 fraction=self.args.fraction)
             return dataset
         else:
-            dataset = TrackNetValDataset(root_dir=img_path, num_input=num_input, mode='val')
+            dataset = TrackNetValDataset(root_dir=img_path, num_input=num_input, mode='val',
+                                         fraction=self.args.fraction)
             return dataset
 
     def get_model(self, cfg=None, weights=None, verbose=True):

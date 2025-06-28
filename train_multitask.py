@@ -37,6 +37,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr0", type=float, default=0.01, help="初始學習率")
     parser.add_argument("--optimizer", default="SGD", help="最佳化器")
     parser.add_argument("--batch", type=int, default=32, help="批次大小")
+    parser.add_argument("--fraction", type=float, default=1.0, help="使用部分資料訓練")
+    parser.add_argument("--debug", action="store_true", help="啟用除錯模式，只使用少量資料")
     parser.add_argument(
         "--freeze-layers",
         type=int,
@@ -56,7 +58,11 @@ def main() -> None:
     """開始訓練。"""
     args = parse_args()
 
-    overrides = {"model": args.model}
+    if args.debug:
+        args.fraction = 0.01
+        args.epochs = 1
+
+    overrides = {"model": args.model, "fraction": args.fraction}
     model = TrackNet(overrides)
     model.train(
         data=args.data,
@@ -68,6 +74,7 @@ def main() -> None:
         batch=args.batch,
         freeze_layers=args.freeze_layers,
         use_resampler=args.use_resampler,
+        fraction=args.fraction,
     )
 
 

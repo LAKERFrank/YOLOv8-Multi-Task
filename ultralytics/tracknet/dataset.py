@@ -14,7 +14,8 @@ from glob import glob
 from concurrent.futures import ThreadPoolExecutor
 
 class TrackNetDataset(Dataset):
-    def __init__(self, root_dir, num_input=10, transform=None, prefix='', cache_threads=1, mode='train'):
+    def __init__(self, root_dir, num_input=10, transform=None, prefix='',
+                 cache_threads=1, mode='train', fraction=1.0):
 
         if not os.path.isdir(root_dir):
             alt = os.path.join(root_dir, 'images', mode)
@@ -28,6 +29,7 @@ class TrackNetDataset(Dataset):
         self.samples = []
         self.prefix = prefix
         self.cache_threads = max(int(cache_threads), 1)
+        self.fraction = float(fraction)
 
         self.idx = set()
 
@@ -62,6 +64,10 @@ class TrackNetDataset(Dataset):
 
             self.read_match(match_name)
         self.pbar.close()
+        if 0 < self.fraction < 1.0:
+            keep = max(1, int(len(self.samples) * self.fraction))
+            self.samples = self.samples[:keep]
+
         if len(self.samples) == 0:
             raise FileNotFoundError(
                 f'No training samples found in {self.root_dir}. '
