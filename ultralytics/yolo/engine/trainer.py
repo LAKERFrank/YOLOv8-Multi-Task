@@ -448,6 +448,7 @@ class BaseTrainer:
             ni = max(i, 0) + nb * epoch
             if last_opt_step < ni:
                 self.optimizer_step()
+                last_opt_step = ni
 
             self.lr = {f'lr/pg{ir}': x['lr'] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers
 
