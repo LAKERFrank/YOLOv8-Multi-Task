@@ -53,7 +53,7 @@ class TrackNetValidatorV3(BaseValidator):
         """Initialize some metrics."""
         # Placeholder for any metrics you might want to use.
         self.stride = 32
-        self.num_groups = int(getattr(model, 'yaml', {}).get('ch', 10))
+        self.num_groups = getattr(model.model[-1], 'num_groups', 10)
 
         self.total_loss = 0.0
         self.num_samples = 0
