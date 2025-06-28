@@ -23,6 +23,11 @@ class TrackNetConfigurableDataset(Dataset):
         self.match_mog2 = {}
         self.cache_threads = max(int(cache_threads), 1)
         self.fraction = float(fraction)
+        max_samples = float('inf')
+        image_count = len(glob(os.path.join(root_dir, "*/", "frame/", "*/", "*.png")))
+        if 0 < self.fraction < 1.0:
+            max_samples = max(1, int(image_count * self.fraction))
+        self.max_samples = max_samples
         if not os.path.isdir(root_dir):
             alt = os.path.join(root_dir, 'images', mode)
             if os.path.isdir(alt):
@@ -68,6 +73,8 @@ class TrackNetConfigurableDataset(Dataset):
         # Traverse all matches
         last_len = 0
         for match_name in matches:
+            if len(self.samples) >= self.max_samples:
+                break
             match_name = match_name.strip('/')
 
             match_dir_path = os.path.join(root_dir, match_name)
@@ -82,12 +89,13 @@ class TrackNetConfigurableDataset(Dataset):
 
                 with tqdm(total=total_samples, desc=f"Processing {match_name}", miniters=1, smoothing=1) as pbar:
                     self.read_match(match_name, pbar)
+                    if len(self.samples) >= self.max_samples:
+                        break
             print(f"Total samples for {match_name}: {len(self.samples)-last_len}\n")
             last_len = len(self.samples)
-                if 0 < self.fraction < 1.0:
-                                keep = max(1, int(len(self.samples) * self.fraction))
-                                self.samples = self.samples[:keep]
 
+        if self.max_samples != float("inf"):
+            self.samples = self.samples[: self.max_samples]
 
         if len(self.samples) == 0:
             raise FileNotFoundError(
@@ -138,6 +146,8 @@ class TrackNetConfigurableDataset(Dataset):
 
                 # Create sliding windows of num_input frames
                 for i in range(min_len - (self.num_input-1)):
+                    if len(self.samples) >= self.max_samples:
+                        return
                     frames = img_files[i: i + self.num_input]
 
                     target = ball_trajectory_df.iloc[i: i + self.num_input].values
@@ -176,6 +186,8 @@ class TrackNetConfigurableDataset(Dataset):
                     max_start_idx = len(img_files) - num_frames_needed + 1
 
                     for i in range(max_start_idx):
+                        if len(self.samples) >= self.max_samples:
+                            return
                         frames = img_files[i: i + num_frames_needed: step]
                         target = ball_trajectory_df.iloc[i: i + num_frames_needed: step].values
                         target = self.transform_coordinates(target, width, height)

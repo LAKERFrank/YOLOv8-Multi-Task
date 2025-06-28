@@ -22,6 +22,11 @@ class TrackNetValDataset(Dataset):
         self.total_ball = 0
         self.cache_threads = max(int(cache_threads), 1)
         self.fraction = float(fraction)
+        max_samples = float('inf')
+        image_count = len(glob(os.path.join(root_dir, "*/", "frame/", "*/", "*.png")))
+        if 0 < self.fraction < 1.0:
+            max_samples = max(1, int(image_count * self.fraction))
+        self.max_samples = max_samples
         if not os.path.isdir(root_dir):
             alt = os.path.join(root_dir, 'images', mode)
             if os.path.isdir(alt):
@@ -56,6 +61,8 @@ class TrackNetValDataset(Dataset):
         self.pbar = tqdm(total=image_count, miniters=1, smoothing=1)
         # Traverse all matches
         for match_name in matches:
+            if len(self.samples) >= self.max_samples:
+                break
             match_name = match_name.strip('/')
 
             match_dir_path = os.path.join(root_dir, match_name)
@@ -65,10 +72,11 @@ class TrackNetValDataset(Dataset):
                 continue
 
             self.read_match(match_name)
+            if len(self.samples) >= self.max_samples:
+                break
         self.pbar.close()
-        if 0 < self.fraction < 1.0:
-            keep = max(1, int(len(self.samples) * self.fraction))
-            self.samples = self.samples[:keep]
+        if self.max_samples != float('inf'):
+            self.samples = self.samples[: self.max_samples]
 
         if len(self.samples) == 0:
             raise FileNotFoundError(
@@ -90,6 +98,8 @@ class TrackNetValDataset(Dataset):
 
         # Traverse all videos in the match directory
         for video_name in glob("*.mp4", root_dir=video_dir):
+            if len(self.samples) >= self.max_samples:
+                return
             # get video fps
             video_path = os.path.join(video_dir, video_name)
             cap = cv2.VideoCapture(video_path)
@@ -113,6 +123,8 @@ class TrackNetValDataset(Dataset):
 
             # Create sliding windows of num_input frames, stride = 10
             for i in range(len(img_files)//10):
+                if len(self.samples) >= self.max_samples:
+                    return
                 frames = img_files[i*self.num_input: i*self.num_input + self.num_input]
 
                 target = ball_trajectory_df.iloc[i*self.num_input: i*self.num_input + self.num_input].values
