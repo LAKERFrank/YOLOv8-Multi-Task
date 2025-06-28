@@ -84,10 +84,6 @@ class TrackNetConfigurableDataset(Dataset):
                     self.read_match(match_name, pbar)
             print(f"Total samples for {match_name}: {len(self.samples)-last_len}\n")
             last_len = len(self.samples)
-                if 0 < self.fraction < 1.0:
-                                keep = max(1, int(len(self.samples) * self.fraction))
-                                self.samples = self.samples[:keep]
-
 
         if 0 < self.fraction < 1.0:
             keep = max(1, int(len(self.samples) * self.fraction))
