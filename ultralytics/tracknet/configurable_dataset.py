@@ -18,10 +18,11 @@ from ultralytics.tracknet.utils.preprocess import preprocess_csvV4
 from ultralytics.tracknet.utils.preprocess import preprocess_csv
 
 class TrackNetConfigurableDataset(Dataset):
-    def __init__(self, root_dir, num_input=10, transform=None, prefix='', cache_threads=1, mode='train'):
+    def __init__(self, root_dir, num_input=10, transform=None, prefix='', cache_threads=1, mode='train', fraction=1.0):
 
         self.match_mog2 = {}
         self.cache_threads = max(int(cache_threads), 1)
+        self.fraction = float(fraction)
         if not os.path.isdir(root_dir):
             alt = os.path.join(root_dir, 'images', mode)
             if os.path.isdir(alt):
@@ -83,6 +84,11 @@ class TrackNetConfigurableDataset(Dataset):
                     self.read_match(match_name, pbar)
             print(f"Total samples for {match_name}: {len(self.samples)-last_len}\n")
             last_len = len(self.samples)
+
+        if 0 < self.fraction < 1.0:
+            keep = max(1, int(len(self.samples) * self.fraction))
+            self.samples = self.samples[:keep]
+
 
         if len(self.samples) == 0:
             raise FileNotFoundError(
