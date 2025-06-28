@@ -212,6 +212,8 @@ class BaseModel(nn.Module):
             self.criterion = self.init_criterion()
 
         preds = self.forward(batch['img']) if preds is None else preds
+        if isinstance(preds, tuple) and not isinstance(preds[0], (list, tuple)):
+            preds = preds[1]
         return self.criterion(preds, batch)
 
     def init_criterion(self):
