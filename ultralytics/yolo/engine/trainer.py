@@ -398,6 +398,7 @@ class BaseTrainer:
                 pbar = tqdm(enumerate(self.train_loader), total=nb, bar_format=TQDM_BAR_FORMAT)
             self.tloss = None
             self.optimizer.zero_grad()
+            i = -1  # track last batch index
             for i, batch in pbar:
                 self.run_callbacks('on_train_batch_start')
                 # Warmup
@@ -443,9 +444,14 @@ class BaseTrainer:
 
                 self.run_callbacks('on_train_batch_end')
 
+            # handle any remaining gradient accumulation
+            ni = max(i, 0) + nb * epoch
+            if last_opt_step < ni:
+                self.optimizer_step()
+                last_opt_step = ni
+
             self.lr = {f'lr/pg{ir}': x['lr'] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers
 
-            self.scheduler.step()
             self.run_callbacks('on_train_epoch_end')
 
             if RANK in (-1, 0):
@@ -542,11 +548,15 @@ class BaseTrainer:
         return ckpt
 
     def optimizer_step(self):
-        """Perform a single step of the training optimizer with gradient clipping and EMA update."""
+        """Perform a single training step and update the scheduler after the optimizer."""
         self.scaler.unscale_(self.optimizer)  # unscale gradients
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)  # clip gradients
+        pre_steps = self.optimizer._step_count  # track steps before optimizer update
         self.scaler.step(self.optimizer)
         self.scaler.update()
+        if self.scheduler and self.optimizer._step_count > pre_steps:
+            self.scheduler.step()
+            self.lr = {f'lr/pg{ir}': x['lr'] for ir, x in enumerate(self.optimizer.param_groups)}
         self.optimizer.zero_grad()
         if self.ema:
             self.ema.update(self.model)
