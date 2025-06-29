@@ -381,10 +381,10 @@ class Pose(Detect):
         """Perform forward pass through YOLO model and return predictions."""
         bs = x[0].shape[0]  # batch size
         if not self.training and (self.anchors.numel() == 0 or self.shape != x[0].shape):
-            # generate anchors from all detection layers
-            self.anchors, self.strides = (y.transpose(0, 1) for y in make_anchors(x, self.stride, 0.5))
+            # use the first detection level to match detection output size
+            self.anchors, self.strides = (y.transpose(0, 1) for y in make_anchors([x[0]], self.stride[:1], 0.5))
             self.shape = x[0].shape
-        kpt = torch.cat([self.cv4[i](x[i]).view(bs, self.nk, -1) for i in range(self.nl)], 2)  # (bs, nk, groups*h*w)
+        kpt = self.cv4[0](x[0]).view(bs, self.nk, -1)  # (bs, nk, groups*h*w)
         x = self.detect(self, x)
         if self.training:
             return x, kpt
