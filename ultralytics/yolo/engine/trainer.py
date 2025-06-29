@@ -452,9 +452,6 @@ class BaseTrainer:
 
             self.lr = {f'lr/pg{ir}': x['lr'] for ir, x in enumerate(self.optimizer.param_groups)}  # for loggers
 
-            if last_opt_step >= 0:
-                # step scheduler only after the optimizer has stepped
-                self.scheduler.step()
             self.run_callbacks('on_train_epoch_end')
 
             if RANK in (-1, 0):
@@ -551,10 +548,13 @@ class BaseTrainer:
         return ckpt
 
     def optimizer_step(self):
-        """Perform a single step of the training optimizer with gradient clipping and EMA update."""
+        """Perform a single training step and update the scheduler after the optimizer."""
         self.scaler.unscale_(self.optimizer)  # unscale gradients
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)  # clip gradients
         self.scaler.step(self.optimizer)
+        if self.scheduler:
+            self.scheduler.step()
+            self.lr = {f'lr/pg{ir}': x['lr'] for ir, x in enumerate(self.optimizer.param_groups)}
         self.scaler.update()
         self.optimizer.zero_grad()
         if self.ema:
