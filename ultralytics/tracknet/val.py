@@ -385,10 +385,8 @@ class TrackNetValidatorV4(BaseValidator):
 
 
         c, h, w = pred.shape
-        groups = max(1, c // self.no)
-        # limit groups to available targets to avoid shape mismatch
-        groups = min(groups, len(batch_target))
-        feats = pred[:groups * self.no].view(groups, self.no, h, w).view(self.no, -1)
+        pred_groups = max(1, c // self.no)
+        feats = pred[:pred_groups * self.no].view(pred_groups, self.no, h, w).view(self.no, -1)
         pred_distri, pred_scores = feats.split(
             (self.reg_max * self.feat_no, self.nc), 0)
         
@@ -402,7 +400,7 @@ class TrackNetValidatorV4(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
 
-        groups = min(groups, pred_probs.shape[0] // (self.cell_num * self.cell_num))
+        groups = pred_probs.shape[0] // (self.cell_num * self.cell_num)
 
         each_probs = pred_probs.view(groups, self.cell_num, self.cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
@@ -598,13 +596,14 @@ class TrackNetValidator(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
 
-        groups = min(groups, pred_probs.shape[0] // (self.cell_num * self.cell_num))
+        groups = pred_probs.shape[0] // (self.cell_num * self.cell_num)
 
-        mask_has_ball = torch.zeros(groups, self.cell_num, self.cell_num, device=self.device)
-        cls_targets = torch.zeros(groups, self.cell_num, self.cell_num, 1, device=self.device)
+        groups_eval = min(groups, len(batch_target))
+        mask_has_ball = torch.zeros(groups_eval, self.cell_num, self.cell_num, device=self.device)
+        cls_targets = torch.zeros(groups_eval, self.cell_num, self.cell_num, 1, device=self.device)
         
         for target_idx, target in enumerate(batch_target):
-            if target_idx >= groups:
+            if target_idx >= groups_eval:
                 break
             grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], self.stride)
             if grid_x >= 80:
@@ -621,8 +620,8 @@ class TrackNetValidator(BaseValidator):
                 ## cls
                 cls_targets[target_idx, grid_y, grid_x, 0] = 1
         
-        cls_targets = cls_targets.view(groups * self.cell_num * self.cell_num, 1)
-        mask_has_ball = mask_has_ball.view(groups * self.cell_num * self.cell_num).bool()
+        cls_targets = cls_targets.view(groups_eval * self.cell_num * self.cell_num, 1)
+        mask_has_ball = mask_has_ball.view(groups_eval * self.cell_num * self.cell_num).bool()
 
         each_probs = pred_probs.view(groups, self.cell_num, self.cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
@@ -630,7 +629,7 @@ class TrackNetValidator(BaseValidator):
         # 計算 hit v2 效果
         # 先填充 hit 前後兩幀
         frame_idx = 0
-        while frame_idx < groups:
+        while frame_idx < groups_eval:
             if batch_target[frame_idx][6] == 1:
                 # 檢查並設定範圍內的相鄰元素
                 if frame_idx - 2 >= 0:
@@ -647,7 +646,7 @@ class TrackNetValidator(BaseValidator):
                 frame_idx += 1
 
         
-        for frame_idx in range(groups):
+        for frame_idx in range(groups_eval):
             label = ''
             
             p_cell_x = each_pos_x[frame_idx]
