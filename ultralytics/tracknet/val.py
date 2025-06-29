@@ -554,7 +554,10 @@ class TrackNetValidator(BaseValidator):
         # Placeholder for loss calculation, etc.
         # preds = [[batch*50*20*20]]
         # batch['target'] = [batch*10*6]
-        preds = preds[1][0] # only pick first (stride = 32)
+        # predictions are returned as (det_out, (features, kpt))
+        preds = preds[1]
+        if isinstance(preds, (list, tuple)):
+            preds = preds[0]  # only pick first detection level (stride=32)
         batch_target = batch['target']
         batch_img = batch['img']
         batch_img_file = batch['img_files']
