@@ -106,7 +106,7 @@ class TrackNetValidatorV3(BaseValidator):
         pred_dxdy = pred_dxdy.permute(1, 0).contiguous()
         pred_dxdy = torch.tanh(pred_dxdy)
 
-        pred_probs = torch.sigmoid(pred_scores)
+        pred_probs = torch.sigmoid(pred_scores).view(-1)
         # pred_probs = [10*20*20]
         
         a, c = pred_distri.shape
@@ -393,7 +393,7 @@ class TrackNetValidatorV4(BaseValidator):
         pred_scores = pred_scores.permute(1, 0).contiguous()
         pred_distri = pred_distri.permute(1, 0).contiguous()
 
-        pred_probs = torch.sigmoid(pred_scores)
+        pred_probs = torch.sigmoid(pred_scores).view(-1)
 
         a, c = pred_distri.shape
 
@@ -586,7 +586,7 @@ class TrackNetValidator(BaseValidator):
         pred_scores = pred_scores.permute(1, 0).contiguous()
         pred_distri = pred_distri.permute(1, 0).contiguous()
 
-        pred_probs = torch.sigmoid(pred_scores)
+        pred_probs = torch.sigmoid(pred_scores).view(-1)
         # pred_probs = [num_groups*cell_num*cell_num]
 
         a, c = pred_distri.shape
@@ -1147,7 +1147,7 @@ class TrackNetValidatorV2(BaseValidator):
         pred_scores = pred_scores.permute(1, 0).contiguous()
         pred_distri = pred_distri.permute(1, 0).contiguous()
 
-        pred_probs = torch.sigmoid(pred_scores)
+        pred_probs = torch.sigmoid(pred_scores).view(-1)
         # pred_probs = [10*self.cell_num*self.cell_num]
         
         a, c = pred_distri.shape
@@ -1644,7 +1644,7 @@ class TrackNetValidatorWithHit(BaseValidator):
         # pred = [50 * 20 * 20]
         # batch_target = [10*6]
         pred_distri, pred_scores, pred_hits = torch.split(pred, [40, 10, 10], dim=0)
-        pred_probs = torch.sigmoid(pred_scores)
+        pred_probs = torch.sigmoid(pred_scores).view(-1)
         # pred_probs = [10*20*20]
         
         pred_pos, pred_mov = torch.split(pred_distri, [20, 20], dim=0)
