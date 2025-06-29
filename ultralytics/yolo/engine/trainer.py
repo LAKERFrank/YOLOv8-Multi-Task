@@ -551,9 +551,10 @@ class BaseTrainer:
         """Perform a single training step and update the scheduler after the optimizer."""
         self.scaler.unscale_(self.optimizer)  # unscale gradients
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)  # clip gradients
+        pre_steps = self.optimizer._step_count  # track steps before optimizer update
         self.scaler.step(self.optimizer)
         self.scaler.update()
-        if self.scheduler:
+        if self.scheduler and self.optimizer._step_count > pre_steps:
             self.scheduler.step()
             self.lr = {f'lr/pg{ir}': x['lr'] for ir, x in enumerate(self.optimizer.param_groups)}
         self.optimizer.zero_grad()
