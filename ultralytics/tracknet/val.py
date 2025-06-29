@@ -556,12 +556,12 @@ class TrackNetValidator(BaseValidator):
         # batch['target'] = [batch*10*6]
         # predictions are returned as (det_out, (features, kpt))
         preds = preds[1]
-        if isinstance(preds, (list, tuple)):
-            preds = preds[0]  # only pick first detection level (stride=32)
+        while isinstance(preds, (list, tuple)) and len(preds):
+            preds = preds[0]  # keep first element until tensor
         batch_target = batch['target']
         batch_img = batch['img']
         batch_img_file = batch['img_files']
-        if len(preds.shape) == 3:
+        if hasattr(preds, 'shape') and len(preds.shape) == 3:
             self.update_metrics_once(0, preds, batch_target[0], batch_img[0], loss)
         else:
             # for each batch
