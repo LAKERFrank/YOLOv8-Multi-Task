@@ -400,12 +400,15 @@ class TrackNetValidatorV4(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
 
-        # use group count from channel slicing above to avoid mismatched shapes
+        # derive group count from probability length
+        groups_from_probs = max(1, pred_probs.numel() // (self.cell_num * self.cell_num))
 
-        each_probs = pred_probs.view(groups, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
+        each_probs = pred_probs.view(groups_from_probs, self.cell_num, self.cell_num)
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups_from_probs, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
-        for frame_idx in range(groups):
+        groups_eval = min(groups, groups_from_probs)
+
+        for frame_idx in range(groups_eval):
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
             p_cell_nx = each_pos_nx[frame_idx]
@@ -589,7 +592,8 @@ class TrackNetValidator(BaseValidator):
         pred_distri = pred_distri.permute(1, 0).contiguous()
 
         pred_probs = torch.sigmoid(pred_scores).view(-1)
-        # pred_probs = [num_groups*cell_num*cell_num]
+        # derive group count directly from probability length for reshaping
+        groups_from_probs = max(1, pred_probs.numel() // (self.cell_num * self.cell_num))
 
         a, c = pred_distri.shape
 
@@ -597,7 +601,7 @@ class TrackNetValidator(BaseValidator):
             self.proj.type(pred_distri.dtype))
 
         # groups already limited above based on available targets
-        groups_eval = groups
+        groups_eval = min(groups, groups_from_probs)
         mask_has_ball = torch.zeros(groups_eval, self.cell_num, self.cell_num, device=self.device)
         cls_targets = torch.zeros(groups_eval, self.cell_num, self.cell_num, 1, device=self.device)
         
@@ -622,8 +626,8 @@ class TrackNetValidator(BaseValidator):
         cls_targets = cls_targets.view(groups_eval * self.cell_num * self.cell_num, 1)
         mask_has_ball = mask_has_ball.view(groups_eval * self.cell_num * self.cell_num).bool()
 
-        each_probs = pred_probs.view(groups, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
+        each_probs = pred_probs.view(groups_from_probs, self.cell_num, self.cell_num)
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups_from_probs, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
         # 計算 hit v2 效果
         # 先填充 hit 前後兩幀
