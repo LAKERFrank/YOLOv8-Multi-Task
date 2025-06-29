@@ -291,7 +291,8 @@ class TrackNetValidatorV4(BaseValidator):
         else:
             self.stride = model.model.stride[0]
         self.cell_num = int(640/self.stride)
-        self.num_groups = 10
+        m = model.model[-1] if hasattr(model, "model") else model
+        self.num_groups = getattr(m, "num_groups", 10)
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -511,7 +512,8 @@ class TrackNetValidator(BaseValidator):
         else:
             self.stride = model.model.stride[0]
         self.cell_num = int(640/self.stride)
-        self.num_groups = 10
+        m = model.model[-1] if hasattr(model, "model") else model
+        self.num_groups = getattr(m, "num_groups", 10)
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -526,11 +528,11 @@ class TrackNetValidator(BaseValidator):
         self.ball_count = 0
         self.pred_ball_count = 0
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.reg_max = 16
+        self.reg_max = getattr(m, "reg_max", 16)
+        self.feat_no = getattr(m, "feat_no", 8)
+        self.nc = getattr(m, "nc", 1)
+        self.no = self.reg_max * self.feat_no + self.nc
         self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
-        self.feat_no = 8
-        self.nc = 1
-        self.no = 16*self.feat_no+self.nc
 
         # 一顆球半徑 = 2 pixel (640*640)
         self.tolerance2 = 2.0 # 50% 距離容忍度
