@@ -384,8 +384,10 @@ class TrackNetValidatorV4(BaseValidator):
             
 
 
-        feats = pred.clone()
-        pred_distri, pred_scores = feats.view(self.no, -1).split(
+        c, h, w = pred.shape
+        groups = max(1, c // self.no)
+        feats = pred[:groups * self.no].view(groups, self.no, h, w).view(self.no, -1)
+        pred_distri, pred_scores = feats.split(
             (self.reg_max * self.feat_no, self.nc), 0)
         
         pred_scores = pred_scores.permute(1, 0).contiguous()
@@ -398,7 +400,7 @@ class TrackNetValidatorV4(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
 
-        groups = max(1, pred_probs.shape[0] // (self.cell_num * self.cell_num))
+        groups = max(groups, pred_probs.shape[0] // (self.cell_num * self.cell_num))
 
         each_probs = pred_probs.view(groups, self.cell_num, self.cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
@@ -575,8 +577,10 @@ class TrackNetValidator(BaseValidator):
     def update_metrics_once(self, batch_idx, pred, batch_target, batch_img, loss):
         # pred = [330 * self.cell_num * self.cell_num]
         # batch_target = [10*7]
-        feats = pred.clone()
-        pred_distri, pred_scores = feats.view(self.no, -1).split(
+        c, h, w = pred.shape
+        groups = max(1, c // self.no)
+        feats = pred[:groups * self.no].view(groups, self.no, h, w).view(self.no, -1)
+        pred_distri, pred_scores = feats.split(
             (self.reg_max * self.feat_no, self.nc), 0)
         
         pred_scores = pred_scores.permute(1, 0).contiguous()
@@ -590,7 +594,7 @@ class TrackNetValidator(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
 
-        groups = max(1, pred_probs.shape[0] // (self.cell_num * self.cell_num))
+        groups = max(groups, pred_probs.shape[0] // (self.cell_num * self.cell_num))
 
         mask_has_ball = torch.zeros(groups, self.cell_num, self.cell_num, device=self.device)
         cls_targets = torch.zeros(groups, self.cell_num, self.cell_num, 1, device=self.device)
