@@ -386,6 +386,8 @@ class TrackNetValidatorV4(BaseValidator):
 
         c, h, w = pred.shape
         groups = max(1, c // self.no)
+        # limit groups to available targets to avoid shape mismatch
+        groups = min(groups, len(batch_target))
         feats = pred[:groups * self.no].view(groups, self.no, h, w).view(self.no, -1)
         pred_distri, pred_scores = feats.split(
             (self.reg_max * self.feat_no, self.nc), 0)
@@ -400,7 +402,7 @@ class TrackNetValidatorV4(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
 
-        groups = max(groups, pred_probs.shape[0] // (self.cell_num * self.cell_num))
+        groups = min(groups, pred_probs.shape[0] // (self.cell_num * self.cell_num))
 
         each_probs = pred_probs.view(groups, self.cell_num, self.cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
@@ -579,6 +581,8 @@ class TrackNetValidator(BaseValidator):
         # batch_target = [10*7]
         c, h, w = pred.shape
         groups = max(1, c // self.no)
+        # limit groups to available targets to avoid shape mismatch
+        groups = min(groups, len(batch_target))
         feats = pred[:groups * self.no].view(groups, self.no, h, w).view(self.no, -1)
         pred_distri, pred_scores = feats.split(
             (self.reg_max * self.feat_no, self.nc), 0)
@@ -594,7 +598,7 @@ class TrackNetValidator(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
 
-        groups = max(groups, pred_probs.shape[0] // (self.cell_num * self.cell_num))
+        groups = min(groups, pred_probs.shape[0] // (self.cell_num * self.cell_num))
 
         mask_has_ball = torch.zeros(groups, self.cell_num, self.cell_num, device=self.device)
         cls_targets = torch.zeros(groups, self.cell_num, self.cell_num, 1, device=self.device)
