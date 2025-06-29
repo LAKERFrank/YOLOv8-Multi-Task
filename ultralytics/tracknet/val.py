@@ -385,8 +385,8 @@ class TrackNetValidatorV4(BaseValidator):
 
 
         c, h, w = pred.shape
-        pred_groups = max(1, c // self.no)
-        feats = pred[:pred_groups * self.no].view(pred_groups, self.no, h, w).view(self.no, -1)
+        groups = max(1, c // self.no)
+        feats = pred[:groups * self.no].view(groups, self.no, h, w).view(self.no, -1)
         pred_distri, pred_scores = feats.split(
             (self.reg_max * self.feat_no, self.nc), 0)
         
@@ -400,7 +400,7 @@ class TrackNetValidatorV4(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
 
-        groups = pred_probs.shape[0] // (self.cell_num * self.cell_num)
+        # use group count from channel slicing above to avoid mismatched shapes
 
         each_probs = pred_probs.view(groups, self.cell_num, self.cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
@@ -596,9 +596,8 @@ class TrackNetValidator(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
 
-        groups = pred_probs.shape[0] // (self.cell_num * self.cell_num)
-
-        groups_eval = min(groups, len(batch_target))
+        # groups already limited above based on available targets
+        groups_eval = groups
         mask_has_ball = torch.zeros(groups_eval, self.cell_num, self.cell_num, device=self.device)
         cls_targets = torch.zeros(groups_eval, self.cell_num, self.cell_num, 1, device=self.device)
         
