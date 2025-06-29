@@ -398,10 +398,12 @@ class TrackNetValidatorV4(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
         
-        each_probs = pred_probs.view(self.num_groups, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(self.num_groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
+        groups = max(1, a // (self.cell_num * self.cell_num))
 
-        for frame_idx in range(self.num_groups):
+        each_probs = pred_probs.view(groups, self.cell_num, self.cell_num)
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
+
+        for frame_idx in range(groups):
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
             p_cell_nx = each_pos_nx[frame_idx]
@@ -589,13 +591,12 @@ class TrackNetValidator(BaseValidator):
             self.proj.type(pred_distri.dtype))
 
         groups = max(1, a // (self.cell_num * self.cell_num))
-        groups = min(groups, self.num_groups)
-        
-        mask_has_ball = torch.zeros(self.num_groups, self.cell_num, self.cell_num, device=self.device)
-        cls_targets = torch.zeros(self.num_groups, self.cell_num, self.cell_num, 1, device=self.device)
+
+        mask_has_ball = torch.zeros(groups, self.cell_num, self.cell_num, device=self.device)
+        cls_targets = torch.zeros(groups, self.cell_num, self.cell_num, 1, device=self.device)
         
         for target_idx, target in enumerate(batch_target):
-            if target_idx >= self.num_groups:
+            if target_idx >= groups:
                 break
             grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], self.stride)
             if grid_x >= 80:
@@ -612,8 +613,8 @@ class TrackNetValidator(BaseValidator):
                 ## cls
                 cls_targets[target_idx, grid_y, grid_x, 0] = 1
         
-        cls_targets = cls_targets.view(self.num_groups*self.cell_num*self.cell_num, 1)
-        mask_has_ball = mask_has_ball.view(self.num_groups*self.cell_num*self.cell_num).bool()
+        cls_targets = cls_targets.view(groups * self.cell_num * self.cell_num, 1)
+        mask_has_ball = mask_has_ball.view(groups * self.cell_num * self.cell_num).bool()
 
         each_probs = pred_probs.view(groups, self.cell_num, self.cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
