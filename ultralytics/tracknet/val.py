@@ -352,7 +352,7 @@ class TrackNetValidatorV4(BaseValidator):
         self.cumulative_TN = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
         self.fitness = 0
 
-        self.frame_10_metrics = deque(maxlen=10)
+        self.frame_10_metrics = deque(maxlen=self.num_groups)
     
     def update_metrics(self, preds, batch):
         """Calculate and update metrics based on predictions and batch."""
@@ -398,10 +398,10 @@ class TrackNetValidatorV4(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
         
-        each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
+        each_probs = pred_probs.view(self.num_groups, self.cell_num, self.cell_num)
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(self.num_groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
-        for frame_idx in range(10):
+        for frame_idx in range(self.num_groups):
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
             p_cell_nx = each_pos_nx[frame_idx]
@@ -549,7 +549,7 @@ class TrackNetValidator(BaseValidator):
         self.fitness = 0
         self.avg_ap = 0
 
-        self.frame_10_metrics = deque(maxlen=10)
+        self.frame_10_metrics = deque(maxlen=self.num_groups)
     
     def update_metrics(self, preds, batch, loss):
         """Calculate and update metrics based on predictions and batch."""
@@ -612,13 +612,13 @@ class TrackNetValidator(BaseValidator):
         cls_targets = cls_targets.view(self.num_groups*self.cell_num*self.cell_num, 1)
         mask_has_ball = mask_has_ball.view(self.num_groups*self.cell_num*self.cell_num).bool()
 
-        each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
+        each_probs = pred_probs.view(self.num_groups, self.cell_num, self.cell_num)
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(self.num_groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
         # 計算 hit v2 效果
         # 先填充 hit 前後兩幀
         frame_idx = 0
-        while frame_idx < 10:
+        while frame_idx < self.num_groups:
             if batch_target[frame_idx][6] == 1:
                 # 檢查並設定範圍內的相鄰元素
                 if frame_idx - 2 >= 0:
@@ -635,7 +635,7 @@ class TrackNetValidator(BaseValidator):
                 frame_idx += 1
 
         
-        for frame_idx in range(10):
+        for frame_idx in range(self.num_groups):
             label = ''
             
             p_cell_x = each_pos_x[frame_idx]
@@ -1054,7 +1054,8 @@ class TrackNetValidatorV2(BaseValidator):
         else:
             self.stride = model.model.stride[0]
         self.cell_num = int(640/self.stride)
-        self.num_groups = 10
+        m = model.model[-1] if hasattr(model, "model") else model
+        self.num_groups = getattr(m, "num_groups", 10)
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -1081,11 +1082,11 @@ class TrackNetValidatorV2(BaseValidator):
         self.ball_count = 0
         self.pred_ball_count = 0
         device = device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.reg_max = 20
+        self.reg_max = getattr(m, "reg_max", 20)
         self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
-        self.no = 33
-        self.feat_no = 2
-        self.nc = 1
+        self.feat_no = getattr(m, "feat_no", 2)
+        self.nc = getattr(m, "nc", 1)
+        self.no = self.reg_max * self.feat_no + self.nc + getattr(m, "dxdy_no", 2)
 
         self.fast_count = 0
         self.hit_count = 0
@@ -1215,13 +1216,13 @@ class TrackNetValidatorV2(BaseValidator):
         mask_fast_hit_ball = (mask_fast_ball.bool()|mask_hit_ball_v2.bool()).float()
         self.fast_hit_count += mask_fast_hit_ball.sum()
 
-        each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y = pred_pos.view(10, self.cell_num, self.cell_num, 2).split([1, 1], dim=3)
+        each_probs = pred_probs.view(self.num_groups, self.cell_num, self.cell_num)
+        each_pos_x, each_pos_y = pred_pos.view(self.num_groups, self.cell_num, self.cell_num, 2).split([1, 1], dim=3)
 
         # 計算 hit v2 效果
         # 先填充 hit 前後兩幀
         frame_idx = 0
-        while frame_idx < 10:
+        while frame_idx < self.num_groups:
             if batch_target[frame_idx][6] == 1:
                 # 檢查並設定範圍內的相鄰元素
                 if frame_idx - 2 >= 0:
@@ -1239,7 +1240,7 @@ class TrackNetValidatorV2(BaseValidator):
 
         
         
-        for frame_idx in range(10):
+        for frame_idx in range(self.num_groups):
             label = ''
             if mask_fast_ball[frame_idx] == 1:
                 label += '_fast_'
