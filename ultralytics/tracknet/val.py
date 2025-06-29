@@ -397,8 +397,8 @@ class TrackNetValidatorV4(BaseValidator):
 
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
-        
-        groups = max(1, a // (self.cell_num * self.cell_num))
+
+        groups = max(1, pred_probs.shape[0] // (self.cell_num * self.cell_num))
 
         each_probs = pred_probs.view(groups, self.cell_num, self.cell_num)
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
@@ -590,7 +590,7 @@ class TrackNetValidator(BaseValidator):
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
 
-        groups = max(1, a // (self.cell_num * self.cell_num))
+        groups = max(1, pred_probs.shape[0] // (self.cell_num * self.cell_num))
 
         mask_has_ball = torch.zeros(groups, self.cell_num, self.cell_num, device=self.device)
         cls_targets = torch.zeros(groups, self.cell_num, self.cell_num, 1, device=self.device)
