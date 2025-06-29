@@ -581,12 +581,15 @@ class TrackNetValidator(BaseValidator):
         pred_distri = pred_distri.permute(1, 0).contiguous()
 
         pred_probs = torch.sigmoid(pred_scores)
-        # pred_probs = [10*self.cell_num*self.cell_num]
-        
+        # pred_probs = [num_groups*cell_num*cell_num]
+
         a, c = pred_distri.shape
 
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
+
+        groups = max(1, a // (self.cell_num * self.cell_num))
+        groups = min(groups, self.num_groups)
         
         mask_has_ball = torch.zeros(self.num_groups, self.cell_num, self.cell_num, device=self.device)
         cls_targets = torch.zeros(self.num_groups, self.cell_num, self.cell_num, 1, device=self.device)
@@ -612,13 +615,13 @@ class TrackNetValidator(BaseValidator):
         cls_targets = cls_targets.view(self.num_groups*self.cell_num*self.cell_num, 1)
         mask_has_ball = mask_has_ball.view(self.num_groups*self.cell_num*self.cell_num).bool()
 
-        each_probs = pred_probs.view(self.num_groups, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(self.num_groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
+        each_probs = pred_probs.view(groups, self.cell_num, self.cell_num)
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
         # 計算 hit v2 效果
         # 先填充 hit 前後兩幀
         frame_idx = 0
-        while frame_idx < self.num_groups:
+        while frame_idx < groups:
             if batch_target[frame_idx][6] == 1:
                 # 檢查並設定範圍內的相鄰元素
                 if frame_idx - 2 >= 0:
@@ -635,7 +638,7 @@ class TrackNetValidator(BaseValidator):
                 frame_idx += 1
 
         
-        for frame_idx in range(self.num_groups):
+        for frame_idx in range(groups):
             label = ''
             
             p_cell_x = each_pos_x[frame_idx]
