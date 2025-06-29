@@ -552,10 +552,10 @@ class BaseTrainer:
         self.scaler.unscale_(self.optimizer)  # unscale gradients
         torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=10.0)  # clip gradients
         self.scaler.step(self.optimizer)
+        self.scaler.update()
         if self.scheduler:
             self.scheduler.step()
             self.lr = {f'lr/pg{ir}': x['lr'] for ir, x in enumerate(self.optimizer.param_groups)}
-        self.scaler.update()
         self.optimizer.zero_grad()
         if self.ema:
             self.ema.update(self.model)
