@@ -106,7 +106,7 @@ class TrackNetValidatorV3(BaseValidator):
         pred_dxdy = pred_dxdy.permute(1, 0).contiguous()
         pred_dxdy = torch.tanh(pred_dxdy)
 
-        pred_probs = torch.sigmoid(pred_scores)
+        pred_probs = torch.sigmoid(pred_scores).view(-1)
         # pred_probs = [10*20*20]
         
         a, c = pred_distri.shape
@@ -291,7 +291,8 @@ class TrackNetValidatorV4(BaseValidator):
         else:
             self.stride = model.model.stride[0]
         self.cell_num = int(640/self.stride)
-        self.num_groups = 10
+        m = model.model[-1] if hasattr(model, "model") else model
+        self.num_groups = getattr(m, "num_groups", 10)
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -351,7 +352,7 @@ class TrackNetValidatorV4(BaseValidator):
         self.cumulative_TN = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
         self.fitness = 0
 
-        self.frame_10_metrics = deque(maxlen=10)
+        self.frame_10_metrics = deque(maxlen=self.num_groups)
     
     def update_metrics(self, preds, batch):
         """Calculate and update metrics based on predictions and batch."""
@@ -383,8 +384,10 @@ class TrackNetValidatorV4(BaseValidator):
             
 
 
-        feats = pred.clone()
-        pred_distri, pred_scores = feats.view(self.no, -1).split(
+        c, h, w = pred.shape
+        groups = max(1, c // self.no)
+        feats = pred[:groups * self.no].view(groups, self.no, h, w).view(self.no, -1)
+        pred_distri, pred_scores = feats.split(
             (self.reg_max * self.feat_no, self.nc), 0)
         
         pred_scores = pred_scores.permute(1, 0).contiguous()
@@ -396,11 +399,17 @@ class TrackNetValidatorV4(BaseValidator):
 
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
-        
-        each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
-        for frame_idx in range(10):
+        # derive group count from probability length accounting for class channels
+        groups_from_probs = max(1, pred_probs.numel() // (self.cell_num * self.cell_num * self.nc))
+
+        pred_probs = pred_probs.view(groups_from_probs, self.nc, self.cell_num, self.cell_num)
+        each_probs = pred_probs[:, 0]
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups_from_probs, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
+
+        groups_eval = min(groups, groups_from_probs)
+
+        for frame_idx in range(groups_eval):
             p_cell_x = each_pos_x[frame_idx]
             p_cell_y = each_pos_y[frame_idx]
             p_cell_nx = each_pos_nx[frame_idx]
@@ -511,7 +520,8 @@ class TrackNetValidator(BaseValidator):
         else:
             self.stride = model.model.stride[0]
         self.cell_num = int(640/self.stride)
-        self.num_groups = 10
+        m = model.model[-1] if hasattr(model, "model") else model
+        self.num_groups = getattr(m, "num_groups", 10)
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -526,11 +536,11 @@ class TrackNetValidator(BaseValidator):
         self.ball_count = 0
         self.pred_ball_count = 0
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.reg_max = 16
+        self.reg_max = getattr(m, "reg_max", 16)
+        self.feat_no = getattr(m, "feat_no", 8)
+        self.nc = getattr(m, "nc", 1)
+        self.no = self.reg_max * self.feat_no + self.nc
         self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
-        self.feat_no = 8
-        self.nc = 1
-        self.no = 16*self.feat_no+self.nc
 
         # 一顆球半徑 = 2 pixel (640*640)
         self.tolerance2 = 2.0 # 50% 距離容忍度
@@ -547,18 +557,21 @@ class TrackNetValidator(BaseValidator):
         self.fitness = 0
         self.avg_ap = 0
 
-        self.frame_10_metrics = deque(maxlen=10)
+        self.frame_10_metrics = deque(maxlen=self.num_groups)
     
     def update_metrics(self, preds, batch, loss):
         """Calculate and update metrics based on predictions and batch."""
         # Placeholder for loss calculation, etc.
         # preds = [[batch*50*20*20]]
         # batch['target'] = [batch*10*6]
-        preds = preds[1][0] # only pick first (stride = 32)
+        # predictions are returned as (det_out, (features, kpt))
+        preds = preds[1]
+        while isinstance(preds, (list, tuple)) and len(preds):
+            preds = preds[0]  # keep first element until tensor
         batch_target = batch['target']
         batch_img = batch['img']
         batch_img_file = batch['img_files']
-        if len(preds.shape) == 3:
+        if hasattr(preds, 'shape') and len(preds.shape) == 3:
             self.update_metrics_once(0, preds, batch_target[0], batch_img[0], loss)
         else:
             # for each batch
@@ -568,26 +581,33 @@ class TrackNetValidator(BaseValidator):
     def update_metrics_once(self, batch_idx, pred, batch_target, batch_img, loss):
         # pred = [330 * self.cell_num * self.cell_num]
         # batch_target = [10*7]
-        feats = pred.clone()
-        pred_distri, pred_scores = feats.view(self.no, -1).split(
+        c, h, w = pred.shape
+        groups = max(1, c // self.no)
+        # limit groups to available targets to avoid shape mismatch
+        groups = min(groups, len(batch_target))
+        feats = pred[:groups * self.no].view(groups, self.no, h, w).view(self.no, -1)
+        pred_distri, pred_scores = feats.split(
             (self.reg_max * self.feat_no, self.nc), 0)
         
         pred_scores = pred_scores.permute(1, 0).contiguous()
         pred_distri = pred_distri.permute(1, 0).contiguous()
 
-        pred_probs = torch.sigmoid(pred_scores)
-        # pred_probs = [10*self.cell_num*self.cell_num]
-        
+        pred_probs = torch.sigmoid(pred_scores).view(-1)
+        # derive group count from probability length accounting for class channels
+        groups_from_probs = max(1, pred_probs.numel() // (self.cell_num * self.cell_num * self.nc))
+
         a, c = pred_distri.shape
 
         pred_pos = pred_distri.view(a, self.feat_no, c // self.feat_no).softmax(2).matmul(
             self.proj.type(pred_distri.dtype))
-        
-        mask_has_ball = torch.zeros(self.num_groups, self.cell_num, self.cell_num, device=self.device)
-        cls_targets = torch.zeros(self.num_groups, self.cell_num, self.cell_num, 1, device=self.device)
+
+        # groups already limited above based on available targets
+        groups_eval = min(groups, groups_from_probs)
+        mask_has_ball = torch.zeros(groups_eval, self.cell_num, self.cell_num, device=self.device)
+        cls_targets = torch.zeros(groups_eval, self.cell_num, self.cell_num, 1, device=self.device)
         
         for target_idx, target in enumerate(batch_target):
-            if target_idx >= self.num_groups:
+            if target_idx >= groups_eval:
                 break
             grid_x, grid_y, offset_x, offset_y = target_grid(target[2], target[3], self.stride)
             if grid_x >= 80:
@@ -604,16 +624,17 @@ class TrackNetValidator(BaseValidator):
                 ## cls
                 cls_targets[target_idx, grid_y, grid_x, 0] = 1
         
-        cls_targets = cls_targets.view(self.num_groups*self.cell_num*self.cell_num, 1)
-        mask_has_ball = mask_has_ball.view(self.num_groups*self.cell_num*self.cell_num).bool()
+        cls_targets = cls_targets.view(groups_eval * self.cell_num * self.cell_num, 1)
+        mask_has_ball = mask_has_ball.view(groups_eval * self.cell_num * self.cell_num).bool()
 
-        each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(10, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
+        pred_probs = pred_probs.view(groups_from_probs, self.nc, self.cell_num, self.cell_num)
+        each_probs = pred_probs[:, 0]
+        each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups_from_probs, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
         # 計算 hit v2 效果
         # 先填充 hit 前後兩幀
         frame_idx = 0
-        while frame_idx < 10:
+        while frame_idx < groups_eval:
             if batch_target[frame_idx][6] == 1:
                 # 檢查並設定範圍內的相鄰元素
                 if frame_idx - 2 >= 0:
@@ -630,7 +651,7 @@ class TrackNetValidator(BaseValidator):
                 frame_idx += 1
 
         
-        for frame_idx in range(10):
+        for frame_idx in range(groups_eval):
             label = ''
             
             p_cell_x = each_pos_x[frame_idx]
@@ -1049,7 +1070,8 @@ class TrackNetValidatorV2(BaseValidator):
         else:
             self.stride = model.model.stride[0]
         self.cell_num = int(640/self.stride)
-        self.num_groups = 10
+        m = model.model[-1] if hasattr(model, "model") else model
+        self.num_groups = getattr(m, "num_groups", 10)
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -1076,11 +1098,11 @@ class TrackNetValidatorV2(BaseValidator):
         self.ball_count = 0
         self.pred_ball_count = 0
         device = device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.reg_max = 20
+        self.reg_max = getattr(m, "reg_max", 20)
         self.proj = torch.arange(self.reg_max, dtype=torch.float, device=device)
-        self.no = 33
-        self.feat_no = 2
-        self.nc = 1
+        self.feat_no = getattr(m, "feat_no", 2)
+        self.nc = getattr(m, "nc", 1)
+        self.no = self.reg_max * self.feat_no + self.nc + getattr(m, "dxdy_no", 2)
 
         self.fast_count = 0
         self.hit_count = 0
@@ -1133,7 +1155,7 @@ class TrackNetValidatorV2(BaseValidator):
         pred_scores = pred_scores.permute(1, 0).contiguous()
         pred_distri = pred_distri.permute(1, 0).contiguous()
 
-        pred_probs = torch.sigmoid(pred_scores)
+        pred_probs = torch.sigmoid(pred_scores).view(-1)
         # pred_probs = [10*self.cell_num*self.cell_num]
         
         a, c = pred_distri.shape
@@ -1210,13 +1232,14 @@ class TrackNetValidatorV2(BaseValidator):
         mask_fast_hit_ball = (mask_fast_ball.bool()|mask_hit_ball_v2.bool()).float()
         self.fast_hit_count += mask_fast_hit_ball.sum()
 
-        each_probs = pred_probs.view(10, self.cell_num, self.cell_num)
-        each_pos_x, each_pos_y = pred_pos.view(10, self.cell_num, self.cell_num, 2).split([1, 1], dim=3)
+        pred_probs = pred_probs.view(self.num_groups, self.nc, self.cell_num, self.cell_num)
+        each_probs = pred_probs[:, 0]
+        each_pos_x, each_pos_y = pred_pos.view(self.num_groups, self.cell_num, self.cell_num, 2).split([1, 1], dim=3)
 
         # 計算 hit v2 效果
         # 先填充 hit 前後兩幀
         frame_idx = 0
-        while frame_idx < 10:
+        while frame_idx < self.num_groups:
             if batch_target[frame_idx][6] == 1:
                 # 檢查並設定範圍內的相鄰元素
                 if frame_idx - 2 >= 0:
@@ -1234,7 +1257,7 @@ class TrackNetValidatorV2(BaseValidator):
 
         
         
-        for frame_idx in range(10):
+        for frame_idx in range(self.num_groups):
             label = ''
             if mask_fast_ball[frame_idx] == 1:
                 label += '_fast_'
@@ -1630,7 +1653,7 @@ class TrackNetValidatorWithHit(BaseValidator):
         # pred = [50 * 20 * 20]
         # batch_target = [10*6]
         pred_distri, pred_scores, pred_hits = torch.split(pred, [40, 10, 10], dim=0)
-        pred_probs = torch.sigmoid(pred_scores)
+        pred_probs = torch.sigmoid(pred_scores).view(-1)
         # pred_probs = [10*20*20]
         
         pred_pos, pred_mov = torch.split(pred_distri, [20, 20], dim=0)

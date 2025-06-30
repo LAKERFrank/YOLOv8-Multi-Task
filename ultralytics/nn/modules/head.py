@@ -381,9 +381,10 @@ class Pose(Detect):
         """Perform forward pass through YOLO model and return predictions."""
         bs = x[0].shape[0]  # batch size
         if not self.training and (self.anchors.numel() == 0 or self.shape != x[0].shape):
-            self.anchors, self.strides = (y.transpose(0, 1) for y in make_anchors(x, self.stride, 0.5))
+            # use the first detection level to match detection output size
+            self.anchors, self.strides = (y.transpose(0, 1) for y in make_anchors([x[0]], self.stride[:1], 0.5))
             self.shape = x[0].shape
-        kpt = torch.cat([self.cv4[i](x[i]).view(bs, self.nk, -1) for i in range(self.nl)], -1)  # (bs, 17*3, h*w)
+        kpt = self.cv4[0](x[0]).view(bs, self.nk, -1)  # (bs, nk, groups*h*w)
         x = self.detect(self, x)
         if self.training:
             return x, kpt
@@ -393,9 +394,15 @@ class Pose(Detect):
     def kpts_decode(self, bs, kpts):
         """Decodes keypoints."""
         ndim = self.kpt_shape[1]
+        anchors, strides = self.anchors, self.strides
+        if kpts.shape[-1] != anchors.shape[1]:  # repeat anchors for multiple groups
+            repeat = kpts.shape[-1] // anchors.shape[1]
+            anchors = anchors.repeat(1, repeat)
+            strides = strides.repeat(1, repeat)
+
         if self.export:  # required for TFLite export to avoid 'PLACEHOLDER_FOR_GREATER_OP_CODES' bug
             y = kpts.view(bs, *self.kpt_shape, -1)
-            a = (y[:, :, :2] * 2.0 + (self.anchors - 0.5)) * self.strides
+            a = (y[:, :, :2] * 2.0 + (anchors - 0.5)) * strides
             if ndim == 3:
                 a = torch.cat((a, y[:, :, 2:3].sigmoid()), 2)
             return a.view(bs, self.nk, -1)
@@ -403,8 +410,8 @@ class Pose(Detect):
             y = kpts.clone()
             if ndim == 3:
                 y[:, 2::3].sigmoid_()  # inplace sigmoid
-            y[:, 0::ndim] = (y[:, 0::ndim] * 2.0 + (self.anchors[0] - 0.5)) * self.strides
-            y[:, 1::ndim] = (y[:, 1::ndim] * 2.0 + (self.anchors[1] - 0.5)) * self.strides
+            y[:, 0::ndim] = (y[:, 0::ndim] * 2.0 + (anchors[0] - 0.5)) * strides
+            y[:, 1::ndim] = (y[:, 1::ndim] * 2.0 + (anchors[1] - 0.5)) * strides
             return y
 
 
