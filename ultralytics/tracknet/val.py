@@ -343,8 +343,10 @@ class TrackNetValidatorV4(BaseValidator):
         self.tolerance2 = 2.0 # 50% 距離容忍度
         self.tolerance3 = 3.0
         self.tolerance5 = 2.0
-        self.conf_thresholds = [i * 0.05 for i in range(1, 20)]  # [0.5, 0.55, ..., 0.95]
-        self.iou_dist_thresholds = [i * 1 for i in range(1, 6)]  # [1, 2, ..., 5]
+        # confidence thresholds from 0.00 to 0.95 with 0.05 step
+        self.conf_thresholds = [i * 0.05 for i in range(20)]  # [0.0, 0.05, ..., 0.95]
+        # distance tolerance from 0.5 to 5 pixels with 0.5 step
+        self.iou_dist_thresholds = [i * 0.5 for i in range(1, 11)]  # [0.5, 1.0, ..., 5.0]
         
         self.cumulative_TP = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
         self.cumulative_FP = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
@@ -547,8 +549,10 @@ class TrackNetValidator(BaseValidator):
         self.tolerance3 = 3.0
         self.tolerance4 = 4.0
         self.tolerance5 = 5.0
-        self.conf_thresholds = [i * 0.05 for i in range(1, 20)]  # [0.5, 0.55, ..., 0.95]
-        self.iou_dist_thresholds = [i * 1 for i in range(1, 6)]  # [1, 2, ..., 5]
+        # confidence thresholds from 0.00 to 0.95 with 0.05 step
+        self.conf_thresholds = [i * 0.05 for i in range(20)]  # [0.0, 0.05, ..., 0.95]
+        # distance tolerance from 0.5 to 5 pixels with 0.5 step
+        self.iou_dist_thresholds = [i * 0.5 for i in range(1, 11)]  # [0.5, 1.0, ..., 5.0]
         
         self.cumulative_TP = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
         self.cumulative_FP = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
@@ -1120,8 +1124,10 @@ class TrackNetValidatorV2(BaseValidator):
 
         # 一顆球半徑 = 3 pixel
         self.tolerance3 = 3.0 # 50% 距離容忍度
-        self.conf_thresholds = [i * 0.05 for i in range(1, 20)]  # [0.5, 0.55, ..., 0.95]
-        self.iou_dist_thresholds = [i * 1 for i in range(1, 6)]  # [1, 2, ..., 5]
+        # confidence thresholds from 0.00 to 0.95 with 0.05 step
+        self.conf_thresholds = [i * 0.05 for i in range(20)]  # [0.0, 0.05, ..., 0.95]
+        # distance tolerance from 0.5 to 5 pixels with 0.5 step
+        self.iou_dist_thresholds = [i * 0.5 for i in range(1, 11)]  # [0.5, 1.0, ..., 5.0]
         
         self.cumulative_TP = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
         self.cumulative_FP = [[0 for _ in self.conf_thresholds] for _ in self.iou_dist_thresholds]
