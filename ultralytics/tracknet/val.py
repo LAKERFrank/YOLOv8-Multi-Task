@@ -57,6 +57,7 @@ class TrackNetValidatorV3(BaseValidator):
         if hasattr(base_model, '__getitem__'):
             base_model = base_model[-1]
         self.num_groups = getattr(base_model, 'num_groups', 10)
+        m = base_model
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -298,6 +299,7 @@ class TrackNetValidatorV4(BaseValidator):
         if hasattr(base_model, '__getitem__'):
             base_model = base_model[-1]
         self.num_groups = getattr(base_model, "num_groups", 10)
+        m = base_model
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -529,6 +531,7 @@ class TrackNetValidator(BaseValidator):
         if hasattr(base_model, '__getitem__'):
             base_model = base_model[-1]
         self.num_groups = getattr(base_model, "num_groups", 10)
+        m = base_model
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -1081,6 +1084,7 @@ class TrackNetValidatorV2(BaseValidator):
         if hasattr(base_model, '__getitem__'):
             base_model = base_model[-1]
         self.num_groups = getattr(base_model, "num_groups", 10)
+        m = base_model
 
         self.total_loss = 0.0
         self.num_samples = 0
