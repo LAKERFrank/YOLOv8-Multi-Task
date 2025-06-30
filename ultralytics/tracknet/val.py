@@ -393,7 +393,7 @@ class TrackNetValidatorV4(BaseValidator):
         pred_scores = pred_scores.permute(1, 0).contiguous()
         pred_distri = pred_distri.permute(1, 0).contiguous()
 
-        pred_probs = torch.sigmoid(pred_scores).view(-1)
+        pred_probs = torch.sigmoid(pred_scores)
 
         a, c = pred_distri.shape
 
@@ -403,7 +403,8 @@ class TrackNetValidatorV4(BaseValidator):
         # derive group count from probability length accounting for class channels
         groups_from_probs = max(1, pred_probs.numel() // (self.cell_num * self.cell_num * self.nc))
 
-        each_probs = pred_probs.view(groups_from_probs, self.cell_num, self.cell_num)
+        pred_probs = pred_probs.view(groups_from_probs, self.nc, self.cell_num, self.cell_num)
+        each_probs = pred_probs[:, 0]
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups_from_probs, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
         groups_eval = min(groups, groups_from_probs)
@@ -626,7 +627,8 @@ class TrackNetValidator(BaseValidator):
         cls_targets = cls_targets.view(groups_eval * self.cell_num * self.cell_num, 1)
         mask_has_ball = mask_has_ball.view(groups_eval * self.cell_num * self.cell_num).bool()
 
-        each_probs = pred_probs.view(groups_from_probs, self.cell_num, self.cell_num)
+        pred_probs = pred_probs.view(groups_from_probs, self.nc, self.cell_num, self.cell_num)
+        each_probs = pred_probs[:, 0]
         each_pos_x, each_pos_y, each_pos_nx, each_pos_ny = pred_pos.view(groups_from_probs, self.cell_num, self.cell_num, self.feat_no).split([2, 2, 2, 2], dim=3)
 
         # 計算 hit v2 效果
@@ -1230,7 +1232,8 @@ class TrackNetValidatorV2(BaseValidator):
         mask_fast_hit_ball = (mask_fast_ball.bool()|mask_hit_ball_v2.bool()).float()
         self.fast_hit_count += mask_fast_hit_ball.sum()
 
-        each_probs = pred_probs.view(self.num_groups, self.cell_num, self.cell_num)
+        pred_probs = pred_probs.view(self.num_groups, self.nc, self.cell_num, self.cell_num)
+        each_probs = pred_probs[:, 0]
         each_pos_x, each_pos_y = pred_pos.view(self.num_groups, self.cell_num, self.cell_num, 2).split([1, 1], dim=3)
 
         # 計算 hit v2 效果
