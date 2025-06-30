@@ -140,7 +140,8 @@ class BaseValidator:
             self.dataloader = self.dataloader or self.get_dataloader(self.data.get(self.args.split), self.args.batch)
 
             model.eval()
-            model.warmup(imgsz=(1 if pt else self.args.batch, 10, imgsz, imgsz))  # warmup
+            in_ch = self.data.get('in_channels', 10)
+            model.warmup(imgsz=(1 if pt else self.args.batch, in_ch, imgsz, imgsz))  # warmup
 
         dt = Profile(), Profile(), Profile(), Profile()
         n_batches = len(self.dataloader)
