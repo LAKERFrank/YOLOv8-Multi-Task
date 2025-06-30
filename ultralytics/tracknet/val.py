@@ -53,7 +53,11 @@ class TrackNetValidatorV3(BaseValidator):
         """Initialize some metrics."""
         # Placeholder for any metrics you might want to use.
         self.stride = 32
-        self.num_groups = getattr(model.model[-1], 'num_groups', 10)
+        base_model = getattr(model, 'model', model)
+        if hasattr(base_model, '__getitem__'):
+            base_model = base_model[-1]
+        self.num_groups = getattr(base_model, 'num_groups', 10)
+        m = base_model
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -289,10 +293,13 @@ class TrackNetValidatorV4(BaseValidator):
         if isinstance(model.stride, torch.Tensor):
             self.stride = model.stride[0]
         else:
-            self.stride = model.model.stride[0]
+            self.stride = getattr(model, 'model', model).stride[0]
         self.cell_num = int(640/self.stride)
-        m = model.model[-1] if hasattr(model, "model") else model
-        self.num_groups = getattr(m, "num_groups", 10)
+        base_model = getattr(model, 'model', model)
+        if hasattr(base_model, '__getitem__'):
+            base_model = base_model[-1]
+        self.num_groups = getattr(base_model, "num_groups", 10)
+        m = base_model
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -518,10 +525,13 @@ class TrackNetValidator(BaseValidator):
         if isinstance(model.stride, torch.Tensor):
             self.stride = model.stride[0]
         else:
-            self.stride = model.model.stride[0]
+            self.stride = getattr(model, 'model', model).stride[0]
         self.cell_num = int(640/self.stride)
-        m = model.model[-1] if hasattr(model, "model") else model
-        self.num_groups = getattr(m, "num_groups", 10)
+        base_model = getattr(model, 'model', model)
+        if hasattr(base_model, '__getitem__'):
+            base_model = base_model[-1]
+        self.num_groups = getattr(base_model, "num_groups", 10)
+        m = base_model
 
         self.total_loss = 0.0
         self.num_samples = 0
@@ -1068,10 +1078,13 @@ class TrackNetValidatorV2(BaseValidator):
         if isinstance(model.stride, torch.Tensor):
             self.stride = model.stride[0]
         else:
-            self.stride = model.model.stride[0]
+            self.stride = getattr(model, 'model', model).stride[0]
         self.cell_num = int(640/self.stride)
-        m = model.model[-1] if hasattr(model, "model") else model
-        self.num_groups = getattr(m, "num_groups", 10)
+        base_model = getattr(model, 'model', model)
+        if hasattr(base_model, '__getitem__'):
+            base_model = base_model[-1]
+        self.num_groups = getattr(base_model, "num_groups", 10)
+        m = base_model
 
         self.total_loss = 0.0
         self.num_samples = 0
