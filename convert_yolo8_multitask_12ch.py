@@ -17,8 +17,7 @@ from pathlib import Path
 import re
 import torch
 import yaml
-# from ultralytics import YOLO
-from ultralytics.engine.model import Model
+from ultralytics import YOLO
 
 # ====== 依實際模型 YAML 調整 ======
 FIRST_KEY = "model.0.conv.weight"  # 第一層 conv 權重在 state_dict 裡的 key
@@ -126,8 +125,7 @@ def main():
     # load yaml & init model (以 YAML 定義的 in_channels=12)
     with open(args.yaml, "r") as f:
         cfg_dict = yaml.safe_load(f)
-    # model = YOLO(args.yaml).model
-    model = Model(cfg_dict, verbose=False)
+    model = YOLO(args.yaml).model
     sd_ref = model.state_dict()  # 參考 shape
 
     # load ckpts
