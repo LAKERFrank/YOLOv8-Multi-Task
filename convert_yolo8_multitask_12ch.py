@@ -22,7 +22,8 @@ from ultralytics.engine.model import Model
 
 # ====== 依實際模型 YAML 調整 ======
 FIRST_KEY = "model.0.conv.weight"  # 第一層 conv 權重在 state_dict 裡的 key
-DETECT_KEY_PATTERN = re.compile(r"model\.(\d+)\.cv[23]\.(?:weight|bias)$")
+# Detect head cls conv keys appear as 'model.22.cv3.0.2.weight' etc.
+DETECT_KEY_PATTERN = re.compile(r"model\.(\d+)\.cv3\.\d+\.2\.(?:weight|bias)$")
 # =================================
 
 def load_state_dict(path: str):
@@ -148,5 +149,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 # 用法：python3 convert_yolo8_multitask_12ch.py --ckpt_pose ./ultralytics/multitask/weights/yolov8n-pose-gray-2ch.pt --ckpt_trk ./ultralytics/multitask/weights/tracknet1000.pt --yaml ./ultralytics/models/v8/yolov8-multi_12ch.yaml
