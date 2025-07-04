@@ -812,10 +812,10 @@ class FocalLossWithMask(nn.Module):
     def top_k_sampling(self, loss, labels, negative_ratio=3.0):
         """Select the hardest negative samples for focal loss."""
 
-        if loss.ndim == 3 and loss.size(-1) > 1:
-            loss = loss[..., 1]
-        if labels.ndim == 3 and labels.size(-1) > 1:
-            labels = labels[..., 1]
+        if loss.ndim == 3:
+            loss = loss[..., 1] if loss.size(-1) > 1 else loss.squeeze(-1)
+        if labels.ndim == 3:
+            labels = labels[..., 1] if labels.size(-1) > 1 else labels.squeeze(-1)
 
         pos_mask = labels > 0
         num_pos = pos_mask.sum(dim=1, keepdim=True)
