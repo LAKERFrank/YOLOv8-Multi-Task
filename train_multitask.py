@@ -5,8 +5,8 @@
 此腳本等同於執行下列指令::
 
     yolo train \
-        model=./ultralytics/multitask/weights/multi_11ch_merged.pt \
-        data=ultralytics/datasets/multi_11ch.yaml \
+        model=./ultralytics/multitask/weights/multi_12ch_merged.pt \
+        data=ultralytics/datasets/multi_12ch.yaml \
         epochs=300 imgsz=640 device=0 \
         lr0=0.01 optimizer=SGD \
         freeze_layers=3
@@ -23,12 +23,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train YOLO multi-task model")
     parser.add_argument(
         "--model",
-        default="./ultralytics/multitask/weights/multi_11ch_merged.pt",
+        default="./ultralytics/multitask/weights/multi_12ch_merged.pt",
         help="模型權重或配置路徑",
     )
     parser.add_argument(
         "--data",
-        default="ultralytics/datasets/multi_11ch.yaml",
+        default="ultralytics/datasets/multi_12ch.yaml",
         help="資料設定檔",
     )
     parser.add_argument("--epochs", type=int, default=300, help="訓練週期數")

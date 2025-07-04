@@ -5,8 +5,8 @@ val: images/val
 test: images/test
 
 # Input configuration
-# The dataset contains 11 grayscale frames stacked as channels.
-in_channels: 11
+# The dataset contains 12 grayscale frames stacked as channels.
+in_channels: 12
 # Detection classes
 nc: 2
 names:
