@@ -877,7 +877,17 @@ class FocalLossWithMask(nn.Module):
 
         w = (alpha/(1-alpha))
 
-        loss = loss * relevant_mask.unsqueeze(-1).float()
+        # The mask lacks the class dimension. Insert it at the same location as
+        # the class channel to avoid mismatched shapes when C is not last.
+        if pred.shape[-1] == 2:
+            mask = relevant_mask.unsqueeze(-1)
+        elif pred.shape[1] == 2:
+            mask = relevant_mask.unsqueeze(1)
+        else:
+            # Fallback to the last dimension to maintain previous behaviour
+            mask = relevant_mask.unsqueeze(-1)
+
+        loss = loss * mask.float()
 
         # loss[FN_mask] *= negative_ratio*20*w
         # loss[FP_mask & ~may_has_ball] *= negative_ratio*15*w
