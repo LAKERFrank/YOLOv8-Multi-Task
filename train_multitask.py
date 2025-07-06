@@ -15,7 +15,7 @@
 """
 
 import argparse
-from ultralytics.tracknet.engine.model import TrackNet
+from ultralytics import YOLO
 
 
 def parse_args() -> argparse.Namespace:
@@ -62,8 +62,11 @@ def main() -> None:
         args.fraction = 0.01
         args.epochs = 1
 
-    overrides = {"model": args.model, "fraction": args.fraction}
-    model = TrackNet(overrides)
+    model = YOLO(args.model)
+    if args.freeze_layers:
+        for i, layer in enumerate(model.model.model[: args.freeze_layers]):
+            for param in layer.parameters():
+                param.requires_grad = False
     model.train(
         data=args.data,
         epochs=args.epochs,
@@ -72,7 +75,6 @@ def main() -> None:
         lr0=args.lr0,
         optimizer=args.optimizer,
         batch=args.batch,
-        freeze_layers=args.freeze_layers,
         use_resampler=args.use_resampler,
         fraction=args.fraction,
     )
